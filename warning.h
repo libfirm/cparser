@@ -7,23 +7,6 @@
 
 #include <stdbool.h>
 
-extern int use_colors; /**< Use colors in terminals supporting it 0 - nocolors, 1 - 8colors, 2 - 256colors */
-
-enum { NO_COLORS, COLORS_8, COLORS_256, TERM_LAST = COLORS_256 };
-enum { FATAL, ERROR, WARN, NOTE, HIGHLIGHT, RESET_HIGHLIGHT, RESET_ALL, STYLE_LAST = RESET_ALL };
-
-extern const char *const colors[TERM_LAST + 1][STYLE_LAST + 1];
-
-#define COL_F colors[use_colors][FATAL]
-#define COL_E colors[use_colors][ERROR]
-#define COL_W colors[use_colors][WARN]
-#define COL_H colors[use_colors][HIGHLIGHT]
-
-#define COL_RH colors[use_colors][RESET_HIGHLIGHT]
-#define COL_RA colors[use_colors][RESET_ALL]
-
-#define COL_X(c) colors[use_colors][c]
-
 void set_warning_opt(const char *opt);
 
 void disable_all_warnings(void);

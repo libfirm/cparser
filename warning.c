@@ -10,14 +10,7 @@
 #include "adt/util.h"
 #include "warning.h"
 #include "help.h"
-
-int use_colors = 0;
-
-const char *const colors[][STYLE_LAST + 1] = {
-	{               "",               "",               "",               "",        ""          "",        "" },
-	{       "\033[31m",       "\033[31m",       "\033[33m",     "\033[37;2m", "\033[1m", "\033[22m", "\033[0m" },
-	{ "\033[38;5;124m", "\033[38;5;160m", "\033[38;5;139m", "\033[38;5;008m", "\033[1m", "\033[22m", "\033[0m" },
-};
+#include "diagnostic.h"
 
 static warning_switch_t warning[] = {
 	[WARN_ADDRESS]                       = { WARN_STATE_ON,   "address"                       },
@@ -191,10 +184,8 @@ extra:
 	else if (streq(opt /* sic */, "error-implicit-function-declaration")) {
 		/* GCC legacy: This way it only can be activated. */
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
-	}
-	else {
-		fprintf(stderr, "%s%swarning:%s ignoring unknown option %s-W%s%s\n",
-		        COL_H, COL_W, COL_RA, COL_H, opt, COL_RA);
+	} else {
+		warningf(WARN_OTHER, NULL, "ignoring unknown option %hs%hs", "-W", opt);
 	}
 }
 

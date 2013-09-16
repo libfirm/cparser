@@ -250,11 +250,19 @@ static bool close_input(compilation_unit_t *unit)
 	return res;
 }
 
-static int check_term(int use)
+static int detect_color_terminal(void)
 {
-	if (use && !getenv("NO_COLOR") && getenv("TERM") && isatty(2))
-            return 1 + !!getenv("COLORTERM");
-        return 0;
+	/* we want to avoid bloated linking against termcap/ncurses, so we use a
+	 * simple detection heuristic (similar to one git uses) */
+	if (!isatty(1))
+		return 0;
+
+	char *term = getenv("TERM");
+	if (term == NULL || streq(term, "dumb"))
+		return 0;
+	if (strstr(term, "256color") != 0)
+		return 256;
+	return 8;
 }
 
 static void print_error_summary(void)
@@ -733,7 +741,8 @@ static void print_help_parser(void)
 	put_help("-fmessage-length=LEN",     "Ignored (gcc compatibility)");
 	put_help("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
 	put_help("-fshow-column",            "Show the column number in diagnostic messages");
-        put_help("-fcolor-diagnostics",      "Use colors in diagnostics");
+	put_help("-fcolor-diagnostics",      "Use colors in diagnostics");
+	put_help("-fdiagnostics-color",      "Use colors (gcc compatibility)");
 	put_help("-fsigned-char",            "Type \"char\" is a signed type");
 	put_help("-funsigned-char",          "Type \"char\" is an unsigned type");
 	put_help("--ms",                     "Enable msvc extensions");
@@ -2104,9 +2113,8 @@ int main(int argc, char **argv)
 	/* initialize this early because it has to parse options */
 	gen_firm_init();
 
-	/* check for terminal capabilities */
-
-	use_colors = check_term(1);
+	int colorterm = detect_color_terminal();
+	diagnostic_enable_color(colorterm);
 
 	/* early options parsing (find out optimization level and OS) */
 	bool argument_errors = false;
@@ -2309,8 +2317,11 @@ invalid_o_option:
 							: ATOMIC_TYPE_INT;
 					} else if (streq(opt, "show-column")) {
 						show_column = truth_value;
-					} else if (streq(opt, "color-diagnostics")) {
-						use_colors = check_term(truth_value);
+					} else if (streq(opt, "color-diagnostics")
+					        || streq(opt, "diagnostics-color")) {
+						diagnostic_enable_color(truth_value
+						    ? (colorterm != 0 ? colorterm : 8)
+						    : 0);
 					} else if (streq(opt, "signed-char")) {
 						char_is_signed = truth_value;
 					} else if (streq(opt, "strength-reduce")) {
