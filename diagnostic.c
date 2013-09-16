@@ -230,7 +230,7 @@ void notef(position_t const *const pos, char const *const fmt, ...)
 
 bool warningf(warning_t const warn, position_t const* pos, char const *const fmt, ...)
 {
-	if (pos->is_system_header && !is_warn_on(WARN_SYSTEM))
+	if (pos != NULL && pos->is_system_header && !is_warn_on(WARN_SYSTEM))
 		return false;
 
 	warning_switch_t const *const s = get_warn_switch(warn);
