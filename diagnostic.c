@@ -43,7 +43,7 @@ static const colorscheme_t colors_256 = {
 	.reset_highlight = "\033[22m",
 	.reset_all       = "\033[0m",
 };
-static colorscheme_t colors;
+static colorscheme_t colors = { "", "", "", "", "", "", "" };
 
 /** Number of occurred errors. */
 unsigned error_count             = 0;
