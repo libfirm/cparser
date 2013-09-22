@@ -1753,8 +1753,7 @@ static whitespace_info_t skip_whitespace(void)
 			wsinfo.whitespace_at_line_begin = 0;
 			if (stop_at_newline) {
 				--input.pos.lineno;
-				put_back(input.c);
-				input.c = '\n';
+				put_back('\n');
 				return wsinfo;
 			}
 			continue;
@@ -1984,8 +1983,7 @@ restart:
 		if (stop_at_newline) {
 			--input.pos.lineno;
 			set_punctuator(T_NEWLINE);
-			put_back(input.c);
-			input.c = '\n';
+			put_back('\n');
 			return;
 		}
 		goto restart;
