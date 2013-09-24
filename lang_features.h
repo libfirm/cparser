@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include "type.h"
+#include "driver/firm_machine.h"
 
 #define BITS_PER_BYTE    8
 
@@ -35,19 +36,25 @@ typedef struct c_dialect_t {
 	lang_features_t    features;
 } c_dialect_t;
 
+typedef struct target_t {
+	/**
+	 * whether architecture shift instructions usually perform modulo bit_size
+	 * on the shift amount, if yes this equals to the machine_size.
+	 */
+	unsigned int modulo_shift;
+	/** byte-order: true = big-endian, false = little-endian */
+	bool byte_order_big_endian : 1;
+	/** enable hack to add call to __main into the main function (mingw) */
+	bool enable_main_collect2_hack : 1;
+	/** parsed machine-triple of target machine. Try not to use this if possible
+	 * but create specific variables for language features instead. */
+	machine_triple_t *machine;
+	/** target triple as a string */
+	const char       *triple;
+	const char       *user_label_prefix;
+} target_t;
+
 extern c_dialect_t dialect;
-
-/**
- * whether architecture shift instructions usually perform modulo bit_size
- * on the shift amount, if yes this equals to the machine_size.
- */
-extern unsigned int architecture_modulo_shift;
-
-/** byte-order: true = big-endian, false = little-endian */
-extern bool byte_order_big_endian;
-
-/** a hack that adds a call to __main into the main function, necessary on
- * mingw */
-extern bool enable_main_collect2_hack;
+extern target_t    target;
 
 #endif

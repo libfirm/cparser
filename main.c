@@ -115,28 +115,23 @@ c_dialect_t dialect = {
 	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
 	.char_is_signed = true,
 };
-bool                byte_order_big_endian     = false;
-bool                enable_main_collect2_hack = false;
-unsigned            architecture_modulo_shift = 0;
+target_t target;
 
-static const char        *user_label_prefix   = "";
-static unsigned           features_on         = 0;
-static unsigned           features_off        = 0;
-static const char        *dumpfunction        = NULL;
-static struct obstack     file_obst;
-static const char        *external_preprocessor = PREPROCESSOR;
+static unsigned        features_on         = 0;
+static unsigned        features_off        = 0;
+static const char     *dumpfunction        = NULL;
+static struct obstack  file_obst;
+static const char     *external_preprocessor = PREPROCESSOR;
 
-static machine_triple_t *target_machine;
-static const char       *target_triple;
-static int               verbose;
-static struct obstack    cppflags_obst;
-static struct obstack    ldflags_obst;
-static struct obstack    asflags_obst;
-static struct obstack    codegenflags_obst;
-static const char       *asflags;
-static const char       *outname;
-static bool              construct_dep_target;
-static bool              dump_defines;
+static int             verbose;
+static struct obstack  cppflags_obst;
+static struct obstack  ldflags_obst;
+static struct obstack  asflags_obst;
+static struct obstack  codegenflags_obst;
+static const char     *asflags;
+static const char     *outname;
+static bool            construct_dep_target;
+static bool            dump_defines;
 
 typedef enum compile_mode_t {
 	MODE_BENCHMARK_PARSER,
@@ -369,8 +364,8 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 	if (preprocessor != NULL) {
 		obstack_printf(&cppflags_obst, "%s ", preprocessor);
 	} else {
-		if (target_triple != NULL)
-			obstack_printf(&cppflags_obst, "%s-", target_triple);
+		if (target.triple != NULL)
+			obstack_printf(&cppflags_obst, "%s-", target.triple);
 		obstack_printf(&cppflags_obst, "%s", external_preprocessor);
 	}
 
@@ -499,8 +494,8 @@ static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
 	if (assembler != NULL) {
 		obstack_printf(&asflags_obst, "%s", assembler);
 	} else {
-		if (target_triple != NULL)
-			obstack_printf(&asflags_obst, "%s-", target_triple);
+		if (target.triple != NULL)
+			obstack_printf(&asflags_obst, "%s-", target.triple);
 		obstack_printf(&asflags_obst, "%s", ASSEMBLER);
 	}
 	if (asflags[0] != '\0')
@@ -536,8 +531,8 @@ static void print_file_name(const char *file)
 	if (linker != NULL) {
 		obstack_printf(&ldflags_obst, "%s ", linker);
 	} else {
-		if (target_triple != NULL)
-			obstack_printf(&ldflags_obst, "%s-", target_triple);
+		if (target.triple != NULL)
+			obstack_printf(&ldflags_obst, "%s-", target.triple);
 		obstack_printf(&ldflags_obst, "%s ", LINKER);
 	}
 	obstack_printf(&ldflags_obst, "%s ", linker);
@@ -914,22 +909,22 @@ static compilation_unit_type_t get_unit_type_from_string(const char *string)
 
 static bool init_os_support(void)
 {
-	dialect.wchar_atomic_kind = ATOMIC_TYPE_INT;
-	dialect.intmax_predefs    = false;
-	enable_main_collect2_hack = false;
+	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
+	dialect.intmax_predefs           = false;
+	target.enable_main_collect2_hack = false;
 
-	if (firm_is_unixish_os(target_machine)) {
+	if (firm_is_unixish_os(target.machine)) {
 		set_create_ld_ident(create_name_linux_elf);
-		user_label_prefix = "";
-	} else if (firm_is_darwin_os(target_machine)) {
+		target.user_label_prefix = "";
+	} else if (firm_is_darwin_os(target.machine)) {
 		set_create_ld_ident(create_name_macho);
-		user_label_prefix = "_";
-		dialect.intmax_predefs = true;
-	} else if (firm_is_windows_os(target_machine)) {
-		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
-		enable_main_collect2_hack = true;
+		target.user_label_prefix = "_";
+		dialect.intmax_predefs   = true;
+	} else if (firm_is_windows_os(target.machine)) {
 		set_create_ld_ident(create_name_win32);
-		user_label_prefix = "_";
+		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
+		target.enable_main_collect2_hack = true;
+		target.user_label_prefix         = "_";
 	} else {
 		return false;
 	}
@@ -944,7 +939,7 @@ static bool parse_target_triple(const char *arg)
 		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
 		return false;
 	}
-	target_machine = triple;
+	target.machine = triple;
 	return true;
 }
 
@@ -968,10 +963,10 @@ static const char *setup_isa_from_triple(const machine_triple_t *machine)
 
 static const char *setup_target_machine(void)
 {
-	if (!setup_firm_for_machine(target_machine))
+	if (!setup_firm_for_machine(target.machine))
 		exit(1);
 
-	const char *isa = setup_isa_from_triple(target_machine);
+	const char *isa = setup_isa_from_triple(target.machine);
 
 	if (isa == NULL)
 		exit(1);
@@ -1027,8 +1022,8 @@ static void init_types_and_adjust(void)
 		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_ull);
 
 	/* operating system ABI specifics */
-	if (firm_is_darwin_os(target_machine)) {
-		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
+	if (firm_is_darwin_os(target.machine)) {
+		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
@@ -1036,8 +1031,8 @@ static void init_types_and_adjust(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
-	} else if (firm_is_windows_os(target_machine)) {
-		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
+	} else if (firm_is_windows_os(target.machine)) {
+		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
@@ -1050,8 +1045,8 @@ static void init_types_and_adjust(void)
 
 		/* on windows long double is not supported */
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-	} else if (firm_is_unixish_os(target_machine)) {
-		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
+	} else if (firm_is_unixish_os(target.machine)) {
+		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
@@ -1074,17 +1069,17 @@ static void init_types_and_adjust(void)
 		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
 
-	byte_order_big_endian = be_params->byte_order_big_endian;
+	target.byte_order_big_endian = be_params->byte_order_big_endian;
 	if (be_params->modulo_shift_efficient) {
-		architecture_modulo_shift = machine_size;
+		target.modulo_shift = machine_size;
 	} else {
-		architecture_modulo_shift = 0;
+		target.modulo_shift = 0;
 	}
 
 	/* initialize firm pointer modes */
 	char     name[64];
 	unsigned bit_size     = machine_size;
-	unsigned modulo_shift = architecture_modulo_shift;
+	unsigned modulo_shift = target.modulo_shift;
 
 	snprintf(name, sizeof(name), "p%u", machine_size);
 	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
@@ -1349,22 +1344,22 @@ static void add_standard_defines(void)
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
 
-	if (firm_is_unixish_os(target_machine)) {
+	if (firm_is_unixish_os(target.machine)) {
 		if (dialect.gnu)
 			add_define("unix",     "1", false);
 		add_define("__unix",   "1", false);
 		add_define("__unix__", "1", false);
 		add_define("__ELF__",  "1", false);
-		if (strstr(target_machine->operating_system, "linux") != NULL) {
+		if (strstr(target.machine->operating_system, "linux") != NULL) {
 			if (dialect.gnu)
 				add_define("linux",     "1", false);
 			add_define("__linux",   "1", false);
 			add_define("__linux__", "1", false);
-			if (strstr(target_machine->operating_system, "gnu") != NULL) {
+			if (strstr(target.machine->operating_system, "gnu") != NULL) {
 				add_define("__gnu_linux__", "1", false);
 			}
 		}
-	} else if (firm_is_darwin_os(target_machine)) {
+	} else if (firm_is_darwin_os(target.machine)) {
 		add_define("__MACH__",     "1", false);
 		add_define("__APPLE__",    "1", false);
 		add_define("__APPLE_CC__", "1", false);
@@ -1378,16 +1373,16 @@ static void add_standard_defines(void)
 		add_define("__PIC__",      "2", false);
 		add_define("__pic__",      "2", false);
 		add_define("__DYNAMIC__",  "1", false);
-		if (!byte_order_big_endian) {
+		if (!target.byte_order_big_endian) {
 			add_define("__LITTLE_ENDIAN__", "1", false);
 		}
 	}
 	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
 	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
 	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
-	add_define("__BYTE_ORDER__", byte_order_big_endian
+	add_define("__BYTE_ORDER__", target.byte_order_big_endian
 	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
-	add_define("__FLOAT_WORD_ORDER__", byte_order_big_endian
+	add_define("__FLOAT_WORD_ORDER__", target.byte_order_big_endian
 	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
 
 	add_define("__FINITE_MATH_ONLY__",    "0",    false);
@@ -1399,9 +1394,9 @@ static void add_standard_defines(void)
 		add_define("__LP64__", "1", false);
 	}
 
-	const char *cpu          = target_machine->cpu_type;
-	const char *manufacturer = target_machine->manufacturer;
-	const char *os           = target_machine->operating_system;
+	const char *cpu          = target.machine->cpu_type;
+	const char *manufacturer = target.machine->manufacturer;
+	const char *os           = target.machine->operating_system;
 	if (firm_is_ia32_cpu(cpu)) {
 		if (dialect.gnu)
 			add_define("i386",     "1", false);
@@ -1454,7 +1449,7 @@ static void add_standard_defines(void)
 		add_define("__FLT_EVAL_METHOD__", "0", false);
 	}
 	/* TODO: query from backend? */
-	add_define("__USER_LABEL_PREFIX__", user_label_prefix, false);
+	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);
 	add_define("__REGISTER_PREFIX__", "", false);
 	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
 
@@ -1686,15 +1681,15 @@ static void append_standard_include_paths(void)
 	else if (target_include_dir == NULL && system_include_dir != NULL) {
 		/* some guessing to find the "gcc-multilib" include dir */
 		assert(obstack_object_size(&file_obst) == 0);
-		if (firm_is_ia32_cpu(target_machine->cpu_type)
-			&& firm_is_unixish_os(target_machine)) {
+		if (firm_is_ia32_cpu(target.machine->cpu_type)
+			&& firm_is_unixish_os(target.machine)) {
 			obstack_printf(&file_obst, "%s/i386-linux-gnu", system_include_dir);
 	path_from_obst:;
 			obstack_1grow(&file_obst, '\0');
 			char *path = obstack_finish(&file_obst);
 			append_include_path(&system_searchpath, path);
-		} else if (target_triple != NULL) {
-			obstack_printf(&file_obst, "%s/%s", system_include_dir, target_triple);
+		} else if (target.triple != NULL) {
+			obstack_printf(&file_obst, "%s/%s", system_include_dir, target.triple);
 			goto path_from_obst;
 		}
 	}
@@ -2053,8 +2048,8 @@ static int link_program(compilation_unit_t *units)
 	if (linker != NULL) {
 		obstack_printf(&file_obst, "%s ", linker);
 	} else {
-		if (target_triple != NULL)
-			obstack_printf(&file_obst, "%s-", target_triple);
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
 		obstack_printf(&file_obst, "%s ", LINKER);
 	}
 
@@ -2164,8 +2159,8 @@ invalid_o_option:
 		}
 	}
 
-	if (target_machine == NULL) {
-		target_machine = firm_get_host_machine();
+	if (target.machine == NULL) {
+		target.machine = firm_get_host_machine();
 	}
 	choose_optimization_pack(opt_level);
 	setup_target_machine();
@@ -2447,7 +2442,7 @@ invalid_o_option:
 					} else {
 						const char *isa = setup_target_machine();
 						snprintf(firm_be, sizeof(firm_be), "%s", isa);
-						target_triple = opt;
+						target.triple = opt;
 					}
 				} else {
 					/* remember option for backend */
@@ -2802,7 +2797,7 @@ invalid_o_option:
 			outname = outnamebuf;
 			break;
 		case MODE_COMPILE_ASSEMBLE_LINK:
-			if (firm_is_windows_os(target_machine)) {
+			if (firm_is_windows_os(target.machine)) {
 				outname = "a.exe";
 			} else {
 				outname = "a.out";

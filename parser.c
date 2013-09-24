@@ -5557,7 +5557,7 @@ static void parse_external_declaration(void)
 			entity->declaration.type   = identify_new_type(new_type);
 		}
 
-		if (enable_main_collect2_hack)
+		if (target.enable_main_collect2_hack)
 			prepare_main_collect2(entity);
 	}
 

@@ -183,9 +183,9 @@ static complex_value expression_to_complex(const expression_t *expression);
 
 static unsigned decide_modulo_shift(unsigned type_size)
 {
-	if (architecture_modulo_shift == 0)
+	if (target.modulo_shift == 0)
 		return 0;
-	return MAX(type_size, architecture_modulo_shift);
+	return MAX(type_size, target.modulo_shift);
 }
 
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)

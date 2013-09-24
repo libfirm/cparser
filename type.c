@@ -1412,7 +1412,7 @@ void layout_compound(compound_t *const compound)
 				}
 			}
 
-			if (byte_order_big_endian) {
+			if (target.byte_order_big_endian) {
 				member->offset     = size & ~alignment_mask;
 				member->bit_offset = base_size - bit_offset - bit_size;
 			} else {
