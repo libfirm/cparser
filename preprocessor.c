@@ -650,14 +650,14 @@ static bool is_universal_char_valid_identifier_c11(utf32 const v)
 
 static bool is_universal_char_valid_identifier(utf32 const v)
 {
-	if (c_mode & _C11)
+	if (dialect.c11)
 		return is_universal_char_valid_identifier_c11(v);
 	return is_universal_char_valid_identifier_c99(v);
 }
 
 static bool is_universal_char_invalid_identifier_start(utf32 const v)
 {
-	if (!(c_mode & _C11))
+	if (!dialect.c11)
 		return false;
 
 	/* C11 Annex D.2 */
@@ -709,7 +709,7 @@ static utf32 parse_escape_sequence(void)
 	 * to §6.11.4, whereas \e is not. */
 	case 'E':
 	case 'e':
-		if (c_mode & _GNUC)
+		if (dialect.gnu)
 			return 27;   /* hopefully 27 is ALWAYS the code for ESCAPE */
 		break;
 
@@ -1188,7 +1188,7 @@ static string_encoding_t identify_encoding_prefix(symbol_t *const sym)
 	case TP_u:  enc = STRING_ENCODING_CHAR16; break;
 	case TP_u8: enc = STRING_ENCODING_UTF8;   break;
 	}
-	return c_mode & _C11 ? enc : STRING_ENCODING_CHAR;
+	return dialect.c11 ? enc : STRING_ENCODING_CHAR;
 }
 
 static void obstack_grow_string(struct obstack *obst, const string_t *string)
@@ -1495,7 +1495,7 @@ static bool concat_tokens(const position_t *pos,
 			set_digraph(']', symbol_colongreater);
 			return true;
 		}
-		if (kind1 == ':' && (c_mode & _CXX)) {
+		if (kind1 == ':' && dialect.cpp) {
 			set_punctuator(T_COLONCOLON);
 			return true;
 		}
@@ -2108,7 +2108,7 @@ digraph_percentcolon:
 		MAYBE_PROLOG
 		MAYBE_DIGRAPH('>', ']', symbol_colongreater)
 		case ':':
-			if (c_mode & _CXX) {
+			if (dialect.cpp) {
 				eat(':');
 				set_punctuator(T_COLONCOLON);
 				return;
@@ -3686,7 +3686,7 @@ static void parse_pragma_directive(void)
 	}
 
 	stdc_pragma_kind_t kind = STDC_UNKNOWN;
-	if (pp_token.base.symbol->pp_ID == TP_STDC && c_mode & _C99) {
+	if (pp_token.base.symbol->pp_ID == TP_STDC && dialect.c99) {
 		/* a STDC pragma */
 		next_input_token();
 

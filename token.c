@@ -28,14 +28,14 @@ static symbol_t *intern_register_token(token_kind_t id, const char *string)
 	return symbol;
 }
 
-static void register_token(unsigned mode, token_kind_t id, const char *string,
-                           bool is_keyword)
+static void register_token(lang_features_t mode, token_kind_t id,
+                           const char *string, bool is_keyword)
 {
 	if (id > 255) {
 		assert(id >= last_id);
 		last_id = id;
 	}
-	if (c_mode & mode) {
+	if (dialect.features & mode) {
 		symbol_t *symbol = intern_register_token(id, string);
 		if (is_keyword)
 			symbol->ID = id;

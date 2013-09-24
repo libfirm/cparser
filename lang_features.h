@@ -6,6 +6,7 @@
 #define LANG_FEATURES_H
 
 #include <stdbool.h>
+#include "type.h"
 
 #define BITS_PER_BYTE    8
 
@@ -19,8 +20,22 @@ typedef enum lang_features_t {
 	_ALL  = 0xFF
 } lang_features_t;
 
-/** the current C mode/dialect */
-extern unsigned int c_mode;
+typedef struct c_dialect_t {
+	atomic_type_kind_t wchar_atomic_kind;
+	bool               freestanding   : 1;
+	bool               char_is_signed : 1;
+	bool               strict         : 1;
+	bool               intmax_predefs : 1;
+	bool               c89            : 1;
+	bool               c99            : 1;
+	bool               c11            : 1;
+	bool               cpp            : 1;
+	bool               gnu            : 1;
+	bool               ms             : 1;
+	lang_features_t    features;
+} c_dialect_t;
+
+extern c_dialect_t dialect;
 
 /**
  * whether architecture shift instructions usually perform modulo bit_size
@@ -31,13 +46,8 @@ extern unsigned int architecture_modulo_shift;
 /** byte-order: true = big-endian, false = little-endian */
 extern bool byte_order_big_endian;
 
-/** true for strict language checking. */
-extern bool strict_mode;
-
 /** a hack that adds a call to __main into the main function, necessary on
  * mingw */
 extern bool enable_main_collect2_hack;
-
-extern bool freestanding;
 
 #endif

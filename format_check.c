@@ -263,14 +263,14 @@ break_fmt_flags:
 			case 'q': fmt = *(++c); fmt_mod = FMT_MOD_q;    break;
 			/* microsoft mode */
 			case 'w':
-				if (c_mode & _MS) {
+				if (dialect.ms) {
 					fmt = *(++c); fmt_mod = FMT_MOD_w;
 				} else {
 					fmt_mod = FMT_MOD_NONE;
 				}
 				break;
 			case 'I':
-				if (c_mode & _MS) {
+				if (dialect.ms) {
 					fmt = *(++c); fmt_mod = FMT_MOD_I;
 					if (fmt == '3') {
 						fmt = *(++c);
@@ -651,13 +651,13 @@ static void check_scanf_format(const call_argument_t *arg,
 		case 'z': fmt = *(++c); fmt_mod = FMT_MOD_z; break;
 		/* microsoft mode */
 		case 'w':
-			if (c_mode & _MS) {
+			if (dialect.ms) {
 				fmt = *(++c);
 				fmt_mod = FMT_MOD_w;
 			}
 			break;
 		case 'I':
-			if (c_mode & _MS) {
+			if (dialect.ms) {
 				fmt = *(++c);
 				fmt_mod = FMT_MOD_I;
 				if (fmt == '3') {

@@ -132,7 +132,7 @@ void init_basic_types(void)
 	type_int64_t = make_atomic_type(int64_type_kind, TYPE_QUALIFIER_NONE);
 
 	/* microsoft types */
-	if (c_mode & _MS) {
+	if (dialect.ms) {
 		type_int8                = make_atomic_type(int8_type_kind, TYPE_QUALIFIER_NONE);
 		type_int16               = make_atomic_type(int16_type_kind, TYPE_QUALIFIER_NONE);
 		type_int32               = make_atomic_type(int32_type_kind, TYPE_QUALIFIER_NONE);

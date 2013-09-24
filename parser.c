@@ -111,7 +111,7 @@ entity_t                  **alias_entities;
 	size_t   const top       = environment_top(); \
 	scope_t *const new_scope = (scope); \
 	scope_t *const old_scope = (new_scope ? scope_push(new_scope) : NULL)
-#define PUSH_SCOPE_STATEMENT(scope) PUSH_SCOPE(c_mode & (_C99 | _CXX) ? (scope) : NULL)
+#define PUSH_SCOPE_STATEMENT(scope) PUSH_SCOPE(dialect.c99 || dialect.cpp ? (scope) : NULL)
 #define POP_SCOPE() (new_scope ? assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top) : (void)0)
 
 #define PUSH_EXTENSION() \
@@ -131,7 +131,7 @@ static unsigned short token_anchor_set[T_LAST_TOKEN];
 #define HERE (&token.base.pos)
 
 /** true if we are in GCC mode. */
-#define GNU_MODE ((c_mode & _GNUC) || in_gcc_extension)
+#define GNU_MODE (dialect.gnu || in_gcc_extension)
 
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
@@ -1008,7 +1008,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 
 			if (is_type_void(points_to_right)) {
 				/* ISO/IEC 14882:1998(E) §C.1.2:6 */
-				return c_mode & _CXX ? ASSIGN_ERROR_INCOMPATIBLE : res;
+				return dialect.cpp ? ASSIGN_ERROR_INCOMPATIBLE : res;
 			}
 
 			if (!types_compatible(points_to_left, points_to_right)) {
@@ -2500,7 +2500,7 @@ static type_t *parse_enum_specifier(void)
 			assert(anonymous_entity == NULL);
 			anonymous_entity = entity;
 		}
-	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
+	} else if (!entity->enume.complete && !dialect.gnu) {
 		errorf(&pos,
 		       "'%T' used before definition (incomplete enums are a GNU extension)",
 		       type);
@@ -2983,7 +2983,7 @@ finish_specifiers:
 	if (type_specifiers == SPECIFIER_NONE) {
 		if (!type) {
 			/* ISO/IEC 14882:1998(E) §C.1.5:4 */
-			if (c_mode & _CXX || strict_mode) {
+			if (dialect.cpp || dialect.strict) {
 				errorf(pos, "type specifier missing");
 				goto error_type;
 			}
@@ -3243,7 +3243,7 @@ static bool has_parameters(void)
 		type_t const *const type = skip_typeref(entity->typedefe.type);
 		if (!is_type_void(type))
 			return true;
-		if (c_mode & _CXX) {
+		if (dialect.cpp) {
 			/* ISO/IEC 14882:1998(E) §8.3.5:2  It must be literally (void).  A typedef
 			 * is not allowed. */
 			errorf(HERE, "empty parameter list defined with a typedef of 'void' not allowed in C++");
@@ -3274,7 +3274,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		parse_identifier_list(scope);
 	} else if (token.kind == ')') {
 		/* ISO/IEC 14882:1998(E) §C.1.6:1 */
-		if (!(c_mode & _CXX))
+		if (!dialect.cpp)
 			type->unspecified_parameters = true;
 	} else if (has_parameters()) {
 		function_parameter_t **anchor = &type->parameters;
@@ -3392,7 +3392,7 @@ static construct_type_t *parse_pointer_declarator(void)
 /* ISO/IEC 14882:1998(E) §8.3.2 */
 static construct_type_t *parse_reference_declarator(void)
 {
-	if (!(c_mode & _CXX))
+	if (!dialect.cpp)
 		errorf(HERE, "references are only available for C++");
 
 	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_REFERENCE, sizeof(parsed_reference_t));
@@ -3892,7 +3892,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		handle_entity_attributes(attributes, entity);
 	}
 
-	if (entity->kind == ENTITY_FUNCTION && !freestanding) {
+	if (entity->kind == ENTITY_FUNCTION && !dialect.freestanding) {
 		adapt_special_functions(&entity->function);
 	}
 
@@ -4184,7 +4184,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			if (kind == ENTITY_TYPEDEF) {
 				type_t *const type      = skip_typeref(entity->typedefe.type);
 				type_t *const prev_type = skip_typeref(previous->typedefe.type);
-				if (c_mode & _CXX) {
+				if (dialect.cpp) {
 					/* C++ allows double typedef if they are identical
 					 * (after skipping typedefs) */
 					if (type == prev_type)
@@ -4292,7 +4292,7 @@ warn_redundant_declaration: ;
 						prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
 					} else {
 						/* ISO/IEC 14882:1998(E) §C.1.2:1 */
-						if (c_mode & _CXX)
+						if (dialect.cpp)
 							goto error_redeclaration;
 						goto warn_redundant_declaration;
 					}
@@ -4667,7 +4667,7 @@ decl_list_end:
 		type_t *parameter_type = parameter->declaration.type;
 		if (parameter_type == NULL) {
 			position_t const* const pos = &parameter->base.pos;
-			if (strict_mode) {
+			if (dialect.strict) {
 				errorf(pos, "no type specified for function '%N'", parameter);
 				parameter_type = type_error_type;
 			} else {
@@ -4685,7 +4685,7 @@ decl_list_end:
 
 		/* gcc special: if the type of the prototype matches the unpromoted
 		 * type don't promote */
-		if (!strict_mode && proto_parameter != NULL) {
+		if (!dialect.strict && proto_parameter != NULL) {
 			type_t *proto_p_type = skip_typeref(proto_parameter->type);
 			type_t *promo_skip   = skip_typeref(parameter_type);
 			type_t *param_skip   = skip_typeref(not_promoted);
@@ -6090,9 +6090,9 @@ static expression_t *parse_character_constant(void)
 	switch (token.literal.string.encoding) {
 	case STRING_ENCODING_CHAR:
 	case STRING_ENCODING_UTF8:
-		literal->base.type = c_mode & _CXX ? type_char : type_int;
+		literal->base.type = dialect.cpp ? type_char : type_int;
 		if (size > 1) {
-			if (!GNU_MODE && !(c_mode & _C99)) {
+			if (!GNU_MODE && !dialect.c99) {
 				errorf(HERE, "more than 1 character in character constant");
 			} else {
 				literal->base.type = type_int;
@@ -6278,7 +6278,7 @@ static entity_t *parse_qualified_identifier(void)
 	}
 
 	if (entity == NULL) {
-		if (!strict_mode && token.kind == '(') {
+		if (!dialect.strict && token.kind == '(') {
 			/* an implicitly declared function */
 			entity = create_implicit_function(symbol, &pos);
 			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos,
@@ -7627,7 +7627,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	rem_anchor_token(':');
 	expect(':');
 	expression_t *false_expression =
-		parse_subexpression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
+		parse_subexpression(dialect.cpp ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
 
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
@@ -7948,7 +7948,7 @@ static void semantic_not(unary_expression_t *expression)
 {
 	/* §6.5.3.3:1  The operand [...] of the ! operator, scalar type. */
 	semantic_condition(expression->value, "operand of !");
-	expression->base.type = c_mode & _CXX ? type_bool : type_int;
+	expression->base.type = dialect.cpp ? type_bool : type_int;
 }
 
 static void semantic_complement(unary_expression_t *expression)
@@ -8550,7 +8550,7 @@ static void semantic_comparison(binary_expression_t *expression,
 		type_error_incompatible("invalid operands in comparison", pos,
 		                        type_left, type_right);
 	}
-	expression->base.type = c_mode & _CXX ? type_bool : type_int;
+	expression->base.type = dialect.cpp ? type_bool : type_int;
 }
 
 static void semantic_relational(binary_expression_t *expression)
@@ -8759,7 +8759,7 @@ static void semantic_logical_op(binary_expression_t *expression)
 		warn_logical_and_within_or(expression->left);
 		warn_logical_and_within_or(expression->right);
 	}
-	expression->base.type = c_mode & _CXX ? type_bool : type_int;
+	expression->base.type = dialect.cpp ? type_bool : type_int;
 }
 
 /**
@@ -9507,7 +9507,7 @@ static statement_t *parse_label_inner_statement(statement_t const *const label,
 		inner_stmt = parse_statement();
 		/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
 		/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
-		if (inner_stmt->kind == STATEMENT_DECLARATION && !(c_mode & _CXX)) {
+		if (inner_stmt->kind == STATEMENT_DECLARATION && !dialect.cpp) {
 			errorf(&inner_stmt->base.pos, "declaration after %s", label_kind);
 		}
 		break;
@@ -9672,7 +9672,7 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
-	if (token.kind == T___attribute__ && !(c_mode & _CXX)) {
+	if (token.kind == T___attribute__ && !dialect.cpp) {
 		parse_attributes(NULL); // TODO process attributes
 	}
 
@@ -9691,7 +9691,7 @@ static statement_t *parse_inner_statement(void)
 	statement_t *const stmt = parse_statement();
 	/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
 	/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
-	if (stmt->kind == STATEMENT_DECLARATION && !(c_mode & _CXX)) {
+	if (stmt->kind == STATEMENT_DECLARATION && !dialect.cpp) {
 		errorf(&stmt->base.pos, "declaration as inner statement, use {}");
 	}
 	return stmt;
@@ -10117,7 +10117,7 @@ static bool expression_is_local_variable(const expression_t *expression)
 
 static void err_or_warn(position_t const *const pos, char const *const msg)
 {
-	if (c_mode & _CXX || strict_mode) {
+	if (dialect.cpp || dialect.strict) {
 		errorf(pos, msg);
 	} else {
 		warningf(WARN_OTHER, pos, msg);
@@ -10152,7 +10152,7 @@ static statement_t *parse_return(void)
 				/* Only warn in C mode, because GCC does the same */
 				err_or_warn(pos,
 				            "'return' with a value, in function returning 'void'");
-			} else if (!(c_mode & _CXX)) { /* ISO/IEC 14882:1998(E) §6.6.3:3 */
+			} else if (!dialect.cpp) { /* ISO/IEC 14882:1998(E) §6.6.3:3 */
 				/* Only warn in C mode, because GCC does the same */
 				err_or_warn(pos,
 				            "'return' with expression in function returning 'void'");
@@ -10803,7 +10803,7 @@ static void parse_external(void)
 		return;
 
 	case ';':
-		if (!strict_mode) {
+		if (!dialect.strict) {
 			warningf(WARN_STRAY_SEMICOLON, HERE,
 			         "stray ';' outside of function");
 			eat(';');
@@ -10921,7 +10921,7 @@ void start_parsing(void)
 	scope_push(&unit->scope);
 
 	create_gnu_builtins();
-	if (c_mode & _MS)
+	if (dialect.ms)
 		create_microsoft_intrinsics();
 
 	symbol_main = symbol_table_insert("main");
@@ -11015,7 +11015,7 @@ void parse(void)
 	for (int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
 		next_token();
 	}
-	current_linkage   = c_mode & _CXX ? LINKAGE_CXX : LINKAGE_C;
+	current_linkage   = dialect.cpp ? LINKAGE_CXX : LINKAGE_C;
 	incomplete_arrays = NEW_ARR_F(declaration_t*, 0);
 	parse_translation_unit();
 	complete_incomplete_arrays();

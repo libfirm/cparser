@@ -873,9 +873,8 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 		bool const is_inline = entity->function.is_inline;
 		if (is_inline && has_body) {
-			if (((c_mode & _C99) && storage_class == STORAGE_CLASS_NONE)
-			    || ((c_mode & _C99) == 0
-			        && storage_class == STORAGE_CLASS_EXTERN)) {
+			if ((dialect.c99 && storage_class == STORAGE_CLASS_NONE)
+			    || (!dialect.c99 && storage_class == STORAGE_CLASS_EXTERN)) {
 				add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 			}
 		}
@@ -886,7 +885,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 	/* We should check for file scope here, but as long as we compile C only
 	   this is not needed. */
-	if (!freestanding && !has_body) {
+	if (!dialect.freestanding && !has_body) {
 		/* check for a known runtime function */
 		for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 			if (id != rts_idents[i])
@@ -909,7 +908,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 				continue;
 
 			/* ignore those rts functions not necessary needed for current mode */
-			if ((c_mode & rts_data[i].flags) == 0)
+			if ((dialect.features & rts_data[i].flags) == 0)
 				continue;
 			assert(rts_entities[rts_data[i].id] == NULL);
 			rts_entities[rts_data[i].id] = irentity;
@@ -6385,11 +6384,11 @@ static const char *get_cwd(void)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
-	if (c_mode & _CXX) {
+	if (dialect.cpp) {
 		be_dwarf_set_source_language(DW_LANG_C_plus_plus);
-	} else if (c_mode & _C99) {
+	} else if (dialect.c99) {
 		be_dwarf_set_source_language(DW_LANG_C99);
-	} else if (c_mode & _C89) {
+	} else if (dialect.c89) {
 		be_dwarf_set_source_language(DW_LANG_C89);
 	} else {
 		be_dwarf_set_source_language(DW_LANG_C);

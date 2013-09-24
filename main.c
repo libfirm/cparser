@@ -111,15 +111,14 @@ static const char  *local_include_dir         = LOCAL_INCLUDE_DIR;
 static const char  *target_include_dir        = TARGET_INCLUDE_DIR;
 static const char  *system_include_dir        = SYSTEM_INCLUDE_DIR;
 
-unsigned int        c_mode                    = _C89 | _C99 | _GNUC;
+c_dialect_t dialect = {
+	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
+	.char_is_signed = true,
+};
 bool                byte_order_big_endian     = false;
-bool                strict_mode               = false;
 bool                enable_main_collect2_hack = false;
-bool                freestanding              = false;
 unsigned            architecture_modulo_shift = 0;
 
-static bool               char_is_signed      = true;
-static atomic_type_kind_t wchar_atomic_kind   = ATOMIC_TYPE_INT;
 static const char        *user_label_prefix   = "";
 static unsigned           features_on         = 0;
 static unsigned           features_off        = 0;
@@ -136,7 +135,6 @@ static struct obstack    asflags_obst;
 static struct obstack    codegenflags_obst;
 static const char       *asflags;
 static const char       *outname;
-static bool              define_intmax_types;
 static bool              construct_dep_target;
 static bool              dump_defines;
 
@@ -405,7 +403,7 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 		add_flag(&cppflags_obst, "-U_FORTIFY_SOURCE");
 		add_flag(&cppflags_obst, "-D_FORTIFY_SOURCE=0");
 
-		if (define_intmax_types) {
+		if (dialect.intmax_predefs) {
 			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
 			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
 			add_flag(&cppflags_obst, "-U__UINTMAX_TYPE__");
@@ -916,9 +914,9 @@ static compilation_unit_type_t get_unit_type_from_string(const char *string)
 
 static bool init_os_support(void)
 {
-	wchar_atomic_kind         = ATOMIC_TYPE_INT;
+	dialect.wchar_atomic_kind = ATOMIC_TYPE_INT;
+	dialect.intmax_predefs    = false;
 	enable_main_collect2_hack = false;
-	define_intmax_types       = false;
 
 	if (firm_is_unixish_os(target_machine)) {
 		set_create_ld_ident(create_name_linux_elf);
@@ -926,9 +924,9 @@ static bool init_os_support(void)
 	} else if (firm_is_darwin_os(target_machine)) {
 		set_create_ld_ident(create_name_macho);
 		user_label_prefix = "_";
-		define_intmax_types = true;
+		dialect.intmax_predefs = true;
 	} else if (firm_is_windows_os(target_machine)) {
-		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
+		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
 		set_create_ld_ident(create_name_win32);
 		user_label_prefix = "_";
@@ -1071,13 +1069,13 @@ static void init_types_and_adjust(void)
 
 	/* stuff decided after processing operating system specifics and
 	 * commandline flags */
-	if (char_is_signed) {
+	if (dialect.char_is_signed) {
 		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
 	} else {
 		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
 	}
 	/* copy over wchar_t properties (including rank) */
-	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
+	props[ATOMIC_TYPE_WCHAR_T] = props[dialect.wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
 	if (!type_ld) {
@@ -1324,15 +1322,15 @@ static void add_standard_defines(void)
 	add_define("__STDC__", "1", true);
 	/* C99 predefined macros, but defining them for other language standards too
 	 * shouldn't hurt */
-	add_define("__STDC_HOSTED__", freestanding ? "0" : "1", true);
+	add_define("__STDC_HOSTED__", dialect.freestanding ? "0" : "1", true);
 
-	if (c_mode & _C99) {
+	if (dialect.c99) {
 		add_define("__STDC_VERSION__", "199901L", true);
 	}
-	if (c_mode & _CXX) {
+	if (dialect.cpp) {
 		add_define("__cplusplus", "1", true);
 	}
-	if (!(c_mode & (_GNUC | _MS | _CXX)))
+	if (!dialect.gnu && !dialect.ms && !dialect.cpp)
 		add_define("__STRICT_ANSI__", "1", false);
 
 	add_define_string("__VERSION__", CPARSER_VERSION, false);
@@ -1346,12 +1344,12 @@ static void add_standard_defines(void)
 	add_define("__GNUC__",            "4", false);
 	add_define("__GNUC_MINOR__",      "6", false);
 	add_define("__GNUC_PATCHLEVEL__", "0", false);
-	if (c_mode & _CXX)
+	if (dialect.cpp)
 		add_define("__GNUG__", "4", false);
 
 	/* TODO */
 	//add_define("__NO_INLINE__", "1");
-	if (c_mode & _C99) {
+	if (dialect.c99) {
 		add_define("__GNUC_STDC_INLINE__", "1", false);
 	} else {
 		add_define("__GNUC_GNU_INLINE__", "1", false);
@@ -1361,13 +1359,13 @@ static void add_standard_defines(void)
 	add_define("_FORTIFY_SOURCE", "0", false);
 
 	if (firm_is_unixish_os(target_machine)) {
-		if (c_mode & _GNUC)
+		if (dialect.gnu)
 			add_define("unix",     "1", false);
 		add_define("__unix",   "1", false);
 		add_define("__unix__", "1", false);
 		add_define("__ELF__",  "1", false);
 		if (strstr(target_machine->operating_system, "linux") != NULL) {
-			if (c_mode & _GNUC)
+			if (dialect.gnu)
 				add_define("linux",     "1", false);
 			add_define("__linux",   "1", false);
 			add_define("__linux__", "1", false);
@@ -1414,7 +1412,7 @@ static void add_standard_defines(void)
 	const char *manufacturer = target_machine->manufacturer;
 	const char *os           = target_machine->operating_system;
 	if (is_ia32_cpu(cpu)) {
-		if (c_mode & _GNUC)
+		if (dialect.gnu)
 			add_define("i386",     "1", false);
 		add_define("__i386",   "1", false);
 		add_define("__i386__", "1", false);
@@ -1490,7 +1488,7 @@ static void add_standard_defines(void)
 	define_sizeof("DOUBLE",      ATOMIC_TYPE_DOUBLE);
 	define_sizeof("LONG_DOUBLE", ATOMIC_TYPE_LONG_DOUBLE);
 	define_sizeof("SIZE_T",      type_size_t->atomic.akind);
-	define_sizeof("WCHAR_T",     wchar_atomic_kind);
+	define_sizeof("WCHAR_T",     dialect.wchar_atomic_kind);
 	define_sizeof("WINT_T",      type_wint_t->atomic.akind);
 	define_sizeof("PTRDIFF_T",   type_ptrdiff_t->atomic.akind);
 	add_define_int("__SIZEOF_POINTER__", get_type_size(type_void_ptr));
@@ -1501,8 +1499,8 @@ static void add_standard_defines(void)
 	define_type_max("LONG",      ATOMIC_TYPE_LONG);
 	define_type_max("LONG_LONG", ATOMIC_TYPE_LONGLONG);
 
-	define_type_type_max("WCHAR",   wchar_atomic_kind);
-	define_type_min(     "WCHAR",   wchar_atomic_kind);
+	define_type_type_max("WCHAR",   dialect.wchar_atomic_kind);
+	define_type_min(     "WCHAR",   dialect.wchar_atomic_kind);
 	define_type_type_max("SIZE",    type_size_t->atomic.akind);
 	define_type_type_max("WINT",    type_wint_t->atomic.akind);
 	define_type_min(     "WINT",    type_wint_t->atomic.akind);
@@ -1569,19 +1567,18 @@ static void add_standard_defines(void)
 	add_define_int("__BIGGEST_ALIGNMENT__", 16);
 }
 
-static void setup_cmode(const compilation_unit_t *unit)
+static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 {
-	compilation_unit_type_t type     = unit->type;
-	lang_standard_t         standard = unit->standard;
-	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C) {
+	lang_features_t features = 0;
+	if (!is_cpp) {
 		switch (standard) {
-		case STANDARD_C89:     c_mode = _C89;                       break;
+		case STANDARD_C89:     features = _C89;                       break;
 							   /* TODO determine difference between these two */
-		case STANDARD_C89AMD1: c_mode = _C89;                       break;
-		case STANDARD_C99:     c_mode = _C89 | _C99;                break;
-		case STANDARD_C11:     c_mode = _C89 | _C99 | _C11;         break;
-		case STANDARD_GNU89:   c_mode = _C89 |               _GNUC; break;
-		case STANDARD_GNU11:   c_mode = _C89 | _C99 | _C11 | _GNUC; break;
+		case STANDARD_C89AMD1: features = _C89;                       break;
+		case STANDARD_C99:     features = _C89 | _C99;                break;
+		case STANDARD_C11:     features = _C89 | _C99 | _C11;         break;
+		case STANDARD_GNU89:   features = _C89 |               _GNUC; break;
+		case STANDARD_GNU11:   features = _C89 | _C99 | _C11 | _GNUC; break;
 
 		case STANDARD_ANSI:
 		case STANDARD_CXX98:
@@ -1589,12 +1586,11 @@ static void setup_cmode(const compilation_unit_t *unit)
 		case STANDARD_DEFAULT:
 			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
 			/* FALLTHROUGH */
-		case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
+		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
 		}
-	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
-	           || type == COMPILATION_UNIT_CXX) {
+	} else {
 		switch (standard) {
-		case STANDARD_CXX98: c_mode = _CXX; break;
+		case STANDARD_CXX98: features = _CXX; break;
 
 		case STANDARD_ANSI:
 		case STANDARD_C89:
@@ -1607,12 +1603,45 @@ static void setup_cmode(const compilation_unit_t *unit)
 		case STANDARD_DEFAULT:
 			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
 			/* FALLTHROUGH */
-		case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
 		}
 	}
 
-	c_mode |= features_on;
-	c_mode &= ~features_off;
+	features |= features_on;
+	features &= ~features_off;
+	dialect.features = features;
+
+	dialect.c89 = dialect.c99 = dialect.c11
+	    = dialect.gnu = dialect.ms = dialect.cpp = false;
+	if (features & _C11)
+	    dialect.c89 = dialect.c99 = dialect.c11 = true;
+	if (features & _C99)
+	    dialect.c89 = dialect.c99 = true;
+	if (features & _C89)
+	    dialect.c89 = true;
+	if (features & _GNUC)
+	    dialect.gnu = true;
+	if (features & _MS)
+	    dialect.ms = true;
+	if (features & _CXX)
+	    dialect.c89 = dialect.cpp = true;
+}
+
+static void init_c_dialect_for_unit(const compilation_unit_t *unit)
+{
+	compilation_unit_type_t type = unit->type;
+	bool                    is_cpp;
+	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C
+	 || type == COMPILATION_UNIT_LEXER_TOKENS_C) {
+		is_cpp = false;
+	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
+	        || type == COMPILATION_UNIT_CXX
+	        || type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
+		is_cpp = true;
+	} else {
+		panic("can't determine c mode from unit type");
+	}
+	init_c_dialect(is_cpp, unit->standard);
 }
 
 static void determine_unit_standard(compilation_unit_t *unit,
@@ -1686,7 +1715,7 @@ static void append_environment_include_paths(void)
 {
 	append_env_paths(&bracket_searchpath, "CPATH");
 	append_env_paths(&system_searchpath,
-	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
+	                 dialect.cpp ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
 }
 
 static bool open_input(compilation_unit_t *unit)
@@ -1872,7 +1901,6 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 		const char *const inputname = unit->name;
 
 		determine_unit_standard(unit, standard);
-		setup_cmode(unit);
 
 		stat_ev_ctx_push_str("compilation_unit", inputname);
 
@@ -1887,6 +1915,8 @@ again:
 
 		case COMPILATION_UNIT_C:
 		case COMPILATION_UNIT_CXX:
+			init_c_dialect_for_unit(unit);
+			/* FALLTHROUGH */
 		case COMPILATION_UNIT_ASSEMBLER:
 			if (external_preprocessor != NULL) {
 				if (!run_external_preprocessor(unit, out, mode)) {
@@ -1904,6 +1934,8 @@ again:
 
 		case COMPILATION_UNIT_LEXER_TOKENS_C:
 		case COMPILATION_UNIT_LEXER_TOKENS_CXX:
+			init_c_dialect_for_unit(unit);
+			/* FALLTHROUGH */
 		case COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER:
 			if (mode == MODE_PREPROCESS_ONLY) {
 				if (!print_preprocessing_tokens(unit, out)) {
@@ -1926,6 +1958,7 @@ again:
 
 		case COMPILATION_UNIT_PREPROCESSED_C:
 		case COMPILATION_UNIT_PREPROCESSED_CXX:
+			init_c_dialect_for_unit(unit);
 			if (mode == MODE_PREPROCESS_ONLY)
 				break;
 			if (!start_preprocessing(unit, out, mode)) {
@@ -2037,7 +2070,6 @@ static int link_program(compilation_unit_t *units)
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		if (unit->type != COMPILATION_UNIT_OBJECT)
 			continue;
-
 		add_flag(&file_obst, "%s", unit->name);
 	}
 
@@ -2313,8 +2345,9 @@ invalid_o_option:
 					} else if (streq(opt, "omit-frame-pointer")) {
 						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "short-wchar")) {
-						wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
-							: ATOMIC_TYPE_INT;
+						dialect.wchar_atomic_kind
+							= truth_value ? ATOMIC_TYPE_USHORT
+							              : ATOMIC_TYPE_INT;
 					} else if (streq(opt, "show-column")) {
 						show_column = truth_value;
 					} else if (streq(opt, "color-diagnostics")
@@ -2323,7 +2356,7 @@ invalid_o_option:
 						    ? (colorterm != 0 ? colorterm : 8)
 						    : 0);
 					} else if (streq(opt, "signed-char")) {
-						char_is_signed = truth_value;
+						dialect.char_is_signed = truth_value;
 					} else if (streq(opt, "strength-reduce")) {
 						/* does nothing, for gcc compatibility (even gcc does
 						 * nothing for this switch anymore) */
@@ -2331,11 +2364,11 @@ invalid_o_option:
 						mode = truth_value ? MODE_PARSE_ONLY
 						                   : MODE_COMPILE_ASSEMBLE_LINK;
 					} else if (streq(opt, "unsigned-char")) {
-						char_is_signed = !truth_value;
+						dialect.char_is_signed = !truth_value;
 					} else if (streq(opt, "freestanding")) {
-						freestanding = truth_value;
+						dialect.freestanding = truth_value;
 					} else if (streq(opt, "hosted")) {
-						freestanding = !truth_value;
+						dialect.freestanding = !truth_value;
 					} else if (streq(opt, "profile-generate")) {
 						profile_generate = truth_value;
 					} else if (streq(opt, "profile-use")) {
@@ -2461,7 +2494,7 @@ invalid_o_option:
 			} else if (streq(option, "ansi")) {
 				standard = STANDARD_ANSI;
 			} else if (streq(option, "pedantic")) {
-				strict_mode = true;
+				dialect.strict = true;
 				set_warning_opt("pedantic");
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
@@ -2709,8 +2742,6 @@ invalid_o_option:
 	}
 
 	/* apply some effects from switches */
-	c_mode |= features_on;
-	c_mode &= ~features_off;
 	if (profile_generate) {
 		add_flag(&ldflags_obst, "-lfirmprof");
 		set_be_option("profilegenerate");
@@ -2719,13 +2750,17 @@ invalid_o_option:
 		set_be_option("profileuse");
 	}
 
+	/* TODO/FIXME we should have nothing depending on c dialect before we
+	 * are processing the first source file... */
+	init_c_dialect(false, standard != STANDARD_DEFAULT ? standard
+	                                                   : STANDARD_GNU99);
 	init_types_and_adjust();
 	init_typehash();
 	init_basic_types();
-	if (c_mode & _CXX) {
+	if (dialect.cpp) {
 		init_wchar_types(ATOMIC_TYPE_WCHAR_T);
 	} else {
-		init_wchar_types(wchar_atomic_kind);
+		init_wchar_types(dialect.wchar_atomic_kind);
 	}
 	if (stdinc)
 		append_standard_include_paths();

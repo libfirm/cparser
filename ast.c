@@ -202,7 +202,7 @@ static void print_quoted_string(const string_t *const string, char border)
 		case '\v': print_string("\\v"); break;
 		case '\?': print_string("\\?"); break;
 		case 27:
-			if (c_mode & _GNUC) {
+			if (dialect.gnu) {
 				print_string("\\e"); break;
 			}
 			/* FALLTHROUGH */
@@ -250,7 +250,7 @@ static void print_funcname(const funcname_expression_t *funcname)
 {
 	const char *s = "";
 	switch (funcname->kind) {
-	case FUNCNAME_FUNCTION:        s = (c_mode & _C99) ? "__func__" : "__FUNCTION__"; break;
+	case FUNCNAME_FUNCTION:        s = dialect.c99 ? "__func__" : "__FUNCTION__"; break;
 	case FUNCNAME_PRETTY_FUNCTION: s = "__PRETTY_FUNCTION__"; break;
 	case FUNCNAME_FUNCSIG:         s = "__FUNCSIG__"; break;
 	case FUNCNAME_FUNCDNAME:       s = "__FUNCDNAME__"; break;
@@ -442,7 +442,7 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
 	switch (expression->base.kind) {
 	case EXPR_SIZEOF:  print_string("sizeof");                                   break;
-	case EXPR_ALIGNOF: print_string(c_mode & _C11 ? "_Alignof" : "__alignof__"); break;
+	case EXPR_ALIGNOF: print_string(dialect.c11 ? "_Alignof" : "__alignof__"); break;
 	default:           panic("invalid typeprop kind");
 	}
 	if (expression->tp_expression != NULL) {
@@ -497,7 +497,7 @@ static void print_conditional(const conditional_expression_t *expression)
 	} else {
 		print_string(" ?: ");
 	}
-	precedence_t prec = c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL;
+	precedence_t prec = dialect.cpp ? PREC_ASSIGNMENT : PREC_CONDITIONAL;
 	print_expression_prec(expression->false_expression, prec);
 }
 
@@ -1203,9 +1203,6 @@ void print_initializer(const initializer_t *initializer)
  */
 static void print_ms_modifiers(const declaration_t *declaration)
 {
-	if ((c_mode & _MS) == 0)
-		return;
-
 	decl_modifiers_t modifiers = declaration->modifiers;
 
 	separator_t sep = { "__declspec(", ", " };
@@ -1346,7 +1343,7 @@ void print_declaration(const entity_t *entity)
 
 		case ENTITY_VARIABLE:
 			if (entity->variable.thread_local)
-				print_string(c_mode & _C11 ? "_Thread_local " : "__thread ");
+				print_string(dialect.c11 ? "_Thread_local " : "__thread ");
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			if (entity->variable.initializer != NULL) {
 				print_string(" = ");

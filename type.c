@@ -227,7 +227,7 @@ const char *get_atomic_kind_name(atomic_type_kind_t kind)
 {
 	switch (kind) {
 	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
-	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
+	case ATOMIC_TYPE_BOOL:        return dialect.cpp ? "bool" : "_Bool";
 	case ATOMIC_TYPE_CHAR:        return "char";
 	case ATOMIC_TYPE_SCHAR:       return "signed char";
 	case ATOMIC_TYPE_UCHAR:       return "unsigned char";
@@ -301,12 +301,12 @@ static void print_function_type_pre(const function_type_t *type)
 {
 	switch (type->linkage) {
 		case LINKAGE_C:
-			if (c_mode & _CXX)
+			if (dialect.cpp)
 				print_string("extern \"C\" ");
 			break;
 
 		case LINKAGE_CXX:
-			if (!(c_mode & _CXX))
+			if (!dialect.cpp)
 				print_string("extern \"C++\" ");
 			break;
 	}
