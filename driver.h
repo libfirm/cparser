@@ -84,6 +84,7 @@ extern bool            construct_dep_target;
 extern bool            dump_defines;
 extern bool            produce_statev;
 extern lang_standard_t standard;
+extern int             colorterm;
 extern const char     *filtev;
 extern const char     *dumpfunction;
 extern const char     *driver_linker;

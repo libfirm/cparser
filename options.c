@@ -9,11 +9,18 @@
 #include <string.h>
 
 #include "adt/strutil.h"
+#include "adt/util.h"
+#include "ast2firm.h"
+#include "ast_t.h"
 #include "diagnostic.h"
 #include "driver.h"
-#include "ast_t.h"
-#include "preprocessor.h"
+#include "driver/firm_opt.h"
+#include "help.h"
 #include "lang_features.h"
+#include "mangle.h"
+#include "parser.h"
+#include "predefs.h"
+#include "preprocessor.h"
 #include "wrappergen/write_compoundsizes.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
@@ -46,7 +53,8 @@ static const char *prefix_arg(const char *prefix, options_state_t *s)
 	return def;
 }
 
-static const char *spaced_arg(const char *arg, options_state_t *s)
+static const char *spaced_arg(const char *arg, options_state_t *s,
+                              bool arg_may_be_option)
 {
 	const char *option = &s->argv[s->i][1];
 	if (!streq(option, arg))
@@ -58,13 +66,44 @@ static const char *spaced_arg(const char *arg, options_state_t *s)
 		return NULL;
 	}
 	const char *res = s->argv[s->i+1];
-	if (res[0] == '-' && res[1] != '\0') {
+	if (!arg_may_be_option && res[0] == '-' && res[1] != '\0') {
 		errorf(NULL, "expected argument after '-%s'", arg);
 		s->argument_errors = true;
 		return NULL;
 	}
 	++s->i;
 	return res;
+}
+
+static const char *equals_arg(const char *prefix, options_state_t *s)
+{
+	const char *option = &s->argv[s->i][1];
+	if (!strstart(option, prefix))
+		return NULL;
+
+	const char *arg = option + strlen(prefix);
+	if (arg[0] == '\0') {
+		errorf(NULL, "expected argument after '-%s'", prefix);
+		s->argument_errors = true;
+		return NULL;
+	}
+	return arg;
+}
+
+static const char *f_no_arg(bool *truth_value, options_state_t *s)
+{
+	const char *option = &s->argv[s->i][1];
+	if (option[0] != 'f')
+		return NULL;
+	++option;
+
+	if (option[0] == 'n' && option[1] == 'o' && option[2] == '-') {
+		*truth_value = false;
+		option += 3;
+	} else {
+		*truth_value = true;
+	}
+	return option;
 }
 
 static void set_be_option(const char *arg)
@@ -123,14 +162,12 @@ bool options_parse_preprocessor(options_state_t *s)
 		/* TODO */
 		//stdinc = false;
 		driver_add_flag(&cppflags_obst, "-%s", option);
-	} else if (streq(option, "finput-charset=")) {
-		char const* const encoding = strchr(option, '=') + 1;
-		input_decoder = input_get_decoder(encoding);
+	} else if ((arg = equals_arg("finput-charset=", s)) != NULL) {
+		input_decoder = input_get_decoder(arg);
 		if (input_decoder == NULL) {
-			errorf(NULL, "input encoding \"%s\" not supported",
-				   encoding);
+			errorf(NULL, "input encoding \"%s\" not supported", arg);
 		}
-	} else if ((arg = prefix_arg("Xpreprocessor", s)) != NULL) {
+	} else if ((arg = spaced_arg("Xpreprocessor", s, true)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-Xpreprocessor");
 		driver_add_flag(&cppflags_obst, arg);
 	} else if (strstart(option, "Wp,")) {
@@ -186,29 +223,28 @@ bool options_parse_driver(options_state_t *s)
 		}
 	} else if (streq(option, "-pipe")) {
 		/* here for gcc compatibility */
-	} else if (strstart(option, "std=")) {
-		const char *const o = &option[4];
+	} else if ((arg = equals_arg("std=", s)) != NULL) {
 		standard =
-			streq(o, "c++")            ? STANDARD_CXX98   :
-			streq(o, "c++98")          ? STANDARD_CXX98   :
-			streq(o, "c11")            ? STANDARD_C11     :
-			streq(o, "c1x")            ? STANDARD_C11     : // deprecated
-			streq(o, "c89")            ? STANDARD_C89     :
-			streq(o, "c90")            ? STANDARD_C89     :
-			streq(o, "c99")            ? STANDARD_C99     :
-			streq(o, "c9x")            ? STANDARD_C99     : // deprecated
-			streq(o, "gnu++98")        ? STANDARD_GNUXX98 :
-			streq(o, "gnu11")          ? STANDARD_GNU11   :
-			streq(o, "gnu1x")          ? STANDARD_GNU11   : // deprecated
-			streq(o, "gnu89")          ? STANDARD_GNU89   :
-			streq(o, "gnu99")          ? STANDARD_GNU99   :
-			streq(o, "gnu9x")          ? STANDARD_GNU99   : // deprecated
-			streq(o, "iso9899:1990")   ? STANDARD_C89     :
-			streq(o, "iso9899:199409") ? STANDARD_C89AMD1 :
-			streq(o, "iso9899:1999")   ? STANDARD_C99     :
-			streq(o, "iso9899:199x")   ? STANDARD_C99     : // deprecated
-			streq(o, "iso9899:2011")   ? STANDARD_C11     :
-			(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
+			streq(arg, "c++")            ? STANDARD_CXX98   :
+			streq(arg, "c++98")          ? STANDARD_CXX98   :
+			streq(arg, "c11")            ? STANDARD_C11     :
+			streq(arg, "c1x")            ? STANDARD_C11     : // deprecated
+			streq(arg, "c89")            ? STANDARD_C89     :
+			streq(arg, "c90")            ? STANDARD_C89     :
+			streq(arg, "c99")            ? STANDARD_C99     :
+			streq(arg, "c9x")            ? STANDARD_C99     : // deprecated
+			streq(arg, "gnu++98")        ? STANDARD_GNUXX98 :
+			streq(arg, "gnu11")          ? STANDARD_GNU11   :
+			streq(arg, "gnu1x")          ? STANDARD_GNU11   : // deprecated
+			streq(arg, "gnu89")          ? STANDARD_GNU89   :
+			streq(arg, "gnu99")          ? STANDARD_GNU99   :
+			streq(arg, "gnu9x")          ? STANDARD_GNU99   : // deprecated
+			streq(arg, "iso9899:1990")   ? STANDARD_C89     :
+			streq(arg, "iso9899:199409") ? STANDARD_C89AMD1 :
+			streq(arg, "iso9899:1999")   ? STANDARD_C99     :
+			streq(arg, "iso9899:199x")   ? STANDARD_C99     : // deprecated
+			streq(arg, "iso9899:2011")   ? STANDARD_C11     :
+			(fprintf(stderr, "warning: ignoring gcc option '-%s'\n", option), standard);
 	} else if (streq(option, "ansi")) {
 		standard = STANDARD_ANSI;
 	} else if (streq(option, "-gcc")) {
@@ -237,11 +273,11 @@ bool options_parse_driver(options_state_t *s)
 		mode = MODE_PRINT_COMPOUND_SIZE;
 	} else if (streq(option, "-print-jna")) {
 		mode = MODE_PRINT_JNA;
-	} else if ((arg = spaced_arg("-jna-limit", s)) != NULL) {
+	} else if ((arg = spaced_arg("-jna-limit", s, false)) != NULL) {
 		jna_limit_output(arg);
-	} else if ((arg = spaced_arg("-jna-libname", s)) != NULL) {
+	} else if ((arg = spaced_arg("-jna-libname", s, false)) != NULL) {
 		jna_set_libname(arg);
-	} else if ((arg = spaced_arg("-dump-function", s)) != NULL) {
+	} else if ((arg = spaced_arg("-dump-function", s, false)) != NULL) {
 		dumpfunction = arg;
 		mode         = MODE_COMPILE_DUMP;
 	} else if (streq(option, "-export-ir")) {
@@ -274,7 +310,7 @@ bool options_parse_linker(options_state_t *s)
 	        || streq(option, "s")
 	        || strstart(option, "Wl,")) {
 	    driver_add_flag(&ldflags_obst, full_option);
-	} else if ((arg = prefix_arg("Xlinker", s)) != NULL) {
+	} else if ((arg = spaced_arg("Xlinker", s, true)) != NULL) {
 		driver_add_flag(&ldflags_obst, "-Xlinker");
 		driver_add_flag(&ldflags_obst, arg);
 	} else if (streq(option, "pg")) {
@@ -296,11 +332,406 @@ bool options_parse_assembler(options_state_t *s)
 	const char *arg;
 	if (strstart(option, "Wa,")) {
 		driver_add_flag(&asflags_obst, "%s", full_option);
-	} else if ((arg = prefix_arg("Xassembler", s)) != NULL) {
+	} else if ((arg = spaced_arg("Xassembler", s, true)) != NULL) {
 		driver_add_flag(&asflags_obst, "-Xassembler");
 		driver_add_flag(&asflags_obst, arg);
 	} else {
 		return false;
+	}
+	return true;
+}
+
+typedef struct codegen_option_t codegen_option_t;
+
+struct codegen_option_t {
+	codegen_option_t *next;
+	char              option[];
+};
+
+static codegen_option_t  *codegen_options        = NULL;
+static codegen_option_t **codegen_options_anchor = &codegen_options;
+static char               firm_be[16]            = "ia32";
+static bool               profile_generate;
+static bool               profile_use;
+
+bool options_parse_codegen(options_state_t *s)
+{
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+	const char *option = &full_option[1];
+
+	const char *arg;
+	if ((arg = equals_arg("falign-loops=", s)) != NULL
+     || (arg = equals_arg("falign-jumps=", s)) != NULL
+     || (arg = equals_arg("falign-functions=", s)) != NULL) {
+		fprintf(stderr, "ignoring gcc option '%s'\n", full_option);
+	} else if ((arg = equals_arg("fvisibility=", s)) != NULL) {
+		elf_visibility_tag_t visibility = get_elf_visibility_from_string(arg);
+		if (visibility == ELF_VISIBILITY_ERROR) {
+			errorf(NULL, "invalid visibility '%s' specified", arg);
+			s->argument_errors = true;
+		} else {
+			set_default_visibility(visibility);
+		}
+	} else if (option[0] == 'b') {
+		if ((arg = equals_arg("bisa=", s)) != NULL) {
+			snprintf(firm_be, sizeof(firm_be), "%s", arg);
+		}
+		if (be_parse_arg(&option[1]))
+			return true;
+	} else if (streq(option, "-unroll-loops")) {
+		/* ignore (gcc compatibility) */
+	} else if (streq(option, "g") || streq(option, "g0") || streq(option, "g1")
+			|| streq(option, "g2") || streq(option, "g3")) {
+		set_be_option("debug=frameinfo");
+		set_be_option("ia32-optcc=false");
+	} else if (option[0] == 'm') {
+		arg = &option[1];
+		/* remember option for backend */
+		assert(obstack_object_size(&codegenflags_obst) == 0);
+		obstack_blank(&codegenflags_obst, sizeof(codegen_option_t));
+		size_t len = strlen(arg);
+		obstack_grow0(&codegenflags_obst, arg, len);
+		codegen_option_t *option = obstack_finish(&codegenflags_obst);
+		option->next             = NULL;
+
+		*codegen_options_anchor = option;
+		codegen_options_anchor  = &option->next;
+	} else {
+		bool truth_value;
+		const char *fopt;
+		if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
+			if (streq(fopt, "fast-math")) {
+				ir_allow_imprecise_float_transforms(truth_value);
+			} else if (streq(fopt, "omit-frame-pointer")) {
+				set_be_option(truth_value ? "omitfp" : "omitfp=no");
+			} else if (streq(fopt, "strength-reduce")) {
+				/* does nothing, for gcc compatibility (even gcc does
+				 * nothing for this switch anymore) */
+			} else if (!truth_value && streq(fopt, "asynchronous-unwind-tables")) {
+				/* nothing todo, a gcc feature which we do not support
+				 * anyway was deactivated */
+			} else if (streq(fopt, "verbose-asm")) {
+				/* ignore: we always print verbose assembler */
+			} else if (streq(fopt, "jump-tables")             ||
+					   streq(fopt, "expensive-optimizations") ||
+					   streq(fopt, "common")                  ||
+					   streq(fopt, "optimize-sibling-calls")  ||
+					   streq(fopt, "align-loops")             ||
+					   streq(fopt, "align-jumps")             ||
+					   streq(fopt, "align-functions")         ||
+					   streq(fopt, "PIC")                     ||
+					   streq(fopt, "stack-protector")         ||
+					   streq(fopt, "stack-protector-all")) {
+				/* better warn the user for these as he might have expected
+				 * that something happens */
+				fprintf(stderr, "ignoring gcc option '-f%s'\n", option);
+			} else if (firm_option(fopt)) {
+				/* parsed a firm option */
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool options_parse_diagnostics(options_state_t *s)
+{
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+	const char *option = &full_option[1];
+
+	if (streq(option, "w")) {
+		driver_add_flag(&cppflags_obst, "-w");
+		disable_all_warnings();
+	} else if (streq(option, "pedantic")) {
+		dialect.strict = true;
+		set_warning_opt("pedantic");
+	} else if (option[0] == 'W') {
+		if (streq(option + 1, "no-trigraphs")
+		 || streq(option + 1, "undef")
+		 || streq(option + 1, "missing-include-dirs")
+		 || streq(option + 1, "endif-labels")) {
+			driver_add_flag(&cppflags_obst, "%s", full_option);
+		} else if (streq(option+1, "init-self")) {
+			/* ignored (same as gcc does) */
+		} else if (streq(option+1, "format-y2k")
+		        || streq(option+1, "format-security")
+		        || streq(option+1, "old-style-declaration")
+		        || streq(option+1, "type-limits")) {
+			/* ignore (gcc compatibility) */
+		} else if (option[1] != '\0' && option[2] == ',') {
+			/* this is not a warning option */
+			return false;
+		} else {
+			set_warning_opt(&option[1]);
+		}
+	} else if (option[0] == 'f') {
+		const char *arg;
+
+		if ((arg = equals_arg("message-length=", s)) != NULL) {
+			/* not supported yet */
+		} else {
+			bool truth_value;
+			const char *fopt;
+			if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
+				if (streq(fopt, "diagnostics-show-option")) {
+					diagnostics_show_option = truth_value;
+				} else if (streq(fopt, "show-column")) {
+					show_column = truth_value;
+				} else if (streq(fopt, "color-diagnostics")
+						|| streq(fopt, "diagnostics-color")) {
+					diagnostic_enable_color(truth_value
+						? (colorterm != 0 ? colorterm : 8)
+						: 0);
+				} else {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		}
+	} else {
+		return false;
+	}
+	return true;
+}
+
+bool options_parse_c_dialect(options_state_t *s)
+{
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+
+	bool truth_value;
+	const char *fopt;
+	if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
+		if (streq(fopt, "short-wchar")) {
+			dialect.wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
+			                                        : ATOMIC_TYPE_INT;
+		} else if (streq(fopt, "signed-char")) {
+			dialect.char_is_signed = truth_value;
+		} else if (streq(fopt, "unsigned-char")) {
+			dialect.char_is_signed = !truth_value;
+		} else if (streq(fopt, "freestanding")) {
+			dialect.freestanding = truth_value;
+		} else if (streq(fopt, "hosted")) {
+			dialect.freestanding = !truth_value;
+		} else {
+			return false;
+		}
+	} else {
+		return false;
+	}
+	return true;
+}
+
+static help_sections_t help = HELP_NONE;
+
+bool options_parse_help(options_state_t *s)
+{
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+	const char *option = &full_option[1];
+
+	if (streq(option, "fhelp")) {
+		fprintf(stderr,
+		        "warning: -fhelp is deprecated (use --help-optimization)\n");
+		help |= HELP_OPTIMIZATION;
+	} else if (streq(option, "bhelp")) {
+		fprintf(stderr, "warning: -bhelp is deprecated (use --help-firm)\n");
+		help |= HELP_FIRM;
+	} else if (streq(option, "-help")) {
+		help |= HELP_BASIC;
+	} else if (streq(option, "-help-preprocessor")) {
+		help |= HELP_PREPROCESSOR;
+	} else if (streq(option, "-help-parser")) {
+		help |= HELP_PARSER;
+	} else if (streq(option, "-help-warnings")) {
+		help |= HELP_WARNINGS;
+	} else if (streq(option, "-help-codegen")) {
+		help |= HELP_CODEGEN;
+	} else if (streq(option, "-help-linker")) {
+		help |= HELP_LINKER;
+	} else if (streq(option, "-help-optimization")) {
+		help |= HELP_OPTIMIZATION;
+	} else if (streq(option, "-help-language-tools")) {
+		help |= HELP_LANGUAGETOOLS;
+	} else if (streq(option, "-help-debug")) {
+		help |= HELP_DEBUG;
+	} else if (streq(option, "-help-firm")) {
+		help |= HELP_FIRM;
+	} else if (streq(option, "-help-all")) {
+		help |= HELP_ALL;
+	} else {
+		return false;
+	}
+	return true;
+}
+
+bool action_print_help(const char *argv0)
+{
+	if (help != HELP_NONE) {
+		help_print(argv0, help);
+		return true;
+	}
+	return false;
+}
+
+void pass_options_to_firm_be(options_state_t *s)
+{
+	/* pass options to firm backend (this happens delayed because we first
+	 * had to decide which backend is actually used) */
+	for (codegen_option_t *option = codegen_options; option != NULL;
+	     option = option->next) {
+		char        buf[256];
+	    const char *opt = option->option;
+	    /* pass option along to firm backend (except the -m32, -m64 stuff) */
+	    if (opt[0] < '0' || opt[0] > '9') {
+			snprintf(buf, sizeof(buf), "%s-%s", firm_be, opt);
+			if (be_parse_arg(buf) == 0) {
+				errorf(NULL, "Unknown codegen option '-m%s'", opt);
+				s->argument_errors = true;
+				continue;
+			}
+		}
+
+		/* hack to emulate the behaviour of some gcc spec files which filter
+		 * flags to pass to cpp/ld/as */
+		static char const *const pass_to_cpp_and_ld[] = {
+			"soft-float", "32", "64", "16"
+		};
+		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
+			if (streq(pass_to_cpp_and_ld[i], option->option)) {
+				snprintf(buf, sizeof(buf), "-m%s", option->option);
+				driver_add_flag(&cppflags_obst, buf);
+				driver_add_flag(&asflags_obst, buf);
+				driver_add_flag(&ldflags_obst, buf);
+				break;
+			}
+		}
+	}
+
+	if (profile_generate) {
+		driver_add_flag(&ldflags_obst, "-lfirmprof");
+		set_be_option("profilegenerate");
+	}
+	if (profile_use) {
+		set_be_option("profileuse");
+	}
+}
+
+static bool parse_target_triple(const char *arg)
+{
+	machine_triple_t *triple = firm_parse_machine_triple(arg);
+	if (triple == NULL) {
+		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
+		return false;
+	}
+	target.machine = triple;
+	return true;
+}
+
+static bool init_os_support(void)
+{
+	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
+	dialect.intmax_predefs           = false;
+	target.enable_main_collect2_hack = false;
+	driver_default_exe_output        = "a.out";
+
+	if (firm_is_unixish_os(target.machine)) {
+		set_create_ld_ident(create_name_linux_elf);
+		target.user_label_prefix = "";
+	} else if (firm_is_darwin_os(target.machine)) {
+		set_create_ld_ident(create_name_macho);
+		target.user_label_prefix = "_";
+		dialect.intmax_predefs   = true;
+	} else if (firm_is_windows_os(target.machine)) {
+		set_create_ld_ident(create_name_win32);
+		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
+		target.enable_main_collect2_hack = true;
+		target.user_label_prefix         = "_";
+		driver_default_exe_output        = "a.exe";
+	} else {
+		return false;
+	}
+
+	return true;
+}
+
+static const char *setup_isa_from_triple(const machine_triple_t *machine)
+{
+	const char *cpu = machine->cpu_type;
+
+	if (firm_is_ia32_cpu(cpu)) {
+		return "ia32";
+	} else if (streq(cpu, "x86_64")) {
+		return "amd64";
+	} else if (streq(cpu, "sparc")) {
+		return "sparc";
+	} else if (streq(cpu, "arm")) {
+		return "arm";
+	} else {
+		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
+		return NULL;
+	}
+}
+
+const char *setup_target_machine(void)
+{
+	if (!setup_firm_for_machine(target.machine))
+		exit(1);
+
+	const char *isa = setup_isa_from_triple(target.machine);
+	if (isa == NULL)
+		exit(1);
+
+	init_os_support();
+	return isa;
+}
+
+bool options_parse_meta(options_state_t *s)
+{
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+	const char *option = &full_option[1];
+
+	const char *arg;
+	if (streq(option, "pthread")) {
+		/* set flags for the preprocessor */
+		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
+		/* set flags for the linker */
+		driver_add_flag(&ldflags_obst, "-lpthread");
+	} else if ((arg = equals_arg("mtarget=", s)) != NULL
+	        || (arg = equals_arg("mtriple=", s)) != NULL) {
+		if (parse_target_triple(arg)) {
+			const char *isa = setup_target_machine();
+			snprintf(firm_be, sizeof(firm_be), "%s", isa);
+			target.triple = arg;
+		} else {
+			s->argument_errors = true;
+		}
+	} else {
+		bool truth_value;
+		const char *fopt;
+		if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
+			if (streq(fopt, "profile-generate")) {
+				profile_generate = truth_value;
+			} else if (streq(fopt, "profile-use")) {
+				profile_use = truth_value;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
 	}
 	return true;
 }

@@ -43,6 +43,7 @@ bool            produce_statev;
 const char     *filtev;
 const char     *dumpfunction;
 lang_standard_t standard;
+int             colorterm;
 bool            driver_use_external_preprocessor = true;
 bool            driver_verbose;
 const char     *driver_linker;
@@ -368,6 +369,8 @@ void init_c_dialect(bool is_cpp, lang_standard_t standard)
 			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
 			/* FALLTHROUGH */
 		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
+		default:
+			panic("invalid standard");
 		}
 	} else {
 		switch (standard) {
@@ -385,6 +388,8 @@ void init_c_dialect(bool is_cpp, lang_standard_t standard)
 			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
 			/* FALLTHROUGH */
 		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
+		default:
+			panic("invalid standard");
 		}
 	}
 
@@ -1013,6 +1018,21 @@ int driver_go(void)
 	return EXIT_SUCCESS;
 }
 
+static int detect_color_terminal(void)
+{
+	/* we want to avoid bloated linking against termcap/ncurses, so we use a
+	 * simple detection heuristic (similar to one git uses) */
+	if (!isatty(1))
+		return 0;
+
+	char *term = getenv("TERM");
+	if (term == NULL || streq(term, "dumb"))
+		return 0;
+	if (strstr(term, "256color") != 0)
+		return 256;
+	return 8;
+}
+
 void init_driver(void)
 {
 	obstack_init(&codegenflags_obst);
@@ -1021,6 +1041,9 @@ void init_driver(void)
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
+
+	colorterm = detect_color_terminal();
+	diagnostic_enable_color(colorterm);
 }
 
 void exit_driver(void)
