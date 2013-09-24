@@ -85,28 +85,6 @@ target_t target;
 
 static struct obstack file_obst;
 
-typedef struct codegen_option_t codegen_option_t;
-
-struct codegen_option_t {
-	codegen_option_t *next;
-	char              option[];
-};
-
-static int detect_color_terminal(void)
-{
-	/* we want to avoid bloated linking against termcap/ncurses, so we use a
-	 * simple detection heuristic (similar to one git uses) */
-	if (!isatty(1))
-		return 0;
-
-	char *term = getenv("TERM");
-	if (term == NULL || streq(term, "dumb"))
-		return 0;
-	if (strstr(term, "256color") != 0)
-		return 256;
-	return 8;
-}
-
 static const char *type_to_string(const type_t *type)
 {
 	assert(type->kind == TYPE_ATOMIC);
@@ -135,84 +113,6 @@ static void print_cparser_version(void)
 static void print_cparser_version_short(void)
 {
 	puts(cparser_REVISION);
-}
-
-static void set_be_option(const char *arg)
-{
-	int res = be_parse_arg(arg);
-	(void) res;
-	assert(res);
-}
-
-static bool init_os_support(void)
-{
-	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
-	dialect.intmax_predefs           = false;
-	target.enable_main_collect2_hack = false;
-	driver_default_exe_output        = "a.out";
-
-	if (firm_is_unixish_os(target.machine)) {
-		set_create_ld_ident(create_name_linux_elf);
-		target.user_label_prefix = "";
-	} else if (firm_is_darwin_os(target.machine)) {
-		set_create_ld_ident(create_name_macho);
-		target.user_label_prefix = "_";
-		dialect.intmax_predefs   = true;
-	} else if (firm_is_windows_os(target.machine)) {
-		set_create_ld_ident(create_name_win32);
-		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
-		target.enable_main_collect2_hack = true;
-		target.user_label_prefix         = "_";
-		driver_default_exe_output        = "a.exe";
-	} else {
-		return false;
-	}
-
-	return true;
-}
-
-static bool parse_target_triple(const char *arg)
-{
-	machine_triple_t *triple = firm_parse_machine_triple(arg);
-	if (triple == NULL) {
-		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
-		return false;
-	}
-	target.machine = triple;
-	return true;
-}
-
-static const char *setup_isa_from_triple(const machine_triple_t *machine)
-{
-	const char *cpu = machine->cpu_type;
-
-	if (firm_is_ia32_cpu(cpu)) {
-		return "ia32";
-	} else if (streq(cpu, "x86_64")) {
-		return "amd64";
-	} else if (streq(cpu, "sparc")) {
-		return "sparc";
-	} else if (streq(cpu, "arm")) {
-		return "arm";
-	} else {
-		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
-		return NULL;
-	}
-}
-
-static const char *setup_target_machine(void)
-{
-	if (!setup_firm_for_machine(target.machine))
-		exit(1);
-
-	const char *isa = setup_isa_from_triple(target.machine);
-
-	if (isa == NULL)
-		exit(1);
-
-	init_os_support();
-
-	return isa;
 }
 
 /**
@@ -432,17 +332,12 @@ static void init_external_preprocessor(void)
 
 int main(int argc, char **argv)
 {
-	const char         *print_file_name_file   = NULL;
-	int                 opt_level              = 1;
-	char                firm_be[16]            = "ia32";
-	bool                profile_generate       = false;
-	bool                profile_use            = false;
-	bool                do_timing              = false;
-	bool                print_timing           = false;
-	bool                stdinc                 = true;
-	bool                had_inputs             = false;
-	codegen_option_t   *codegen_options        = NULL;
-	codegen_option_t  **codegen_options_anchor = &codegen_options;
+	const char *print_file_name_file = NULL;
+	int         opt_level            = 1;
+	bool        do_timing            = false;
+	bool        print_timing         = false;
+	bool        stdinc               = true;
+	bool        had_inputs           = false;
 
 	obstack_init(&file_obst);
 	init_temp_files();
@@ -470,13 +365,8 @@ int main(int argc, char **argv)
 	}                                                                        \
 	} while (0)
 
-#define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
-
 	/* initialize this early because it has to parse options */
 	gen_firm_init();
-
-	int colorterm = detect_color_terminal();
-	diagnostic_enable_color(colorterm);
 
 	/* early options parsing (find out optimization level and OS) */
 	bool argument_errors = false;
@@ -510,180 +400,16 @@ invalid_o_option:
 	setup_target_machine();
 
 	/* parse rest of options */
-	help_sections_t         help            = HELP_NONE;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
 			/* an option */
 			const char *option = &arg[1];
-			if (option[0] == 'g') {
-				/* TODO: parse -gX with 0<=X<=3... */
-				set_be_option("debug=frameinfo");
-				set_be_option("ia32-optcc=false");
-			} else if (option[0] == 'O') {
+			if (option[0] == 'O') {
 				continue;
-			} else if (SINGLE_OPTION('w')) {
-				driver_add_flag(&cppflags_obst, "-w");
-				disable_all_warnings();
 			} else if (streq(option, "nostdinc")) {
 				stdinc = false;
 				driver_add_flag(&cppflags_obst, "%s", arg);
-			} else if (streq(option, "pthread")) {
-				/* set flags for the preprocessor */
-				driver_add_flag(&cppflags_obst, "-D_REENTRANT");
-				/* set flags for the linker */
-				driver_add_flag(&ldflags_obst, "-lpthread");
-			} else if (option[0] == 'f') {
-				char const *orig_opt;
-				GET_ARG_AFTER(orig_opt, "-f");
-
-				if (strstart(orig_opt, "align-loops=") ||
-				    strstart(orig_opt, "align-jumps=") ||
-				    strstart(orig_opt, "align-functions=")) {
-					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
-				} else if (strstart(orig_opt, "visibility=")) {
-					const char *val = strchr(orig_opt, '=')+1;
-					elf_visibility_tag_t visibility
-						= get_elf_visibility_from_string(val);
-					if (visibility == ELF_VISIBILITY_ERROR) {
-						errorf(NULL, "invalid visibility '%s' specified", val);
-						argument_errors = true;
-					} else {
-						set_default_visibility(visibility);
-					}
-				} else if (strstart(orig_opt, "message-length=")) {
-					/* ignore: would only affect error message format */
-				} else if (streq(orig_opt, "help")) {
-					fprintf(stderr, "warning: -fhelp is deprecated\n");
-					help |= HELP_OPTIMIZATION;
-				} else {
-					/* -f options which have an -fno- variant */
-					char const *opt         = orig_opt;
-					bool        truth_value = true;
-					if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
-						truth_value = false;
-						opt += 3;
-					}
-
-					if (streq(opt, "diagnostics-show-option")) {
-						diagnostics_show_option = truth_value;
-					} else if (streq(opt, "fast-math")) {
-						ir_allow_imprecise_float_transforms(truth_value);
-					} else if (streq(opt, "omit-frame-pointer")) {
-						set_be_option(truth_value ? "omitfp" : "omitfp=no");
-					} else if (streq(opt, "short-wchar")) {
-						dialect.wchar_atomic_kind
-							= truth_value ? ATOMIC_TYPE_USHORT
-							              : ATOMIC_TYPE_INT;
-					} else if (streq(opt, "show-column")) {
-						show_column = truth_value;
-					} else if (streq(opt, "color-diagnostics")
-					        || streq(opt, "diagnostics-color")) {
-						diagnostic_enable_color(truth_value
-						    ? (colorterm != 0 ? colorterm : 8)
-						    : 0);
-					} else if (streq(opt, "signed-char")) {
-						dialect.char_is_signed = truth_value;
-					} else if (streq(opt, "strength-reduce")) {
-						/* does nothing, for gcc compatibility (even gcc does
-						 * nothing for this switch anymore) */
-					} else if (streq(opt, "unsigned-char")) {
-						dialect.char_is_signed = !truth_value;
-					} else if (streq(opt, "freestanding")) {
-						dialect.freestanding = truth_value;
-					} else if (streq(opt, "hosted")) {
-						dialect.freestanding = !truth_value;
-					} else if (streq(opt, "profile-generate")) {
-						profile_generate = truth_value;
-					} else if (streq(opt, "profile-use")) {
-						profile_use = truth_value;
-					} else if (!truth_value &&
-					           streq(opt, "asynchronous-unwind-tables")) {
-					    /* nothing todo, a gcc feature which we do not support
-					     * anyway was deactivated */
-					} else if (streq(opt, "verbose-asm")) {
-						/* ignore: we always print verbose assembler */
-					} else if (streq(opt, "jump-tables")             ||
-					           streq(opt, "expensive-optimizations") ||
-					           streq(opt, "common")                  ||
-					           streq(opt, "optimize-sibling-calls")  ||
-					           streq(opt, "align-loops")             ||
-					           streq(opt, "align-jumps")             ||
-					           streq(opt, "align-functions")         ||
-					           streq(opt, "PIC")                     ||
-					           streq(opt, "stack-protector")         ||
-					           streq(opt, "stack-protector-all")) {
-						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
-					} else {
-						if (firm_option(orig_opt) == 0) {
-							errorf(NULL, "unknown Firm option '-f%s'", orig_opt);
-							argument_errors = true;
-							continue;
-						}
-					}
-				}
-			} else if (option[0] == 'b') {
-				const char *opt;
-				GET_ARG_AFTER(opt, "-b");
-
-				if (streq(opt, "help")) {
-					fprintf(stderr, "warning: -bhelp is deprecated (use --help-firm)\n");
-					help |= HELP_FIRM;
-				} else {
-					if (be_parse_arg(opt) == 0) {
-						errorf(NULL, "unknown Firm backend option '-b%s'", opt);
-						argument_errors = true;
-					} else if (strstart(opt, "isa=")) {
-						GET_ARG_AFTER(opt, "-bisa=");
-						snprintf(firm_be, sizeof(firm_be), "%s", opt);
-					}
-				}
-			} else if (option[0] == 'W') {
-				if (streq(option + 1, "no-trigraphs")
-							|| streq(option + 1, "undef")
-							|| streq(option + 1, "missing-include-dirs")
-							|| streq(option + 1, "endif-labels")) {
-					driver_add_flag(&cppflags_obst, "%s", arg);
-				} else if (streq(option+1, "init-self")) {
-					/* ignored (same as gcc does) */
-				} else if (streq(option+1, "format-y2k")
-				           || streq(option+1, "format-security")
-				           || streq(option+1, "old-style-declaration")
-				           || streq(option+1, "type-limits")) {
-					/* ignore (gcc compatibility) */
-				} else {
-					set_warning_opt(&option[1]);
-				}
-			} else if (option[0] == 'm') {
-				/* -m options */
-				const char *opt;
-
-				GET_ARG_AFTER(opt, "-m");
-				if (strstart(opt, "target=") || strstart(opt, "triple=")) {
-					GET_ARG_AFTER(opt, "-mtarget=");
-					if (!parse_target_triple(opt)) {
-						argument_errors = true;
-					} else {
-						const char *isa = setup_target_machine();
-						snprintf(firm_be, sizeof(firm_be), "%s", isa);
-						target.triple = opt;
-					}
-				} else {
-					/* remember option for backend */
-					assert(obstack_object_size(&codegenflags_obst) == 0);
-					obstack_blank(&codegenflags_obst, sizeof(codegen_option_t));
-					size_t len = strlen(opt);
-					obstack_grow0(&codegenflags_obst, opt, len);
-					codegen_option_t *option
-						= obstack_finish(&codegenflags_obst);
-					option->next            = NULL;
-
-					*codegen_options_anchor = option;
-					codegen_options_anchor  = &option->next;
-				}
-			} else if (streq(option, "pedantic")) {
-				dialect.strict = true;
-				set_warning_opt("pedantic");
 			} else if (streq(option, "version")) {
 				print_cparser_version();
 				return EXIT_SUCCESS;
@@ -713,30 +439,6 @@ invalid_o_option:
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					return EXIT_SUCCESS;
-				} else if (streq(option, "help")) {
-					help |= HELP_BASIC;
-				} else if (streq(option, "help-preprocessor")) {
-					help |= HELP_PREPROCESSOR;
-				} else if (streq(option, "help-parser")) {
-					help |= HELP_PARSER;
-				} else if (streq(option, "help-warnings")) {
-					help |= HELP_WARNINGS;
-				} else if (streq(option, "help-codegen")) {
-					help |= HELP_CODEGEN;
-				} else if (streq(option, "help-linker")) {
-					help |= HELP_LINKER;
-				} else if (streq(option, "help-optimization")) {
-					help |= HELP_OPTIMIZATION;
-				} else if (streq(option, "help-language-tools")) {
-					help |= HELP_LANGUAGETOOLS;
-				} else if (streq(option, "help-debug")) {
-					help |= HELP_DEBUG;
-				} else if (streq(option, "help-firm")) {
-					help |= HELP_FIRM;
-				} else if (streq(option, "help-all")) {
-					help |= HELP_ALL;
-				} else if (streq(option, "unroll-loops")) {
-					/* ignore (gcc compatibility) */
 				} else {
 					goto unknown_arg;
 				}
@@ -750,10 +452,15 @@ unknown_arg:;
 			state.argc = argc;
 			state.argv = argv;
 			state.i    = i;
-			if (options_parse_preprocessor(&state)
-			 || options_parse_assembler(&state)
+			if (options_parse_assembler(&state)
+			 || options_parse_c_dialect(&state)
+			 || options_parse_codegen(&state)
+			 || options_parse_diagnostics(&state)
+			 || options_parse_driver(&state)
+			 || options_parse_help(&state)
 			 || options_parse_linker(&state)
-			 || options_parse_driver(&state)) {
+			 || options_parse_meta(&state)
+			 || options_parse_preprocessor(&state)) {
 				i                = state.i;
 				argument_errors |= state.argument_errors;
 				had_inputs      |= state.had_inputs;
@@ -764,8 +471,7 @@ unknown_arg:;
 		}
 	}
 
-	if (help != HELP_NONE) {
-		help_print(argv[0], help);
+	if (action_print_help(argv[0])) {
 		return argument_errors ? EXIT_FAILURE : EXIT_SUCCESS;
 	}
 
@@ -774,37 +480,10 @@ unknown_arg:;
 		return EXIT_SUCCESS;
 	}
 
-	/* pass options to firm backend (this happens delayed because we first
-	 * had to decide which backend is actually used) */
-	for (codegen_option_t *option = codegen_options; option != NULL;
-	     option = option->next) {
-		char        buf[256];
-	    const char *opt = option->option;
-	    /* pass option along to firm backend (except the -m32, -m64 stuff) */
-	    if (opt[0] < '0' || opt[0] > '9') {
-			snprintf(buf, sizeof(buf), "%s-%s", firm_be, opt);
-			if (be_parse_arg(buf) == 0) {
-				errorf(NULL, "Unknown codegen option '-m%s'", opt);
-				argument_errors = true;
-				continue;
-			}
-		}
-
-		/* hack to emulate the behaviour of some gcc spec files which filter
-		 * flags to pass to cpp/ld/as */
-		static char const *const pass_to_cpp_and_ld[] = {
-			"soft-float", "32", "64", "16"
-		};
-		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
-			if (streq(pass_to_cpp_and_ld[i], option->option)) {
-				snprintf(buf, sizeof(buf), "-m%s", option->option);
-				driver_add_flag(&cppflags_obst, buf);
-				driver_add_flag(&asflags_obst, buf);
-				driver_add_flag(&ldflags_obst, buf);
-				break;
-			}
-		}
-	}
+	options_state_t state;
+	memset(&state, 0, sizeof(state));
+	pass_options_to_firm_be(&state);
+	argument_errors |= state.argument_errors;
 
 	if (!had_inputs) {
 		errorf(NULL, "no input files specified");
@@ -817,15 +496,6 @@ unknown_arg:;
 	}
 
 	init_driver_tools();
-
-	/* apply some effects from switches */
-	if (profile_generate) {
-		driver_add_flag(&ldflags_obst, "-lfirmprof");
-		set_be_option("profilegenerate");
-	}
-	if (profile_use) {
-		set_be_option("profileuse");
-	}
 
 	/* TODO/FIXME we should have nothing depending on c dialect before we
 	 * are processing the first source file... */
