@@ -40,6 +40,8 @@ unsigned        features_off;
 bool            construct_dep_target;
 bool            dump_defines;
 bool            produce_statev;
+bool            print_timing;
+bool            do_timing;
 const char     *filtev;
 const char     *dumpfunction;
 lang_standard_t standard;
@@ -896,6 +898,8 @@ void driver_add_input(const char *filename, compilation_unit_type_t type)
 
 int driver_go(void)
 {
+	if (do_timing)
+		timer_init();
 	if (driver_verbose)
 		print_include_paths();
 
@@ -998,14 +1002,12 @@ int driver_go(void)
 
 		dump_ir_graph_file(out, irg);
 		fclose(out);
-		return EXIT_SUCCESS;
 	} else if (mode == MODE_COMPILE_EXPORTIR) {
 		ir_export_file(out);
 		if (ferror(out) != 0) {
 			errorf(NULL, "writing to output failed");
 			return EXIT_FAILURE;
 		}
-		return EXIT_SUCCESS;
 	} else if (mode == MODE_COMPILE_ASSEMBLE_LINK) {
 		int const link_result = link_program(units);
 		if (link_result != EXIT_SUCCESS) {
@@ -1015,6 +1017,8 @@ int driver_go(void)
 		}
 	}
 
+	if (do_timing)
+		timer_term(print_timing ? stderr : NULL);
 	return EXIT_SUCCESS;
 }
 

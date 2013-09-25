@@ -334,8 +334,6 @@ int main(int argc, char **argv)
 {
 	const char *print_file_name_file = NULL;
 	int         opt_level            = 1;
-	bool        do_timing            = false;
-	bool        print_timing         = false;
 	bool        stdinc               = true;
 	bool        had_inputs           = false;
 
@@ -428,15 +426,7 @@ invalid_o_option:
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;
-				if (streq(option, "time")) {
-					do_timing    = true;
-					print_timing = true;
-				} else if (streq(option, "statev")) {
-					do_timing      = true;
-					produce_statev = true;
-				} else if (strstart(option, "filtev=")) {
-					GET_ARG_AFTER(filtev, "--filtev=");
-				} else if (streq(option, "version")) {
+				if (streq(option, "version")) {
 					print_cparser_version();
 					return EXIT_SUCCESS;
 				} else {
@@ -521,13 +511,7 @@ unknown_arg:;
 	init_ast2firm();
 	init_mangle();
 
-	if (do_timing)
-		timer_init();
-
 	int result = driver_go();
-
-	if (do_timing)
-		timer_term(print_timing ? stderr : NULL);
 
 	free_temp_files();
 	obstack_free(&file_obst, NULL);
