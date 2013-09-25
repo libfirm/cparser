@@ -4149,6 +4149,8 @@ void init_preprocessor(void)
 
 void exit_preprocessor(void)
 {
+	if (macro_call_stack == NULL)
+		return;
 	DEL_ARR_F(macro_call_stack);
 	DEL_ARR_F(argument_stack);
 	DEL_ARR_F(expansion_stack);
