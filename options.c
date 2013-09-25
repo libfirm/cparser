@@ -287,6 +287,14 @@ bool options_parse_driver(options_state_t *s)
 	} else if (streq(option, "fno-syntax-only")) {
 	} else if (streq(option, "v")) {
 		driver_verbose = true;
+	} else if (streq(option, "-time")) {
+		do_timing    = true;
+		print_timing = true;
+	} else if (streq(option, "-statev")) {
+		do_timing      = true;
+		produce_statev = true;
+	} else if ((arg = equals_arg("-filtev=", s)) != NULL) {
+		filtev = arg;
 	} else {
 		return false;
 	}
