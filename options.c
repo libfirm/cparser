@@ -159,8 +159,7 @@ bool options_parse_preprocessor(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "%s", arg);
 		append_include_path(&quote_searchpath, arg);
 	} else if (streq(option, "nostdinc")) {
-		/* TODO */
-		//stdinc = false;
+		driver_no_stdinc = true;
 		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if ((arg = equals_arg("finput-charset=", s)) != NULL) {
 		input_decoder = input_get_decoder(arg);
