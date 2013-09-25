@@ -59,24 +59,6 @@
 #define ASSEMBLER "gcc -c -xassembler"
 #endif
 
-#ifndef COMPILER_INCLUDE_DIR
-#define COMPILER_INCLUDE_DIR NULL
-#endif
-#ifndef LOCAL_INCLUDE_DIR
-#define LOCAL_INCLUDE_DIR NULL
-#endif
-#ifndef TARGET_INCLUDE_DIR
-#define TARGET_INCLUDE_DIR NULL
-#endif
-#ifndef SYSTEM_INCLUDE_DIR
-#define SYSTEM_INCLUDE_DIR NULL
-#endif
-
-static const char  *compiler_include_dir      = COMPILER_INCLUDE_DIR;
-static const char  *local_include_dir         = LOCAL_INCLUDE_DIR;
-static const char  *target_include_dir        = TARGET_INCLUDE_DIR;
-static const char  *system_include_dir        = SYSTEM_INCLUDE_DIR;
-
 c_dialect_t dialect = {
 	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
 	.char_is_signed = true,
@@ -84,12 +66,6 @@ c_dialect_t dialect = {
 target_t target;
 
 static struct obstack file_obst;
-
-static const char *type_to_string(const type_t *type)
-{
-	assert(type->kind == TYPE_ATOMIC);
-	return get_atomic_kind_name(type->atomic.akind);
-}
 
 static void print_cparser_version(void)
 {
@@ -240,40 +216,6 @@ static void init_types_and_adjust(void)
 	set_modeP_code(ptr_mode);
 }
 
-static void append_standard_include_paths(void)
-{
-	if (compiler_include_dir != NULL)
-		append_include_path(&system_searchpath, compiler_include_dir);
-	if (local_include_dir != NULL)
-		append_include_path(&system_searchpath, local_include_dir);
-	if (target_include_dir != NULL)
-		append_include_path(&system_searchpath, target_include_dir);
-	else if (target_include_dir == NULL && system_include_dir != NULL) {
-		/* some guessing to find the "gcc-multilib" include dir */
-		assert(obstack_object_size(&file_obst) == 0);
-		if (firm_is_ia32_cpu(target.machine->cpu_type)
-			&& firm_is_unixish_os(target.machine)) {
-			obstack_printf(&file_obst, "%s/i386-linux-gnu", system_include_dir);
-	path_from_obst:;
-			obstack_1grow(&file_obst, '\0');
-			char *path = obstack_finish(&file_obst);
-			append_include_path(&system_searchpath, path);
-		} else if (target.triple != NULL) {
-			obstack_printf(&file_obst, "%s/%s", system_include_dir, target.triple);
-			goto path_from_obst;
-		}
-	}
-	if (system_include_dir != NULL)
-		append_include_path(&system_searchpath, system_include_dir);
-}
-
-static void append_environment_include_paths(void)
-{
-	append_env_paths(&bracket_searchpath, "CPATH");
-	append_env_paths(&system_searchpath,
-	                 dialect.cpp ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
-}
-
 static void init_driver_tools(void)
 {
 	assert(obstack_object_size(&file_obst) == 0);
@@ -301,40 +243,10 @@ static void init_driver_tools(void)
 	}
 }
 
-static void init_external_preprocessor(void)
-{
-	struct obstack *o = &c_cpp_cppflags_obst;
-	/* setup default defines */
-	driver_add_flag(o, "-U__WCHAR_TYPE__");
-	driver_add_flag(o, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
-	driver_add_flag(o, "-U__SIZE_TYPE__");
-	driver_add_flag(o, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
-
-	driver_add_flag(o, "-U__VERSION__");
-	driver_add_flag(o, "-D__VERSION__=\"%s\"", CPARSER_VERSION);
-	driver_add_flag(o, "-D__CPARSER_MAJOR__=\"%s\"", CPARSER_MAJOR);
-	driver_add_flag(o, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
-	driver_add_flag(o, "-D__CPARSER_PATCHLEVEL__=\"%s\"",
-					CPARSER_PATCHLEVEL);
-
-	driver_add_flag(o, "-U_FORTIFY_SOURCE");
-	driver_add_flag(o, "-D_FORTIFY_SOURCE=0");
-
-	if (dialect.intmax_predefs) {
-		driver_add_flag(o, "-U__INTMAX_TYPE__");
-		driver_add_flag(o, "-D__INTMAX_TYPE__=%s",
-						type_to_string(type_intmax_t));
-		driver_add_flag(o, "-U__UINTMAX_TYPE__");
-		driver_add_flag(o, "-D__UINTMAX_TYPE__=%s",
-						type_to_string(type_uintmax_t));
-	}
-}
-
 int main(int argc, char **argv)
 {
 	const char *print_file_name_file = NULL;
 	int         opt_level            = 1;
-	bool        stdinc               = true;
 	bool        had_inputs           = false;
 
 	obstack_init(&file_obst);
@@ -405,9 +317,6 @@ invalid_o_option:
 			const char *option = &arg[1];
 			if (option[0] == 'O') {
 				continue;
-			} else if (streq(option, "nostdinc")) {
-				stdinc = false;
-				driver_add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "version")) {
 				print_cparser_version();
 				return EXIT_SUCCESS;
@@ -499,12 +408,6 @@ unknown_arg:;
 	} else {
 		init_wchar_types(dialect.wchar_atomic_kind);
 	}
-	if (stdinc)
-		append_standard_include_paths();
-	append_environment_include_paths();
-	init_preprocessor();
-	if (driver_use_external_preprocessor)
-		init_external_preprocessor();
 	init_ast();
 	init_constfold();
 	init_parser();

@@ -93,6 +93,7 @@ extern const char     *driver_assembler;
 extern const char     *driver_default_exe_output;
 extern bool            driver_use_external_preprocessor;
 extern bool            driver_verbose;
+extern bool            driver_no_stdinc;
 extern bool            do_timing;
 extern bool            print_timing;
 
