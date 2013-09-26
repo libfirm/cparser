@@ -31,6 +31,18 @@
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 
+#ifndef PREPROCESSOR
+#define PREPROCESSOR "gcc -E"
+#endif
+
+#ifndef LINKER
+#define LINKER    "gcc"
+#endif
+
+#ifndef ASSEMBLER
+#define ASSEMBLER "gcc -c -xassembler"
+#endif
+
 #ifndef COMPILER_INCLUDE_DIR
 #define COMPILER_INCLUDE_DIR NULL
 #endif
@@ -223,6 +235,10 @@ static void init_external_preprocessor(void)
 
 	driver_add_flag(o, "-U_FORTIFY_SOURCE");
 	driver_add_flag(o, "-D_FORTIFY_SOURCE=0");
+
+	if (!dialect.gnu && !dialect.ms && !dialect.cpp)
+		driver_add_flag(o, "-U__STRICT_ANSI__");
+	driver_add_flag(o, "-U__BLOCKS__");
 
 	if (dialect.intmax_predefs) {
 		driver_add_flag(o, "-U__INTMAX_TYPE__");
@@ -1117,6 +1133,33 @@ static int detect_color_terminal(void)
 	return 8;
 }
 
+static void init_driver_tools(void)
+{
+	assert(obstack_object_size(&file_obst) == 0);
+	/* decide which linker, preprocessor, assembler to use */
+	driver_preprocessor = getenv("CPARSER_PP");
+	if (driver_preprocessor == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", PREPROCESSOR);
+		driver_preprocessor = obstack_finish(&file_obst);
+	}
+	driver_assembler = getenv("CPARSER_AS");
+	if (driver_assembler == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", ASSEMBLER);
+		driver_assembler = obstack_finish(&file_obst);
+	}
+	driver_linker = getenv("CPARSER_LINK");
+	if (driver_linker == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", LINKER);
+		driver_linker = obstack_finish(&file_obst);
+	}
+}
+
 void init_driver(void)
 {
 	obstack_init(&codegenflags_obst);
@@ -1125,6 +1168,8 @@ void init_driver(void)
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
+
+	init_driver_tools();
 
 	colorterm = detect_color_terminal();
 	diagnostic_enable_color(colorterm);
