@@ -167,30 +167,6 @@ static bool close_input(compilation_unit_t *unit)
 	return res;
 }
 
-void driver_print_file_name(const char *file)
-{
-	driver_add_flag(&ldflags_obst, "-print-file-name=%s", file);
-
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
-
-	/* construct commandline */
-	obstack_printf(&ldflags_obst, "%s ", driver_linker);
-	obstack_printf(&ldflags_obst, "%s", flags);
-	obstack_1grow(&ldflags_obst, '\0');
-
-	char *commandline = obstack_finish(&ldflags_obst);
-	if (driver_verbose) {
-		puts(commandline);
-	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "%s: error: linker reported an error\n", file);
-		exit(EXIT_FAILURE);
-	}
-	obstack_free(&ldflags_obst, commandline);
-}
-
 static char const* str_lang_standard(lang_standard_t const standard)
 {
 	switch (standard) {
@@ -994,8 +970,14 @@ void driver_add_input(const char *filename, compilation_unit_type_t type)
 	last_unit = entry;
 }
 
-int driver_go(void)
+int action_compile(const char *argv0)
 {
+	(void)argv0;
+	if (units == NULL) {
+		errorf(NULL, "no input files specified");
+		return EXIT_FAILURE;
+	}
+
 	if (do_timing)
 		timer_init();
 	if (driver_verbose)

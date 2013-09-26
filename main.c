@@ -41,7 +41,6 @@
 #include "types.h"
 #include "version.h"
 #include "warning.h"
-#include <revision.h>
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
@@ -66,30 +65,6 @@ c_dialect_t dialect = {
 target_t target;
 
 static struct obstack file_obst;
-
-static void print_cparser_version(void)
-{
-	printf("cparser %s.%s.%s",
-	       CPARSER_MAJOR, CPARSER_MINOR, CPARSER_PATCHLEVEL);
-	if (cparser_REVISION[0] != '\0') {
-		printf("(%s)", cparser_REVISION);
-	}
-	printf(" using libFirm %u.%u",
-	       ir_get_version_major(), ir_get_version_minor());
-
-	const char *revision = ir_get_version_revision();
-	if (revision[0] != 0) {
-		printf("(%s)", revision);
-	}
-	putchar('\n');
-	fputs("This is free software; see the source for copying conditions.  There is NO\n"
-	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n", stdout);
-}
-
-static void print_cparser_version_short(void)
-{
-	puts(cparser_REVISION);
-}
 
 /**
  * initialize cparser type properties based on a firm type
@@ -245,9 +220,7 @@ static void init_driver_tools(void)
 
 int main(int argc, char **argv)
 {
-	const char *print_file_name_file = NULL;
-	int         opt_level            = 1;
-	bool        had_inputs           = false;
+	int opt_level = 1;
 
 	obstack_init(&file_obst);
 	init_temp_files();
@@ -256,30 +229,17 @@ int main(int argc, char **argv)
 	init_driver();
 	preprocessor_early_init();
 
-#define GET_ARG_AFTER(def, args)                                             \
-	do {                                                                     \
-	def = &arg[sizeof(args)-1];                                              \
-	if (def[0] == '\0') {                                                    \
-		++i;                                                                 \
-		if (i >= argc) {                                                     \
-			errorf(NULL, "expected argument after '" args "'"); \
-			argument_errors = true;                                          \
-			break;                                                           \
-		}                                                                    \
-		def = argv[i];                                                       \
-		if (def[0] == '-' && def[1] != '\0') {                               \
-			errorf(NULL, "expected argument after '" args "'"); \
-			argument_errors = true;                                          \
-			continue;                                                        \
-		}                                                                    \
-	}                                                                        \
-	} while (0)
-
 	/* initialize this early because it has to parse options */
 	gen_firm_init();
 
+	options_state_t state;
+	memset(&state, 0, sizeof(state));
+	state.argc   = argc;
+	state.argv   = argv;
+	state.i      = 1;
+	state.action = action_compile;
+
 	/* early options parsing (find out optimization level and OS) */
-	bool argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] != '-')
@@ -297,7 +257,7 @@ int main(int argc, char **argv)
 			} else {
 invalid_o_option:
 				errorf(NULL, "invalid optimization option '%s'", arg);
-				argument_errors = true;
+				state.argument_errors = true;
 				continue;
 			}
 		}
@@ -310,86 +270,44 @@ invalid_o_option:
 	setup_target_machine();
 
 	/* parse rest of options */
-	for (int i = 1; i < argc; ++i) {
-		const char *arg = argv[i];
+	for (state.i = 1; state.i < argc; ++state.i) {
+		if (options_parse_assembler(&state)
+		 || options_parse_c_dialect(&state)
+		 || options_parse_codegen(&state)
+		 || options_parse_diagnostics(&state)
+		 || options_parse_driver(&state)
+		 || options_parse_help(&state)
+		 || options_parse_linker(&state)
+		 || options_parse_meta(&state)
+		 || options_parse_preprocessor(&state)) {
+			continue;
+		}
+
+		const char *arg = argv[state.i];
 		if (arg[0] == '-' && arg[1] != '\0') {
 			/* an option */
 			const char *option = &arg[1];
 			if (option[0] == 'O') {
 				continue;
-			} else if (streq(option, "version")) {
-				print_cparser_version();
-				return EXIT_SUCCESS;
-			} else if (streq(option, "dumpversion")) {
-				/* gcc compatibility option */
-				print_cparser_version_short();
-				return EXIT_SUCCESS;
-			} else if (strstart(option, "print-file-name=")) {
-				GET_ARG_AFTER(print_file_name_file, "-print-file-name=");
 			} else if (option[0] == 'd') {
 				/* scan debug flags */
 				for (const char *flag = &option[1]; *flag != '\0'; ++flag) {
 					if (*flag == 'M')
 						dump_defines = true;
 				}
-			} else if (option[0] == '-') {
-				/* double dash option */
-				++option;
-				if (streq(option, "version")) {
-					print_cparser_version();
-					return EXIT_SUCCESS;
-				} else {
-					goto unknown_arg;
-				}
 			} else {
 				goto unknown_arg;
 			}
 		} else {
-unknown_arg:;
-			options_state_t state;
-			memset(&state, 0, sizeof(state));
-			state.argc = argc;
-			state.argv = argv;
-			state.i    = i;
-			if (options_parse_assembler(&state)
-			 || options_parse_c_dialect(&state)
-			 || options_parse_codegen(&state)
-			 || options_parse_diagnostics(&state)
-			 || options_parse_driver(&state)
-			 || options_parse_help(&state)
-			 || options_parse_linker(&state)
-			 || options_parse_meta(&state)
-			 || options_parse_preprocessor(&state)) {
-				i                = state.i;
-				argument_errors |= state.argument_errors;
-				had_inputs      |= state.had_inputs;
-			} else {
-				errorf(NULL, "unknown argument '%s'", arg);
-				argument_errors = true;
-			}
+unknown_arg:
+			errorf(NULL, "unknown argument '%s'", arg);
+			state.argument_errors = true;
 		}
 	}
 
-	if (action_print_help(argv[0])) {
-		return argument_errors ? EXIT_FAILURE : EXIT_SUCCESS;
-	}
-
-	if (print_file_name_file != NULL) {
-		driver_print_file_name(print_file_name_file);
-		return EXIT_SUCCESS;
-	}
-
-	options_state_t state;
-	memset(&state, 0, sizeof(state));
 	pass_options_to_firm_be(&state);
-	argument_errors |= state.argument_errors;
 
-	if (!had_inputs) {
-		errorf(NULL, "no input files specified");
-		argument_errors = true;
-	}
-
-	if (argument_errors) {
+	if (state.argument_errors) {
 		help_usage(argv[0]);
 		return EXIT_FAILURE;
 	}
@@ -414,7 +332,8 @@ unknown_arg:;
 	init_ast2firm();
 	init_mangle();
 
-	int result = driver_go();
+	assert(state.action != NULL);
+	int ret = state.action(argv[0]);
 
 	free_temp_files();
 	obstack_free(&file_obst, NULL);
@@ -430,5 +349,5 @@ unknown_arg:;
 	exit_tokens();
 	exit_symbol_table();
 	exit_driver();
-	return result;
+	return ret;
 }

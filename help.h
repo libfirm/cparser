@@ -31,8 +31,10 @@ typedef enum {
 	HELP_ALL           = -1
 } help_sections_t;
 
-void help_print(const char *argv0, help_sections_t sections);
-
 void help_usage(const char *argv0);
+
+int action_help(const char *argv0);
+
+extern help_sections_t help;
 
 #endif

@@ -41,6 +41,7 @@ LINKFLAGS_coverage = --coverage
 LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
 cparser_SOURCES = \
+	actions.c \
 	adt/strset.c \
 	adt/strutil.c \
 	adt/pset_new.c \

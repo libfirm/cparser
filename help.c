@@ -11,6 +11,8 @@
 #include "driver/firm_opt.h"
 #include "warning.h"
 
+help_sections_t help;
+
 void put_help(const char *option, const char *explanation)
 {
 	printf("\t%-15s  %s\n", option, explanation);
@@ -204,16 +206,17 @@ static void print_help_firm(void)
 	assert(res);
 }
 
-void help_print(const char *argv0, help_sections_t sections)
+int action_help(const char *argv0)
 {
-	if (sections & HELP_BASIC)         print_help_basic(argv0);
-	if (sections & HELP_PREPROCESSOR)  print_help_preprocessor();
-	if (sections & HELP_PARSER)        print_help_parser();
-	if (sections & HELP_WARNINGS)      print_help_warnings();
-	if (sections & HELP_OPTIMIZATION)  print_help_optimization();
-	if (sections & HELP_CODEGEN)       print_help_codegeneration();
-	if (sections & HELP_LINKER)        print_help_linker();
-	if (sections & HELP_LANGUAGETOOLS) print_help_language_tools();
-	if (sections & HELP_DEBUG)         print_help_debug();
-	if (sections & HELP_FIRM)          print_help_firm();
+	if (help & HELP_BASIC)         print_help_basic(argv0);
+	if (help & HELP_PREPROCESSOR)  print_help_preprocessor();
+	if (help & HELP_PARSER)        print_help_parser();
+	if (help & HELP_WARNINGS)      print_help_warnings();
+	if (help & HELP_OPTIMIZATION)  print_help_optimization();
+	if (help & HELP_CODEGEN)       print_help_codegeneration();
+	if (help & HELP_LINKER)        print_help_linker();
+	if (help & HELP_LANGUAGETOOLS) print_help_language_tools();
+	if (help & HELP_DEBUG)         print_help_debug();
+	if (help & HELP_FIRM)          print_help_firm();
+	return EXIT_SUCCESS;
 }
