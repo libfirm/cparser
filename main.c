@@ -42,29 +42,11 @@
 #include "version.h"
 #include "warning.h"
 
-#ifndef PREPROCESSOR
-#ifndef __WIN32__
-#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__ -U__BLOCKS__"
-#else
-#define PREPROCESSOR "cpp -U__STRICT_ANSI__"
-#endif
-#endif
-
-#ifndef LINKER
-#define LINKER    "gcc"
-#endif
-
-#ifndef ASSEMBLER
-#define ASSEMBLER "gcc -c -xassembler"
-#endif
-
 c_dialect_t dialect = {
 	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
 	.char_is_signed = true,
 };
 target_t target;
-
-static struct obstack file_obst;
 
 /**
  * initialize cparser type properties based on a firm type
@@ -191,38 +173,10 @@ static void init_types_and_adjust(void)
 	set_modeP_code(ptr_mode);
 }
 
-static void init_driver_tools(void)
-{
-	assert(obstack_object_size(&file_obst) == 0);
-	/* decide which linker, preprocessor, assembler to use */
-	driver_preprocessor = getenv("CPARSER_PP");
-	if (driver_preprocessor == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", PREPROCESSOR);
-		driver_preprocessor = obstack_finish(&file_obst);
-	}
-	driver_assembler = getenv("CPARSER_AS");
-	if (driver_assembler == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", ASSEMBLER);
-		driver_assembler = obstack_finish(&file_obst);
-	}
-	driver_linker = getenv("CPARSER_LINK");
-	if (driver_linker == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", LINKER);
-		driver_linker = obstack_finish(&file_obst);
-	}
-}
-
 int main(int argc, char **argv)
 {
 	int opt_level = 1;
 
-	obstack_init(&file_obst);
 	init_temp_files();
 	init_symbol_table();
 	init_tokens();
@@ -312,8 +266,6 @@ unknown_arg:
 		return EXIT_FAILURE;
 	}
 
-	init_driver_tools();
-
 	/* TODO/FIXME we should have nothing depending on c dialect before we
 	 * are processing the first source file... */
 	init_c_dialect(false, standard != STANDARD_DEFAULT ? standard
@@ -336,7 +288,6 @@ unknown_arg:
 	int ret = state.action(argv[0]);
 
 	free_temp_files();
-	obstack_free(&file_obst, NULL);
 
 	gen_firm_finish();
 	exit_mangle();
