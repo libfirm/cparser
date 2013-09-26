@@ -106,7 +106,7 @@ void driver_add_flag(struct obstack *obst, const char *format, ...);
 
 void driver_print_file_name(const char *name);
 
-int driver_go(void);
+int action_compile(const char *argv0);
 
 void init_driver(void);
 void exit_driver(void);

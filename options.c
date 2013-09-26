@@ -8,6 +8,7 @@
 #include <libfirm/be.h>
 #include <string.h>
 
+#include "actions.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast2firm.h"
@@ -294,6 +295,13 @@ bool options_parse_driver(options_state_t *s)
 		produce_statev = true;
 	} else if ((arg = equals_arg("-filtev=", s)) != NULL) {
 		filtev = arg;
+	} else if ((arg = equals_arg("print-file-name=", s)) != NULL) {
+		print_file_name_file = arg;
+		s->action = action_print_file_name;
+	} else if (streq(option, "version") || streq(option, "-version")) {
+		s->action = action_version;
+	} else if (streq(option, "dumpversion")) {
+		s->action = action_version_short;
 	} else {
 		return false;
 	}
@@ -538,8 +546,6 @@ bool options_parse_c_dialect(options_state_t *s)
 	return true;
 }
 
-static help_sections_t help = HELP_NONE;
-
 bool options_parse_help(options_state_t *s)
 {
 	const char *full_option = s->argv[s->i];
@@ -579,16 +585,8 @@ bool options_parse_help(options_state_t *s)
 	} else {
 		return false;
 	}
+	s->action = action_help;
 	return true;
-}
-
-bool action_print_help(const char *argv0)
-{
-	if (help != HELP_NONE) {
-		help_print(argv0, help);
-		return true;
-	}
-	return false;
 }
 
 void pass_options_to_firm_be(options_state_t *s)
