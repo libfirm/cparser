@@ -22,6 +22,7 @@
 #include "constfold.h"
 #include "constfoldbits.h"
 #include "diagnostic.h"
+#include "driver.h"
 #include "driver/firm_machine.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_timing.h"
@@ -29,23 +30,19 @@
 #include "lang_features.h"
 #include "mangle.h"
 #include "parser.h"
+#include "predefs.h"
 #include "preprocessor.h"
 #include "printer.h"
 #include "symbol_table.h"
-#include "token_t.h"
+#include "tempfile.h"
 #include "type_hash.h"
 #include "type_t.h"
 #include "types.h"
-#include "warning.h"
+#include "version.h"
 #include "wrappergen/write_compoundsizes.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 #include <revision.h>
-
-#define CPARSER_MAJOR      "0"
-#define CPARSER_MINOR      "9"
-#define CPARSER_PATCHLEVEL "14"
-#define CPARSER_VERSION   CPARSER_MAJOR "." CPARSER_MINOR "." CPARSER_PATCHLEVEL
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
@@ -87,82 +84,8 @@ c_dialect_t dialect = {
 };
 target_t target;
 
-static unsigned        features_on         = 0;
-static unsigned        features_off        = 0;
-static const char     *dumpfunction        = NULL;
 static struct obstack  file_obst;
-static const char     *external_preprocessor = PREPROCESSOR;
-
-static int             verbose;
-static struct obstack  cppflags_obst;
-static struct obstack  ldflags_obst;
-static struct obstack  asflags_obst;
-static struct obstack  codegenflags_obst;
-static const char     *asflags;
-static const char     *outname;
-static bool            construct_dep_target;
-static bool            dump_defines;
-
-typedef enum compile_mode_t {
-	MODE_BENCHMARK_PARSER,
-	MODE_PREPROCESS_ONLY,
-	MODE_GENERATE_DEPENDENCIES,
-	MODE_PARSE_ONLY,
-	MODE_COMPILE,
-	MODE_COMPILE_DUMP,
-	MODE_COMPILE_EXPORTIR,
-	MODE_COMPILE_ASSEMBLE,
-	MODE_COMPILE_ASSEMBLE_LINK,
-	MODE_PRINT_AST,
-	MODE_PRINT_FLUFFY,
-	MODE_PRINT_JNA,
-	MODE_PRINT_COMPOUND_SIZE,
-} compile_mode_t;
-
-typedef enum lang_standard_t {
-	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
-	STANDARD_ANSI,    /* ISO C90 (for C) or ISO C++ 1998 (for C++) */
-	STANDARD_C89,     /* ISO C90 (sic) */
-	STANDARD_C89AMD1, /* ISO C90 as modified in amendment 1 */
-	STANDARD_C99,     /* ISO C99 */
-	STANDARD_C11,     /* ISO C11 */
-	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
-	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
-	STANDARD_GNU11,   /* ISO C11 plus GNU extensions */
-	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
-	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
-} lang_standard_t;
-
-typedef enum compilation_unit_type_t {
-	COMPILATION_UNIT_AUTODETECT,
-	COMPILATION_UNIT_C,
-	COMPILATION_UNIT_PREPROCESSED_C,
-	COMPILATION_UNIT_CXX,
-	COMPILATION_UNIT_PREPROCESSED_CXX,
-	COMPILATION_UNIT_LEXER_TOKENS_C,
-	COMPILATION_UNIT_LEXER_TOKENS_CXX,
-	COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
-	COMPILATION_UNIT_AST,
-	COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
-	COMPILATION_UNIT_ASSEMBLER,
-	COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
-	COMPILATION_UNIT_OBJECT,
-	COMPILATION_UNIT_IR,
-	COMPILATION_UNIT_DEPENDENCIES,
-	COMPILATION_UNIT_UNKNOWN
-} compilation_unit_type_t;
-
-typedef struct compilation_unit_t compilation_unit_t;
-struct compilation_unit_t {
-	const char             *name;  /**< filename or "-" for stdin */
-	FILE                   *input; /**< input (NULL if not opened yet) */
-	input_t                *input_decoder;
-	bool                    input_is_pipe;
-	compilation_unit_type_t type;
-	lang_standard_t         standard;
-	translation_unit_t     *ast;
-	compilation_unit_t     *next;
-};
+static const char     *external_preprocessor;
 
 typedef struct codegen_option_t codegen_option_t;
 
@@ -170,48 +93,6 @@ struct codegen_option_t {
 	codegen_option_t *next;
 	char              option[];
 };
-
-static char **temp_files;
-
-static void get_output_name(char *buf, size_t buflen, const char *inputname,
-                            const char *newext)
-{
-	if (inputname == NULL)
-		inputname = "a";
-
-	char const *const last_slash = strrchr(inputname, '/');
-	char const *const filename   =
-		last_slash != NULL ? last_slash + 1 : inputname;
-	char const *const last_dot   = strrchr(filename, '.');
-	char const *const name_end   =
-		last_dot != NULL ? last_dot : strchr(filename, '\0');
-
-	int const len = snprintf(buf, buflen, "%.*s%s",
-			(int)(name_end - filename), filename, newext);
-#ifdef _WIN32
-	if (len < 0 || buflen <= (size_t)len)
-#else
-	if (buflen <= (size_t)len)
-#endif
-		panic("filename too long");
-}
-
-static bool close_input(compilation_unit_t *unit)
-{
-	assert(unit->input);
-	bool res;
-	if (unit->input == stdin) {
-		res = true;
-	} else if (unit->input_is_pipe) {
-		res = pclose(unit->input) == EXIT_SUCCESS;
-	} else {
-		fclose(unit->input);
-		res = true;
-	}
-	unit->input = NULL;
-	unit->name  = NULL;
-	return res;
-}
 
 static int detect_color_terminal(void)
 {
@@ -228,393 +109,10 @@ static int detect_color_terminal(void)
 	return 8;
 }
 
-static void print_error_summary(void)
-{
-	if (error_count > 0) {
-		/* parsing failed because of errors */
-		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
-				warning_count);
-	} else if (warning_count > 0) {
-		fprintf(stderr, "%u warning(s)\n", warning_count);
-	}
-}
-
-static void add_flag(struct obstack *obst, const char *format, ...)
-{
-	char buf[65536];
-	va_list ap;
-
-	va_start(ap, format);
-#ifdef _WIN32
-	int len =
-#endif
-		vsnprintf(buf, sizeof(buf), format, ap);
-	va_end(ap);
-
-	obstack_1grow(obst, ' ');
-#ifdef _WIN32
-	obstack_1grow(obst, '"');
-	obstack_grow(obst, buf, len);
-	obstack_1grow(obst, '"');
-#else
-	/* escape stuff... */
-	for (char *c = buf; *c != '\0'; ++c) {
-		switch (*c) {
-		case ' ':
-		case '"':
-		case '$':
-		case '&':
-		case '(':
-		case ')':
-		case ';':
-		case '<':
-		case '>':
-		case '\'':
-		case '\\':
-		case '\n':
-		case '\r':
-		case '\t':
-		case '`':
-		case '|':
-			obstack_1grow(obst, '\\');
-			/* FALLTHROUGH */
-		default:
-			obstack_1grow(obst, *c);
-			break;
-		}
-	}
-#endif
-}
-
-static const char *type_to_string(type_t *type)
+static const char *type_to_string(const type_t *type)
 {
 	assert(type->kind == TYPE_ATOMIC);
 	return get_atomic_kind_name(type->atomic.akind);
-}
-
-static char const* str_lang_standard(lang_standard_t const standard)
-{
-	switch (standard) {
-	case STANDARD_C89:     return "c89";
-	case STANDARD_C89AMD1: return "iso9899:199409";
-	case STANDARD_C99:     return "c99";
-	case STANDARD_C11:     return "c11";
-	case STANDARD_GNU89:   return "gnu89";
-	case STANDARD_GNU99:   return "gnu99";
-	case STANDARD_GNU11:   return "gnu11";
-	case STANDARD_CXX98:   return "c++98";
-	case STANDARD_GNUXX98: return "gnu++98";
-	case STANDARD_ANSI:    break;
-	case STANDARD_DEFAULT: break;
-	}
-	panic("invalid standard");
-}
-
-static void copy_file(FILE *dest, FILE *input)
-{
-	char buf[16384];
-
-	for (;;) {
-		size_t bytes_read = fread(buf, 1, sizeof(buf), input);
-		if (bytes_read == 0)
-			break;
-		if (fwrite(buf, 1, bytes_read, dest) != bytes_read) {
-			perror("could not write output");
-		}
-	}
-}
-
-static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
-                                      compile_mode_t mode)
-{
-	obstack_1grow(&cppflags_obst, '\0');
-	const char *flags = obstack_finish(&cppflags_obst);
-
-	const char *preprocessor = getenv("CPARSER_PP");
-	if (preprocessor != NULL) {
-		obstack_printf(&cppflags_obst, "%s ", preprocessor);
-	} else {
-		if (target.triple != NULL)
-			obstack_printf(&cppflags_obst, "%s-", target.triple);
-		obstack_printf(&cppflags_obst, "%s", external_preprocessor);
-	}
-
-	char const *lang;
-	switch (unit->type) {
-	case COMPILATION_UNIT_C:         lang = "c";                  break;
-	case COMPILATION_UNIT_CXX:       lang = "c++";                break;
-	case COMPILATION_UNIT_ASSEMBLER: lang = "assembler-with-cpp"; break;
-	default:                         lang = NULL;                 break;
-	}
-	if (lang)
-		add_flag(&cppflags_obst, "-x%s", lang);
-
-	if (unit->type == COMPILATION_UNIT_C
-	 || unit->type == COMPILATION_UNIT_CXX) {
-		add_flag(&cppflags_obst, "-std=%s", str_lang_standard(unit->standard));
-
-		/* setup default defines */
-		add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
-		add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
-		add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
-		add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
-
-		add_flag(&cppflags_obst, "-U__VERSION__");
-		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", CPARSER_VERSION);
-		add_flag(&cppflags_obst, "-D__CPARSER_MAJOR__=\"%s\"", CPARSER_MAJOR);
-		add_flag(&cppflags_obst, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
-		add_flag(&cppflags_obst, "-D__CPARSER_PATCHLEVEL__=\"%s\"", CPARSER_PATCHLEVEL);
-
-		add_flag(&cppflags_obst, "-U_FORTIFY_SOURCE");
-		add_flag(&cppflags_obst, "-D_FORTIFY_SOURCE=0");
-
-		if (dialect.intmax_predefs) {
-			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
-			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
-			add_flag(&cppflags_obst, "-U__UINTMAX_TYPE__");
-			add_flag(&cppflags_obst, "-D__UINTMAX_TYPE__=%s", type_to_string(type_uintmax_t));
-		}
-	}
-	if (flags[0] != '\0') {
-		size_t len = strlen(flags);
-		obstack_1grow(&cppflags_obst, ' ');
-		obstack_grow(&cppflags_obst, flags, len);
-	}
-
-	/* handle dependency generation */
-	if (construct_dep_target) {
-		static char dep_target[4096];
-		if (outname != 0) {
-			size_t len = strlen(outname);
-			len = MIN(len, sizeof(dep_target) - 4); /* leave room for .d extension */
-			memcpy(dep_target, outname, len);
-			/* replace extension with .d if found */
-			char *dot = &dep_target[len-1];
-			for ( ; dot >= dep_target && *dot != '/'; --dot) {
-				if (*dot == '.') {
-					dot[1] = 'd';
-					len = (dot-dep_target)+2;
-					break;
-				}
-			}
-			dep_target[len] = '\0';
-		} else {
-			get_output_name(dep_target, sizeof(dep_target), unit->name, ".d");
-		}
-
-		add_flag(&cppflags_obst, "-MF");
-		add_flag(&cppflags_obst, dep_target);
-	}
-	assert(unit->input == NULL);
-	add_flag(&cppflags_obst, unit->name);
-	obstack_1grow(&cppflags_obst, '\0');
-
-	char *commandline = obstack_finish(&cppflags_obst);
-	if (verbose) {
-		puts(commandline);
-	}
-	FILE *f = popen(commandline, "r");
-	if (f == NULL) {
-		position_t const pos = { unit->name, 0, 0, 0 };
-		errorf(&pos, "invoking preprocessor failed");
-		return false;
-	}
-	/* we do not really need that anymore */
-	obstack_free(&cppflags_obst, commandline);
-
-	unit->input         = f;
-	unit->input_is_pipe = true;
-	bool res            = true;
-	if (mode == MODE_GENERATE_DEPENDENCIES) {
-		unit->type = COMPILATION_UNIT_DEPENDENCIES;
-		copy_file(out, unit->input);
-		res &= close_input(unit);
-	} else {
-		if (mode == MODE_PREPROCESS_ONLY) {
-			copy_file(out, unit->input);
-			res &= close_input(unit);
-		}
-		switch (unit->type) {
-		case COMPILATION_UNIT_ASSEMBLER:
-			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-			break;
-		case COMPILATION_UNIT_C:
-			unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-			break;
-		case COMPILATION_UNIT_CXX:
-			unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-			break;
-		default:
-			unit->type = COMPILATION_UNIT_UNKNOWN;
-			break;
-		}
-	}
-
-	return res;
-}
-
-static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
-{
-	if (asflags == NULL) {
-		obstack_1grow(&asflags_obst, '\0');
-		asflags = obstack_finish(&asflags_obst);
-	}
-
-	const char *assembler = getenv("CPARSER_AS");
-	if (assembler != NULL) {
-		obstack_printf(&asflags_obst, "%s", assembler);
-	} else {
-		if (target.triple != NULL)
-			obstack_printf(&asflags_obst, "%s-", target.triple);
-		obstack_printf(&asflags_obst, "%s", ASSEMBLER);
-	}
-	if (asflags[0] != '\0')
-		obstack_printf(&asflags_obst, " %s", asflags);
-
-	obstack_printf(&asflags_obst, " %s -o %s", in, out);
-	obstack_1grow(&asflags_obst, '\0');
-
-	char *commandline = obstack_finish(&asflags_obst);
-	if (verbose) {
-		puts(commandline);
-	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		position_t const pos = { in, 0, 0, 0 };
-		errorf(&pos, "assembler reported an error");
-		return false;
-	}
-	obstack_free(&asflags_obst, commandline);
-	unit->type = COMPILATION_UNIT_OBJECT;
-	return true;
-}
-
-static void print_file_name(const char *file)
-{
-	add_flag(&ldflags_obst, "-print-file-name=%s", file);
-
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
-
-	/* construct commandline */
-	const char *linker = getenv("CPARSER_LINK");
-	if (linker != NULL) {
-		obstack_printf(&ldflags_obst, "%s ", linker);
-	} else {
-		if (target.triple != NULL)
-			obstack_printf(&ldflags_obst, "%s-", target.triple);
-		obstack_printf(&ldflags_obst, "%s ", LINKER);
-	}
-	obstack_printf(&ldflags_obst, "%s ", linker);
-	obstack_printf(&ldflags_obst, "%s", flags);
-	obstack_1grow(&ldflags_obst, '\0');
-
-	char *commandline = obstack_finish(&ldflags_obst);
-	if (verbose) {
-		puts(commandline);
-	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		position_t const pos = { file, 0, 0, 0 };
-		errorf(&pos, "linker reported an error");
-		exit(EXIT_FAILURE);
-	}
-	obstack_free(&ldflags_obst, commandline);
-}
-
-static const char *try_dir(const char *dir)
-{
-	if (dir == NULL)
-		return dir;
-	if (access(dir, R_OK | W_OK | X_OK) == 0)
-		return dir;
-	return NULL;
-}
-
-static const char *get_tempdir(void)
-{
-	static const char *tmpdir = NULL;
-
-	if (tmpdir != NULL)
-		return tmpdir;
-
-	if (tmpdir == NULL)
-		tmpdir = try_dir(getenv("TMPDIR"));
-	if (tmpdir == NULL)
-		tmpdir = try_dir(getenv("TMP"));
-	if (tmpdir == NULL)
-		tmpdir = try_dir(getenv("TEMP"));
-
-#ifdef P_tmpdir
-	if (tmpdir == NULL)
-		tmpdir = try_dir(P_tmpdir);
-#endif
-
-	if (tmpdir == NULL)
-		tmpdir = try_dir("/var/tmp");
-	if (tmpdir == NULL)
-		tmpdir = try_dir("/usr/tmp");
-	if (tmpdir == NULL)
-		tmpdir = try_dir("/tmp");
-
-	if (tmpdir == NULL)
-		tmpdir = ".";
-
-	return tmpdir;
-}
-
-#ifndef HAVE_MKSTEMP
-/* cheap and nasty mkstemp replacement */
-static int mkstemp(char *templ)
-{
-	mktemp(templ);
-	return open(templ, O_RDWR|O_CREAT|O_EXCL|O_BINARY, 0600);
-}
-#endif
-
-/**
- * custom version of tmpnam, which: writes to an obstack, emits no warnings
- * during linking (like glibc/gnu ld do for tmpnam)...
- */
-static FILE *make_temp_file(const char *prefix, const char **name_result)
-{
-	const char *tempdir = get_tempdir();
-	assert(obstack_object_size(&file_obst) == 0);
-	obstack_printf(&file_obst, "%s/%sXXXXXX", tempdir, prefix);
-	obstack_1grow(&file_obst, '\0');
-
-	char *name = obstack_finish(&file_obst);
-	int fd = mkstemp(name);
-	if (fd == -1) {
-		position_t const pos = { name, 0, 0, 0 };
-		errorf(&pos, "could not create temporary file: %s", strerror(errno));
-		return NULL;
-	}
-	FILE *out = fdopen(fd, "w");
-	if (out == NULL) {
-		position_t const pos = { name, 0, 0, 0 };
-		errorf(&pos, "could not open temporary file as FILE*");
-		return NULL;
-	}
-
-	ARR_APP1(char*, temp_files, name);
-	*name_result = name;
-	return out;
-}
-
-static void free_temp_files(void)
-{
-	if (temp_files == NULL)
-		return;
-
-	size_t n_temp_files = ARR_LEN(temp_files);
-	size_t i;
-	for (i = 0; i < n_temp_files; ++i) {
-		char *file = temp_files[i];
-		unlink(file);
-	}
-	DEL_ARR_F(temp_files);
-	temp_files = NULL;
 }
 
 static void usage(const char *argv0)
@@ -861,27 +359,12 @@ static void set_be_option(const char *arg)
 	assert(res);
 }
 
-static compilation_unit_type_t get_unit_type_from_string(const char *string)
-{
-	if (streq(string, "c") || streq(string, "c-header"))
-		return COMPILATION_UNIT_C;
-	if (streq(string, "c++") || streq(string, "c++-header"))
-		return COMPILATION_UNIT_CXX;
-	if (streq(string, "assembler"))
-		return COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-	if (streq(string, "assembler-with-cpp"))
-		return COMPILATION_UNIT_ASSEMBLER;
-	if (streq(string, "none"))
-		return COMPILATION_UNIT_AUTODETECT;
-
-	return COMPILATION_UNIT_UNKNOWN;
-}
-
 static bool init_os_support(void)
 {
 	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
 	dialect.intmax_predefs           = false;
 	target.enable_main_collect2_hack = false;
+	driver_default_exe_output        = "a.out";
 
 	if (firm_is_unixish_os(target.machine)) {
 		set_create_ld_ident(create_name_linux_elf);
@@ -895,6 +378,7 @@ static bool init_os_support(void)
 		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
 		target.enable_main_collect2_hack = true;
 		target.user_label_prefix         = "_";
+		driver_default_exe_output        = "a.exe";
 	} else {
 		return false;
 	}
@@ -1071,574 +555,6 @@ static void init_types_and_adjust(void)
 	set_modeP_code(ptr_mode);
 }
 
-static void add_define_prop_fmt(const char *name_template, const char *name,
-                                const char *value_fmt, ...)
-{
-	char name_prop[64];
-	snprintf(name_prop, sizeof(name_prop), name_template, name);
-
-	va_list ap;
-	va_start(ap, value_fmt);
-	char value[128];
-	vsnprintf(value, sizeof(value), value_fmt, ap);
-	add_define(name_prop, value, false);
-	va_end(ap);
-}
-
-static const char *get_max_string(atomic_type_kind_t akind)
-{
-	/* float not implemented yet */
-	unsigned flags = get_atomic_type_flags(akind);
-	assert(flags & ATOMIC_TYPE_FLAG_INTEGER);
-
-	unsigned bits = get_atomic_type_size(akind) * BITS_PER_BYTE;
-	if (flags & ATOMIC_TYPE_FLAG_SIGNED)
-		--bits;
-	switch (bits) {
-	case 7:  return "127";
-	case 8:  return "255";
-	case 15: return "32767";
-	case 16: return "65535";
-	case 31: return "2147483647";
-	case 32: return "4294967295";
-	case 63: return "9223372036854775807";
-	case 64: return "18446744073709551615";
-	}
-	panic("unexpected number of bits requested");
-}
-
-static const char *get_literal_suffix(atomic_type_kind_t kind)
-{
-	switch (kind) {
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_DOUBLE:
-	case ATOMIC_TYPE_WCHAR_T:
-		return "";
-	case ATOMIC_TYPE_UINT:        return "U";
-	case ATOMIC_TYPE_LONG:        return "L";
-	case ATOMIC_TYPE_ULONG:       return "UL";
-	case ATOMIC_TYPE_LONGLONG:    return "LL";
-	case ATOMIC_TYPE_ULONGLONG:   return "ULL";
-	case ATOMIC_TYPE_FLOAT:       return "F";
-	case ATOMIC_TYPE_LONG_DOUBLE: return "L";
-	}
-	panic("invalid kind in get_literal_suffix");
-}
-
-static void define_type_max(const char *name, atomic_type_kind_t akind)
-{
-	add_define_prop_fmt("__%s_MAX__", name, "%s%s", get_max_string(akind),
-	                    get_literal_suffix(akind));
-}
-
-static void define_type_min(const char *name, atomic_type_kind_t akind)
-{
-	unsigned flags = get_atomic_type_flags(akind);
-	if (flags & ATOMIC_TYPE_FLAG_SIGNED) {
-		/* float not implemented yet */
-		assert(flags & ATOMIC_TYPE_FLAG_INTEGER);
-		add_define_prop_fmt("__%s_MIN__", name, "(-__%s_MAX__ - 1)", name);
-	} else {
-		add_define_prop_fmt("__%s_MIN__", name, "0%s",
-		                    get_literal_suffix(akind));
-	}
-}
-
-static void define_type_type_max(const char *name, atomic_type_kind_t akind)
-{
-	const char *type = get_atomic_kind_name(akind);
-	add_define_prop_fmt("__%s_TYPE__", name, "%s", type);
-	define_type_max(name, akind);
-}
-
-static void add_define_int(const char *name, int value)
-{
-	add_define_prop_fmt("%s", name, "%d", value);
-}
-
-static void define_sizeof(const char *name, atomic_type_kind_t akind)
-{
-	int size = get_atomic_type_size(akind);
-	add_define_prop_fmt("__SIZEOF_%s__", name, "%d", size);
-}
-
-static void define_type_c(const char *name, atomic_type_kind_t akind)
-{
-	char buf[32];
-	const char *suffix = get_literal_suffix(akind);
-	const char *val;
-	if (suffix[0] != '\0') {
-		snprintf(buf, sizeof(buf), "c ## %s", suffix);
-		val = buf;
-	} else {
-		val = "c";
-	}
-	add_define_macro(name, "c", val, false);
-}
-
-static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
-                               atomic_type_kind_t signed_kind)
-{
-	char buf[32];
-
-	assert(size == get_atomic_type_size(signed_kind) * BITS_PER_BYTE);
-	snprintf(buf, sizeof(buf), "INT%u", size);
-	define_type_type_max(buf, signed_kind);
-	snprintf(buf, sizeof(buf), "__INT%u_C", size);
-	define_type_c(buf, signed_kind);
-	snprintf(buf, sizeof(buf), "INT_LEAST%u", size);
-	define_type_type_max(buf, signed_kind);
-	snprintf(buf, sizeof(buf), "INT_FAST%u", size);
-	define_type_type_max(buf, signed_kind);
-
-	assert(size == get_atomic_type_size(unsigned_kind) * BITS_PER_BYTE);
-	snprintf(buf, sizeof(buf), "UINT%u", size);
-	define_type_type_max(buf, unsigned_kind);
-	snprintf(buf, sizeof(buf), "__UINT%u_C", size);
-	define_type_c(buf, unsigned_kind);
-	snprintf(buf, sizeof(buf), "UINT_LEAST%u", size);
-	define_type_type_max(buf, unsigned_kind);
-	snprintf(buf, sizeof(buf), "UINT_FAST%u", size);
-	define_type_type_max(buf, unsigned_kind);
-}
-
-static void define_float_properties(const char *prefix,
-                                    atomic_type_kind_t akind)
-{
-	ir_mode *mode = atomic_modes[akind];
-	unsigned d;
-	if (get_mode_arithmetic(mode) == irma_ieee754
-	    && get_mode_exponent_size(mode) == 8
-	    && get_mode_mantissa_size(mode) == 23) {
-	    d = 0;
-	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	           && get_mode_exponent_size(mode) == 11
-	           && get_mode_mantissa_size(mode) == 52) {
-	    d = 1;
-	} else if (get_mode_arithmetic(mode) == irma_x86_extended_float
-	           && get_mode_exponent_size(mode) == 15
-	           && get_mode_mantissa_size(mode) == 63) {
-		d = 2;
-	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	           && get_mode_exponent_size(mode) == 15
-	           && get_mode_mantissa_size(mode) == 112) {
-	    d = 3;
-	} else {
-		panic("unexpected long double mode");
-	}
-
-	static const char *const mant_digs[]    = { "24", "53", "64", "113" };
-	static const char *const digs[]         = { "6", "15", "18", "33" };
-	static const char *const min_exps[]     = { "(-125)", "(-1021)", "(-16381)", "(-16381)" };
-	static const char *const min_10_exps[]  = { "(-37)", "(-307)", "(-4931)", "(-4931)" };
-	static const char *const decimal_digs[] = { "9", "17", "21", "36" };
-	static const char *const max_exps[]     = { "128", "1024", "16384", "16384" };
-	static const char *const max_10_exps[]  = { "38", "308", "4932", "4932" };
-	static const char *const maxs[]         = {
-		"3.40282346638528859812e+38F", "((double)1.79769313486231570815e+308L)",
-		"1.18973149535723176502e+4932L",
-		"1.189731495357231765085759326628007016E+4932L"};
-	static const char *const mins[]         = {
-		"1.17549435082228750797e-38F", "((double)2.22507385850720138309e-308L)",
-		"3.36210314311209350626e-4932L",
-		"3.36210314311209350626267781732175260e-4932L"};
-	static const char *const epsilons[]     = {
-		"1.19209289550781250000e-7F", "((double)2.22044604925031308085e-16L)",
-		"1.08420217248550443401e-19L",
-		"1.92592994438723585305597794258492732e-34L" };
-	static const char *const denorm_mins[]  = {
-		"1.40129846432481707092e-45F", "((double)4.94065645841246544177e-324L)",
-		"3.64519953188247460253e-4951L",
-		"6.47517511943802511092443895822764655e-4966L" };
-	add_define_prop_fmt("__%s_MANT_DIG__",      prefix, "%s", mant_digs[d]);
-	add_define_prop_fmt("__%s_DIG__",           prefix, "%s", digs[d]);
-	add_define_prop_fmt("__%s_MIN_EXP__",       prefix, "%s", min_exps[d]);
-	add_define_prop_fmt("__%s_MIN_10_EXP__",    prefix, "%s", min_10_exps[d]);
-	add_define_prop_fmt("__%s_MAX_EXP__",       prefix, "%s", max_exps[d]);
-	add_define_prop_fmt("__%s_MAX_10_EXP__",    prefix, "%s", max_10_exps[d]);
-	add_define_prop_fmt("__%s_DECIMAL_DIG__",   prefix, "%s", decimal_digs[d]);
-	add_define_prop_fmt("__%s_MAX__",           prefix, "%s", maxs[d]);
-	add_define_prop_fmt("__%s_MIN__",           prefix, "%s", mins[d]);
-	add_define_prop_fmt("__%s_EPSILON__",       prefix, "%s", epsilons[d]);
-	add_define_prop_fmt("__%s_DENORM_MIN__",    prefix, "%s", denorm_mins[d]);
-	add_define_prop_fmt("__%s_HAS_DENORM__",    prefix, "1");
-	add_define_prop_fmt("__%s_HAS_INFINITY__",  prefix, "1");
-	add_define_prop_fmt("__%s_HAS_QUIET_NAN__", prefix, "1");
-}
-
-static void add_standard_defines(void)
-{
-	add_define("__STDC__", "1", true);
-	/* C99 predefined macros, but defining them for other language standards too
-	 * shouldn't hurt */
-	add_define("__STDC_HOSTED__", dialect.freestanding ? "0" : "1", true);
-
-	if (dialect.c99) {
-		add_define("__STDC_VERSION__", "199901L", true);
-	}
-	if (dialect.cpp) {
-		add_define("__cplusplus", "1", true);
-	}
-	if (!dialect.gnu && !dialect.ms && !dialect.cpp)
-		add_define("__STRICT_ANSI__", "1", false);
-
-	add_define_string("__VERSION__", CPARSER_VERSION, false);
-
-	/* we are cparser */
-	add_define("__CPARSER__",            CPARSER_MAJOR, false);
-	add_define("__CPARSER_MINOR__",      CPARSER_MINOR, false);
-	add_define("__CPARSER_PATCHLEVEL__", CPARSER_PATCHLEVEL, false);
-
-	/* let's pretend we are a GCC compiler */
-	add_define("__GNUC__",            "4", false);
-	add_define("__GNUC_MINOR__",      "6", false);
-	add_define("__GNUC_PATCHLEVEL__", "0", false);
-	if (dialect.cpp)
-		add_define("__GNUG__", "4", false);
-
-	/* TODO */
-	//add_define("__NO_INLINE__", "1");
-	if (dialect.c99) {
-		add_define("__GNUC_STDC_INLINE__", "1", false);
-	} else {
-		add_define("__GNUC_GNU_INLINE__", "1", false);
-	}
-
-	/* no support for the XXX_chk functions in cparser yet */
-	add_define("_FORTIFY_SOURCE", "0", false);
-
-	if (firm_is_unixish_os(target.machine)) {
-		if (dialect.gnu)
-			add_define("unix",     "1", false);
-		add_define("__unix",   "1", false);
-		add_define("__unix__", "1", false);
-		add_define("__ELF__",  "1", false);
-		if (strstr(target.machine->operating_system, "linux") != NULL) {
-			if (dialect.gnu)
-				add_define("linux",     "1", false);
-			add_define("__linux",   "1", false);
-			add_define("__linux__", "1", false);
-			if (strstr(target.machine->operating_system, "gnu") != NULL) {
-				add_define("__gnu_linux__", "1", false);
-			}
-		}
-	} else if (firm_is_darwin_os(target.machine)) {
-		add_define("__MACH__",     "1", false);
-		add_define("__APPLE__",    "1", false);
-		add_define("__APPLE_CC__", "1", false);
-		add_define("__weak",       "",  false);
-		add_define("__strong",     "",  false);
-		/* TODO: when are these disabled? */
-		add_define("__CONSTANT_CFSTRINGS__", "1", false);
-		add_define("__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050",
-		           false);
-		/* TODO: the following should depend on -fPIC and others... */
-		add_define("__PIC__",      "2", false);
-		add_define("__pic__",      "2", false);
-		add_define("__DYNAMIC__",  "1", false);
-		if (!target.byte_order_big_endian) {
-			add_define("__LITTLE_ENDIAN__", "1", false);
-		}
-	}
-	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
-	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
-	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
-	add_define("__BYTE_ORDER__", target.byte_order_big_endian
-	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
-	add_define("__FLOAT_WORD_ORDER__", target.byte_order_big_endian
-	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
-
-	add_define("__FINITE_MATH_ONLY__",    "0",    false);
-
-	if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 8
-	    && get_type_size(type_void_ptr) == 8
-	    && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
-		add_define("_LP64",    "1", false);
-		add_define("__LP64__", "1", false);
-	}
-
-	const char *cpu          = target.machine->cpu_type;
-	const char *manufacturer = target.machine->manufacturer;
-	const char *os           = target.machine->operating_system;
-	if (firm_is_ia32_cpu(cpu)) {
-		if (dialect.gnu)
-			add_define("i386",     "1", false);
-		add_define("__i386",   "1", false);
-		add_define("__i386__", "1", false);
-		if (streq(cpu, "i486")) {
-			add_define("__i486",   "1", false);
-			add_define("__i486__", "1", false);
-		} else if (streq(cpu, "i586")) {
-			add_define("__i586",      "1", false);
-			add_define("__i586__",    "1", false);
-			add_define("__pentium",   "1", false);
-			add_define("__pentium__", "1", false);
-			//add_define("__pentium_mmx__", "1", false);
-		} else if (streq(cpu, "i686")) {
-			add_define("__pentiumpro",   "1", false);
-			add_define("__pentiumpro__", "1", false);
-			add_define("__i686",         "1", false);
-			add_define("__i686__",       "1", false);
-		} else if (streq(cpu, "i786")) {
-			add_define("__pentium4",     "1", false);
-			add_define("__pentium4__",   "1", false);
-		}
-		/* TODO: __MMX__, __SSE__, __SSE2__, __SSE3__ */
-		/* x87 rounds towards positive infinity */
-		add_define("__FLT_EVAL_METHOD__", "2", false);
-	} else if (streq(cpu, "sparc")) {
-		add_define("sparc",     "1", false);
-		add_define("__sparc",   "1", false);
-		add_define("__sparc__", "1", false);
-		/* we always produce sparc V8 code at the moment */
-		add_define("__sparc_v8__", "1", false);
-		if (strstr(manufacturer, "leon") != NULL) {
-			add_define("__leon__", "1", false);
-		}
-	} else if (streq(cpu, "arm")) {
-		/* TODO: test, what about
-		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
-		add_define("__arm__",   "1", false);
-		if (strstr(os, "eabi") != NULL) {
-			add_define("__ARM_EABI__", "1", false);
-		}
-	} else if (streq(cpu, "x86_64")) {
-		add_define("__x86_64",   "1", false);
-		add_define("__x86_64__", "1", false);
-		add_define("__amd64",    "1", false);
-		add_define("__amd64__",  "1", false);
-	} else {
-		/* round towards zero */
-		add_define("__FLT_EVAL_METHOD__", "0", false);
-	}
-	/* TODO: query from backend? */
-	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);
-	add_define("__REGISTER_PREFIX__", "", false);
-	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
-
-	atomic_type_properties_t *props = atomic_type_properties;
-	if ((props[ATOMIC_TYPE_CHAR].flags & ATOMIC_TYPE_FLAG_SIGNED) == 0) {
-		add_define("__CHAR_UNSIGNED__", "1", false);
-	}
-	if ((props[ATOMIC_TYPE_WCHAR_T].flags & ATOMIC_TYPE_FLAG_SIGNED) == 0) {
-		add_define("__WCHAR_UNSIGNED__", "1", false);
-	}
-	add_define_int("__CHAR_BIT__", BITS_PER_BYTE);
-
-	assert(type_size_t->kind    == TYPE_ATOMIC);
-	assert(type_wint_t->kind    == TYPE_ATOMIC);
-	assert(type_ptrdiff_t->kind == TYPE_ATOMIC);
-
-	define_sizeof("SHORT",       ATOMIC_TYPE_SHORT);
-	define_sizeof("INT",         ATOMIC_TYPE_INT);
-	define_sizeof("LONG",        ATOMIC_TYPE_LONG);
-	define_sizeof("LONG_LONG",   ATOMIC_TYPE_LONGLONG);
-	define_sizeof("FLOAT",       ATOMIC_TYPE_FLOAT);
-	define_sizeof("DOUBLE",      ATOMIC_TYPE_DOUBLE);
-	define_sizeof("LONG_DOUBLE", ATOMIC_TYPE_LONG_DOUBLE);
-	define_sizeof("SIZE_T",      type_size_t->atomic.akind);
-	define_sizeof("WCHAR_T",     dialect.wchar_atomic_kind);
-	define_sizeof("WINT_T",      type_wint_t->atomic.akind);
-	define_sizeof("PTRDIFF_T",   type_ptrdiff_t->atomic.akind);
-	add_define_int("__SIZEOF_POINTER__", get_type_size(type_void_ptr));
-
-	define_type_max("SCHAR",     ATOMIC_TYPE_SCHAR);
-	define_type_max("SHRT",      ATOMIC_TYPE_SHORT);
-	define_type_max("INT",       ATOMIC_TYPE_INT);
-	define_type_max("LONG",      ATOMIC_TYPE_LONG);
-	define_type_max("LONG_LONG", ATOMIC_TYPE_LONGLONG);
-
-	define_type_type_max("WCHAR",   dialect.wchar_atomic_kind);
-	define_type_min(     "WCHAR",   dialect.wchar_atomic_kind);
-	define_type_type_max("SIZE",    type_size_t->atomic.akind);
-	define_type_type_max("WINT",    type_wint_t->atomic.akind);
-	define_type_min(     "WINT",    type_wint_t->atomic.akind);
-	define_type_type_max("PTRDIFF", type_ptrdiff_t->atomic.akind);
-
-	/* TODO: what to choose here... */
-	define_type_type_max("SIG_ATOMIC", ATOMIC_TYPE_INT);
-	define_type_min(     "SIG_ATOMIC", ATOMIC_TYPE_INT);
-
-	define_int_n_types(8,  ATOMIC_TYPE_UCHAR,  ATOMIC_TYPE_SCHAR);
-	define_int_n_types(16, ATOMIC_TYPE_USHORT, ATOMIC_TYPE_SHORT);
-	define_int_n_types(32, ATOMIC_TYPE_UINT,   ATOMIC_TYPE_INT);
-	if (get_type_size(type_void_ptr) == 4) {
-		define_type_type_max("UINTPTR", ATOMIC_TYPE_UINT);
-		define_type_type_max("INTPTR",  ATOMIC_TYPE_INT);
-	} else if (get_type_size(type_void_ptr) == 8) {
-		assert(props[ATOMIC_TYPE_LONG].size == 8);
-		assert(props[ATOMIC_TYPE_ULONG].size == 8);
-		define_type_type_max("UINTPTR", ATOMIC_TYPE_ULONG);
-		define_type_type_max("INTPTR",  ATOMIC_TYPE_LONG);
-	}
-	if (props[ATOMIC_TYPE_LONG].size == 8) {
-		define_int_n_types(64, ATOMIC_TYPE_ULONG, ATOMIC_TYPE_LONG);
-	} else if (props[ATOMIC_TYPE_LONGLONG].size == 8) {
-		define_int_n_types(64, ATOMIC_TYPE_ULONGLONG, ATOMIC_TYPE_LONGLONG);
-	}
-
-	unsigned           intmax_size  = 0;
-	atomic_type_kind_t intmax_kind  = ATOMIC_TYPE_FIRST;
-	unsigned           uintmax_size = 0;
-	atomic_type_kind_t uintmax_kind = ATOMIC_TYPE_FIRST;
-	for (atomic_type_kind_t i = ATOMIC_TYPE_FIRST; i <= ATOMIC_TYPE_LAST; ++i) {
-		unsigned flags = get_atomic_type_flags(i);
-		if (!(flags & ATOMIC_TYPE_FLAG_INTEGER))
-			continue;
-		unsigned size = get_atomic_type_size(i);
-		if (flags & ATOMIC_TYPE_FLAG_SIGNED) {
-			if (size > intmax_size) {
-				intmax_kind = i;
-				intmax_size = size;
-			}
-		} else {
-			if (size > uintmax_size) {
-				uintmax_kind = i;
-				uintmax_size = size;
-			}
-		}
-	}
-	define_type_type_max("UINTMAX", uintmax_kind);
-	define_type_c("__UINTMAX_C", uintmax_kind);
-	define_type_type_max("INTMAX",  intmax_kind);
-	define_type_c("__INTMAX_C", intmax_kind);
-
-	/* TODO: less hardcoding for the following... */
-	define_float_properties("FLT",  ATOMIC_TYPE_FLOAT);
-	define_float_properties("DBL",  ATOMIC_TYPE_DOUBLE);
-	define_float_properties("LDBL", ATOMIC_TYPE_LONG_DOUBLE);
-	add_define("__FLT_RADIX__",   "2",                    false);
-	add_define("__DECIMAL_DIG__", "__LDBL_DECIMAL_DIG__", false);
-
-	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
-	/* TODO: query this from backend? (if we just look for all alignments in
-	 *       our atomic types it's usually < 16... */
-	add_define_int("__BIGGEST_ALIGNMENT__", 16);
-}
-
-static void init_c_dialect(bool is_cpp, lang_standard_t standard)
-{
-	lang_features_t features = 0;
-	if (!is_cpp) {
-		switch (standard) {
-		case STANDARD_C89:     features = _C89;                       break;
-							   /* TODO determine difference between these two */
-		case STANDARD_C89AMD1: features = _C89;                       break;
-		case STANDARD_C99:     features = _C89 | _C99;                break;
-		case STANDARD_C11:     features = _C89 | _C99 | _C11;         break;
-		case STANDARD_GNU89:   features = _C89 |               _GNUC; break;
-		case STANDARD_GNU11:   features = _C89 | _C99 | _C11 | _GNUC; break;
-
-		case STANDARD_ANSI:
-		case STANDARD_CXX98:
-		case STANDARD_GNUXX98:
-		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
-			/* FALLTHROUGH */
-		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
-		}
-	} else {
-		switch (standard) {
-		case STANDARD_CXX98: features = _CXX; break;
-
-		case STANDARD_ANSI:
-		case STANDARD_C89:
-		case STANDARD_C89AMD1:
-		case STANDARD_C99:
-		case STANDARD_C11:
-		case STANDARD_GNU89:
-		case STANDARD_GNU99:
-		case STANDARD_GNU11:
-		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
-			/* FALLTHROUGH */
-		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
-		}
-	}
-
-	features |= features_on;
-	features &= ~features_off;
-	dialect.features = features;
-
-	dialect.c89 = dialect.c99 = dialect.c11
-	    = dialect.gnu = dialect.ms = dialect.cpp = false;
-	if (features & _C11)
-	    dialect.c89 = dialect.c99 = dialect.c11 = true;
-	if (features & _C99)
-	    dialect.c89 = dialect.c99 = true;
-	if (features & _C89)
-	    dialect.c89 = true;
-	if (features & _GNUC)
-	    dialect.gnu = true;
-	if (features & _MS)
-	    dialect.ms = true;
-	if (features & _CXX)
-	    dialect.c89 = dialect.cpp = true;
-}
-
-static void init_c_dialect_for_unit(const compilation_unit_t *unit)
-{
-	compilation_unit_type_t type = unit->type;
-	bool                    is_cpp;
-	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C
-	 || type == COMPILATION_UNIT_LEXER_TOKENS_C) {
-		is_cpp = false;
-	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
-	        || type == COMPILATION_UNIT_CXX
-	        || type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-		is_cpp = true;
-	} else {
-		panic("can't determine c mode from unit type");
-	}
-	init_c_dialect(is_cpp, unit->standard);
-}
-
-static void determine_unit_standard(compilation_unit_t *unit,
-                                    lang_standard_t standard)
-{
-	unit->standard = standard;
-	switch (standard) {
-	case STANDARD_ANSI:
-		switch (unit->type) {
-		case COMPILATION_UNIT_C:
-		case COMPILATION_UNIT_PREPROCESSED_C:
-			unit->standard = STANDARD_C89;
-			break;
-		case COMPILATION_UNIT_CXX:
-		case COMPILATION_UNIT_PREPROCESSED_CXX:
-			unit->standard = STANDARD_CXX98;
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case STANDARD_DEFAULT:
-		switch (unit->type) {
-		case COMPILATION_UNIT_C:
-		case COMPILATION_UNIT_PREPROCESSED_C:
-			unit->standard = STANDARD_GNU99;
-			break;
-		case COMPILATION_UNIT_CXX:
-		case COMPILATION_UNIT_PREPROCESSED_CXX:
-			unit->standard = STANDARD_GNUXX98;
-			break;
-		default:
-			break;
-		}
-		break;
-
-	default:
-		break;
-	}
-}
-
 static void append_standard_include_paths(void)
 {
 	if (compiler_include_dir != NULL)
@@ -1673,407 +589,83 @@ static void append_environment_include_paths(void)
 	                 dialect.cpp ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
 }
 
-static bool open_input(compilation_unit_t *unit)
+static void init_driver_tools(void)
 {
-	/* input already available as FILE? */
-	if (unit->input != NULL)
-		return true;
-
-	const char *const inputname = unit->name;
-	unit->input_is_pipe = false;
-	if (streq(inputname, "-")) {
-		unit->input   = stdin;
-	} else {
-		unit->input = fopen(inputname, "r");
-		if (unit->input == NULL) {
-			position_t const pos = { inputname, 0, 0, 0 };
-			errorf(&pos, "could not open: %s", strerror(errno));
-			return false;
-		}
-	}
-	return true;
-}
-
-static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
-                                compile_mode_t mode)
-{
-	if (!open_input(unit))
-		return false;
-
-	add_standard_defines();
-	if (mode == MODE_PREPROCESS_ONLY) {
-		set_preprocessor_output(out);
-		/* just here for gcc compatibility */
-		fprintf(out, "# 1 \"%s\"\n", unit->name);
-		fprintf(out, "# 1 \"<built-in>\"\n");
-		fprintf(out, "# 1 \"<command-line>\"\n");
-	}
-	input_t *decoder = input_from_stream(unit->input, input_decoder);
-	switch_pp_input(decoder, unit->name, NULL, false);
-	unit->input_decoder = decoder;
-
-	switch (unit->type) {
-	case COMPILATION_UNIT_C:
-	case COMPILATION_UNIT_PREPROCESSED_C:
-		unit->type = COMPILATION_UNIT_LEXER_TOKENS_C;
-		break;
-	case COMPILATION_UNIT_CXX:
-	case COMPILATION_UNIT_PREPROCESSED_CXX:
-		unit->type = COMPILATION_UNIT_LEXER_TOKENS_CXX;
-		break;
-	case COMPILATION_UNIT_ASSEMBLER:
-		unit->type = COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER;
-		break;
-	default:
-		panic("invalid input for preprocessing");
-	}
-	return true;
-}
-
-static bool finish_preprocessing(compilation_unit_t *unit)
-{
-	close_pp_input();
-	input_free(unit->input_decoder);
-	set_preprocessor_output(NULL);
-	bool res = close_input(unit);
-	if (!res || error_count > 0)
-		return false;
-
-	if (dump_defines)
-		print_defines();
-	return true;
-}
-
-static bool print_preprocessing_tokens(compilation_unit_t *unit, FILE *out)
-{
-	for (;;) {
-		next_preprocessing_token();
-		if (pp_token.kind == T_EOF)
-			break;
-		emit_pp_token();
-	}
-
-	fputc('\n', out);
-	check_unclosed_conditionals();
-	bool res = finish_preprocessing(unit);
-	print_error_summary();
-
-	if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-	} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-	} else {
-		assert(unit->type == COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER);
-		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-	}
-	return res;
-}
-
-static bool do_parsing(compilation_unit_t *unit, compile_mode_t mode)
-{
-	ir_timer_t *t_parsing = ir_timer_new();
-	timer_register(t_parsing, "Frontend: Parsing");
-	timer_start(t_parsing);
-
-	start_parsing();
-
-	parse();
-	unit->ast = finish_parsing();
-	check_unclosed_conditionals();
-	bool res = finish_preprocessing(unit);
-	print_error_summary();
-
-	unit->type         = COMPILATION_UNIT_AST;
-	timer_stop(t_parsing);
-	if (stat_ev_enabled) {
-		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
-	}
-
-	return (res && error_count == 0) || mode == MODE_PRINT_AST;
-}
-
-static void node_counter(ir_node *node, void *env)
-{
-	(void)node;
-	unsigned long long *count = (unsigned long long*)env;
-	++(*count);
-}
-
-static unsigned long long count_firm_nodes(void)
-{
-	unsigned long long count = 0;
-
-	int n_irgs = get_irp_n_irgs();
-	for (int i = 0; i < n_irgs; ++i) {
-		ir_graph *irg = get_irp_irg(i);
-		irg_walk_graph(irg, node_counter, NULL, &count);
-	}
-	return count;
-}
-
-static bool already_constructed_firm = false;
-
-static bool build_firm_ir(compilation_unit_t *unit)
-{
-	ir_timer_t *t_construct = ir_timer_new();
-	timer_register(t_construct, "Frontend: Graph construction");
-	timer_start(t_construct);
-	if (already_constructed_firm) {
-		panic("compiling multiple files/translation units not possible");
-	}
-	already_constructed_firm = true;
-	init_implicit_optimizations();
-	translation_unit_to_firm(unit->ast);
-	timer_stop(t_construct);
-	if (stat_ev_enabled) {
-		stat_ev_dbl("time_graph_construction",
-					ir_timer_elapsed_sec(t_construct));
-		stat_ev_int("size_graph_construction", count_firm_nodes());
-	}
-	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
-	return true;
-}
-
-static bool read_ir_file(compilation_unit_t *unit)
-{
-	if (!open_input(unit))
-		return false;
-	if (ir_import_file(unit->input, unit->name)) {
-		position_t const pos = { unit->name, 0, 0, 0 };
-		errorf(&pos, "import of firm graph failed");
-		return false;
-	}
-	already_constructed_firm = true;
-	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
-	return true;
-}
-
-static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
-							lang_standard_t standard, FILE *out)
-{
-	int  result                   = EXIT_SUCCESS;
-	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
-		const char *const inputname = unit->name;
-
-		determine_unit_standard(unit, standard);
-
-		stat_ev_ctx_push_str("compilation_unit", inputname);
-
-again:
-		switch (unit->type) {
-		case COMPILATION_UNIT_IR:
-			if (!read_ir_file(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
-
-		case COMPILATION_UNIT_C:
-		case COMPILATION_UNIT_CXX:
-			init_c_dialect_for_unit(unit);
-			/* FALLTHROUGH */
-		case COMPILATION_UNIT_ASSEMBLER:
-			if (external_preprocessor != NULL) {
-				if (!run_external_preprocessor(unit, out, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-				goto again;
-			} else {
-				if (!start_preprocessing(unit, out, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-			}
-			goto again;
-
-		case COMPILATION_UNIT_LEXER_TOKENS_C:
-		case COMPILATION_UNIT_LEXER_TOKENS_CXX:
-			init_c_dialect_for_unit(unit);
-			/* FALLTHROUGH */
-		case COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER:
-			if (mode == MODE_PREPROCESS_ONLY) {
-				if (!print_preprocessing_tokens(unit, out)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-			} else if (mode == MODE_GENERATE_DEPENDENCIES) {
-				position_t const pos = { inputname, 0, 0, 0 };
-				errorf(&pos, "builtin preprocessor does not support dependency generation");
-				result = EXIT_FAILURE;
-				break;
-			} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C
-			        || unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-				if (!do_parsing(unit, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-			}
-			goto again;
-
-		case COMPILATION_UNIT_PREPROCESSED_C:
-		case COMPILATION_UNIT_PREPROCESSED_CXX:
-			init_c_dialect_for_unit(unit);
-			if (mode == MODE_PREPROCESS_ONLY)
-				break;
-			if (!start_preprocessing(unit, out, mode)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
-
-		case COMPILATION_UNIT_AST:
-			if (mode == MODE_PRINT_AST) {
-				print_to_file(out);
-				print_ast(unit->ast);
-				if (error_count > 0)
-					result = EXIT_FAILURE;
-				break;
-			} else if (mode == MODE_BENCHMARK_PARSER) {
-				break;
-			} else if (mode == MODE_PRINT_FLUFFY) {
-				write_fluffy_decls(out, unit->ast);
-				break;
-			} else if (mode == MODE_PRINT_JNA) {
-				write_jna_decls(out, unit->ast);
-				break;
-			} else if (mode == MODE_PRINT_COMPOUND_SIZE) {
-				write_compoundsizes(out, unit->ast);
-				break;
-			}
-
-			if (!build_firm_ir(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
-
-		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
-			if (mode == MODE_PARSE_ONLY || mode == MODE_COMPILE_DUMP
-			 || mode == MODE_COMPILE_EXPORTIR)
-				break;
-
-			FILE *asm_out;
-			if (mode == MODE_COMPILE) {
-				asm_out = out;
-			} else {
-				asm_out = make_temp_file("ccs", &unit->name);
-			}
-			ir_timer_t *t_opt_codegen = ir_timer_new();
-			timer_register(t_opt_codegen, "Optimization and Codegeneration");
-			timer_start(t_opt_codegen);
-			generate_code(asm_out, inputname);
-			timer_stop(t_opt_codegen);
-			if (stat_ev_enabled) {
-				stat_ev_dbl("time_opt_codegen", ir_timer_elapsed_sec(t_opt_codegen));
-			}
-			if (asm_out != out) {
-				fclose(asm_out);
-			}
-			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-			goto again;
-
-		case COMPILATION_UNIT_PREPROCESSED_ASSEMBLER:
-			if (mode != MODE_COMPILE_ASSEMBLE
-			 && mode != MODE_COMPILE_ASSEMBLE_LINK)
-				break;
-
-			/* assemble */
-			const char *input = unit->name;
-			if (mode == MODE_COMPILE_ASSEMBLE) {
-				fclose(out);
-				unit->name = outname;
-			} else {
-				FILE *tempf = make_temp_file("cco", &unit->name);
-				/* hackish... */
-				fclose(tempf);
-			}
-
-			if (!assemble(unit, unit->name, input)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
-
-		case COMPILATION_UNIT_DEPENDENCIES:
-		case COMPILATION_UNIT_UNKNOWN:
-		case COMPILATION_UNIT_AUTODETECT:
-		case COMPILATION_UNIT_OBJECT:
-			break;
-		}
-
-		stat_ev_ctx_pop("compilation_unit");
-	}
-	return result;
-}
-
-static int link_program(compilation_unit_t *units)
-{
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
-
-	/* construct commandline */
-	const char *linker = getenv("CPARSER_LINK");
-	if (linker != NULL) {
-		obstack_printf(&file_obst, "%s ", linker);
-	} else {
+	assert(obstack_object_size(&file_obst) == 0);
+	/* decide which linker, preprocessor, assembler to use */
+	driver_preprocessor = external_preprocessor;
+	if (driver_preprocessor == NULL)
+		driver_preprocessor = getenv("CPARSER_PP");
+	if (driver_preprocessor == NULL) {
 		if (target.triple != NULL)
 			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s ", LINKER);
+		obstack_printf(&file_obst, "%s", PREPROCESSOR);
+		driver_preprocessor = obstack_finish(&file_obst);
 	}
-
-	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
-		if (unit->type != COMPILATION_UNIT_OBJECT)
-			continue;
-		add_flag(&file_obst, "%s", unit->name);
+	driver_assembler = getenv("CPARSER_AS");
+	if (driver_assembler == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", ASSEMBLER);
+		driver_assembler = obstack_finish(&file_obst);
 	}
-
-	add_flag(&file_obst, "-o");
-	add_flag(&file_obst, outname);
-	obstack_printf(&file_obst, "%s", flags);
-	obstack_1grow(&file_obst, '\0');
-
-	char *commandline = obstack_finish(&file_obst);
-
-	if (verbose) {
-		puts(commandline);
+	driver_linker = getenv("CPARSER_LINK");
+	if (driver_linker == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", LINKER);
+		driver_linker = obstack_finish(&file_obst);
 	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		errorf(NULL, "linker reported an error");
-		return EXIT_FAILURE;
+}
+
+static void init_external_preprocessor(void)
+{
+	struct obstack *o = &c_cpp_cppflags_obst;
+	/* setup default defines */
+	driver_add_flag(o, "-U__WCHAR_TYPE__");
+	driver_add_flag(o, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
+	driver_add_flag(o, "-U__SIZE_TYPE__");
+	driver_add_flag(o, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+
+	driver_add_flag(o, "-U__VERSION__");
+	driver_add_flag(o, "-D__VERSION__=\"%s\"", CPARSER_VERSION);
+	driver_add_flag(o, "-D__CPARSER_MAJOR__=\"%s\"", CPARSER_MAJOR);
+	driver_add_flag(o, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
+	driver_add_flag(o, "-D__CPARSER_PATCHLEVEL__=\"%s\"",
+					CPARSER_PATCHLEVEL);
+
+	driver_add_flag(o, "-U_FORTIFY_SOURCE");
+	driver_add_flag(o, "-D_FORTIFY_SOURCE=0");
+
+	if (dialect.intmax_predefs) {
+		driver_add_flag(o, "-U__INTMAX_TYPE__");
+		driver_add_flag(o, "-D__INTMAX_TYPE__=%s",
+						type_to_string(type_intmax_t));
+		driver_add_flag(o, "-U__UINTMAX_TYPE__");
+		driver_add_flag(o, "-D__UINTMAX_TYPE__=%s",
+						type_to_string(type_uintmax_t));
 	}
-	return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv)
 {
 	const char         *print_file_name_file   = NULL;
-	compile_mode_t      mode                   = MODE_COMPILE_ASSEMBLE_LINK;
 	int                 opt_level              = 1;
 	char                firm_be[16]            = "ia32";
-	compilation_unit_t *units                  = NULL;
-	compilation_unit_t *last_unit              = NULL;
-	bool                produce_statev         = false;
-	const char         *filtev                 = NULL;
 	bool                profile_generate       = false;
 	bool                profile_use            = false;
 	bool                do_timing              = false;
 	bool                print_timing           = false;
 	bool                stdinc                 = true;
+	bool                had_inputs             = false;
 	codegen_option_t   *codegen_options        = NULL;
 	codegen_option_t  **codegen_options_anchor = &codegen_options;
 
-	temp_files = NEW_ARR_F(char*, 0);
-	atexit(free_temp_files);
-
-	obstack_init(&codegenflags_obst);
-	obstack_init(&cppflags_obst);
-	obstack_init(&ldflags_obst);
-	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
+	init_temp_files();
 	init_symbol_table();
 	init_tokens();
+	init_driver();
 	preprocessor_early_init();
 
 #define GET_ARG_AFTER(def, args)                                             \
@@ -2135,7 +727,6 @@ invalid_o_option:
 	setup_target_machine();
 
 	/* parse rest of options */
-	lang_standard_t         standard        = STANDARD_DEFAULT;
 	compilation_unit_type_t forced_unittype = COMPILATION_UNIT_AUTODETECT;
 	help_sections_t         help            = HELP_NONE;
 	for (int i = 1; i < argc; ++i) {
@@ -2154,7 +745,7 @@ invalid_o_option:
 			} else if (SINGLE_OPTION('E')) {
 				mode = MODE_PREPROCESS_ONLY;
 			} else if (SINGLE_OPTION('s')) {
-				add_flag(&ldflags_obst, "-s");
+				driver_add_flag(&ldflags_obst, "-s");
 			} else if (SINGLE_OPTION('S')) {
 				mode = MODE_COMPILE;
 			} else if (option[0] == 'O') {
@@ -2162,30 +753,30 @@ invalid_o_option:
 			} else if (option[0] == 'I') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-I");
-				add_flag(&cppflags_obst, "-I%s", opt);
+				driver_add_flag(&cppflags_obst, "-I%s", opt);
 				append_include_path(&bracket_searchpath, opt);
 			} else if (option[0] == 'D') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-D");
-				add_flag(&cppflags_obst, "-D%s", opt);
+				driver_add_flag(&cppflags_obst, "-D%s", opt);
 				parse_define(opt);
 			} else if (option[0] == 'U') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-U");
-				add_flag(&cppflags_obst, "-U%s", opt);
+				driver_add_flag(&cppflags_obst, "-U%s", opt);
 				undefine(opt);
 			} else if (option[0] == 'l') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-l");
-				add_flag(&ldflags_obst, "-l%s", opt);
+				driver_add_flag(&ldflags_obst, "-l%s", opt);
 			} else if (option[0] == 'L') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-L");
-				add_flag(&ldflags_obst, "-L%s", opt);
+				driver_add_flag(&ldflags_obst, "-L%s", opt);
 			} else if (SINGLE_OPTION('v')) {
-				verbose = 1;
+				driver_verbose = true;
 			} else if (SINGLE_OPTION('w')) {
-				add_flag(&cppflags_obst, "-w");
+				driver_add_flag(&cppflags_obst, "-w");
 				disable_all_warnings();
 			} else if (option[0] == 'x') {
 				const char *opt;
@@ -2198,60 +789,60 @@ invalid_o_option:
 			} else if (SINGLE_OPTION('M')
 			        || streq(option, "MM")) {
 				mode = MODE_GENERATE_DEPENDENCIES;
-				add_flag(&cppflags_obst, "-%s", option);
+				driver_add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MMD") ||
 			           streq(option, "MD")) {
 				construct_dep_target = true;
-				add_flag(&cppflags_obst, "-%s", option);
+				driver_add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MP")) {
-				add_flag(&cppflags_obst, "-%s", option);
+				driver_add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MT") ||
 			           streq(option, "MQ") ||
 			           streq(option, "MF")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-MT");
-				add_flag(&cppflags_obst, "-%s", option);
-				add_flag(&cppflags_obst, "%s", opt);
+				driver_add_flag(&cppflags_obst, "-%s", option);
+				driver_add_flag(&cppflags_obst, "%s", opt);
 			} else if (streq(option, "include")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-include");
-				add_flag(&cppflags_obst, "-include");
-				add_flag(&cppflags_obst, "%s", opt);
+				driver_add_flag(&cppflags_obst, "-include");
+				driver_add_flag(&cppflags_obst, "%s", opt);
 			} else if (streq(option, "idirafter")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-idirafter");
-				add_flag(&cppflags_obst, "-idirafter");
-				add_flag(&cppflags_obst, "%s", opt);
+				driver_add_flag(&cppflags_obst, "-idirafter");
+				driver_add_flag(&cppflags_obst, "%s", opt);
 				append_include_path(&after_searchpath, opt);
 			} else if (streq(option, "isystem")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-isystem");
-				add_flag(&cppflags_obst, "-isystem");
-				add_flag(&cppflags_obst, "%s", opt);
+				driver_add_flag(&cppflags_obst, "-isystem");
+				driver_add_flag(&cppflags_obst, "%s", opt);
 				append_include_path(&system_searchpath, opt);
 			} else if (streq(option, "iquote")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-iquote");
-				add_flag(&cppflags_obst, "-iquote");
-				add_flag(&cppflags_obst, "%s", opt);
+				driver_add_flag(&cppflags_obst, "-iquote");
+				driver_add_flag(&cppflags_obst, "%s", opt);
 				append_include_path(&quote_searchpath, opt);
 			} else if (streq(option, "nostdinc")) {
 				stdinc = false;
-				add_flag(&cppflags_obst, "%s", arg);
+				driver_add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pthread")) {
 				/* set flags for the preprocessor */
-				add_flag(&cppflags_obst, "-D_REENTRANT");
+				driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 				/* set flags for the linker */
-				add_flag(&ldflags_obst, "-lpthread");
+				driver_add_flag(&ldflags_obst, "-lpthread");
 			} else if (streq(option, "trigraphs")) {
 				/* pass these through to the preprocessor */
-				add_flag(&cppflags_obst, "%s", arg);
+				driver_add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pipe")) {
 				/* here for gcc compatibility */
 			} else if (streq(option, "static")) {
-				add_flag(&ldflags_obst, "-static");
+				driver_add_flag(&ldflags_obst, "-static");
 			} else if (streq(option, "shared")) {
-				add_flag(&ldflags_obst, "-shared");
+				driver_add_flag(&ldflags_obst, "-shared");
 			} else if (option[0] == 'f') {
 				char const *orig_opt;
 				GET_ARG_AFTER(orig_opt, "-f");
@@ -2373,22 +964,22 @@ invalid_o_option:
 				if (strstart(option + 1, "a,")) {
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wa,");
-					add_flag(&asflags_obst, "-Wa,%s", opt);
+					driver_add_flag(&asflags_obst, "-Wa,%s", opt);
 				} else if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wp,");
-					add_flag(&cppflags_obst, "-Wp,%s", opt);
+					driver_add_flag(&cppflags_obst, "-Wp,%s", opt);
 				} else if (strstart(option + 1, "l,")) {
 					// pass options directly to the linker
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
-					add_flag(&ldflags_obst, "-Wl,%s", opt);
+					driver_add_flag(&ldflags_obst, "-Wl,%s", opt);
 				} else if (streq(option + 1, "no-trigraphs")
 							|| streq(option + 1, "undef")
 							|| streq(option + 1, "missing-include-dirs")
 							|| streq(option + 1, "endif-labels")) {
-					add_flag(&cppflags_obst, "%s", arg);
+					driver_add_flag(&cppflags_obst, "%s", arg);
 				} else if (streq(option+1, "init-self")) {
 					/* ignored (same as gcc does) */
 				} else if (streq(option+1, "format-y2k")
@@ -2430,22 +1021,22 @@ invalid_o_option:
 				if (streq(option + 1, "assembler")) {
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Xassembler");
-					add_flag(&asflags_obst, "-Xassembler");
-					add_flag(&asflags_obst, opt);
+					driver_add_flag(&asflags_obst, "-Xassembler");
+					driver_add_flag(&asflags_obst, opt);
 				} else if (streq(option + 1, "preprocessor")) {
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Xpreprocessor");
-					add_flag(&cppflags_obst, "-Xpreprocessor");
-					add_flag(&cppflags_obst, opt);
+					driver_add_flag(&cppflags_obst, "-Xpreprocessor");
+					driver_add_flag(&cppflags_obst, opt);
 				} else if (streq(option + 1, "linker")) {
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Xlinker");
-					add_flag(&ldflags_obst, "-Xlinker");
-					add_flag(&ldflags_obst, opt);
+					driver_add_flag(&ldflags_obst, "-Xlinker");
+					driver_add_flag(&ldflags_obst, opt);
 				}
 			} else if (streq(option, "pg")) {
 				set_be_option("gprof");
-				add_flag(&ldflags_obst, "-pg");
+				driver_add_flag(&ldflags_obst, "-pg");
 			} else if (streq(option, "ansi")) {
 				standard = STANDARD_ANSI;
 			} else if (streq(option, "pedantic")) {
@@ -2535,14 +1126,15 @@ invalid_o_option:
 					}
 					jna_set_libname(argv[i]);
 				} else if (streq(option, "external-pp")) {
+					driver_use_external_preprocessor = true;
 					if (i+1 < argc && argv[i+1][0] != '-') {
 						++i;
 						external_preprocessor = argv[i+1];
 					} else {
-						external_preprocessor = PREPROCESSOR;
+						external_preprocessor = NULL;
 					}
 				} else if (streq(option, "no-external-pp")) {
-					external_preprocessor = NULL;
+					driver_use_external_preprocessor = false;
 				} else if (streq(option, "time")) {
 					do_timing    = true;
 					print_timing = true;
@@ -2598,49 +1190,14 @@ invalid_o_option:
 				argument_errors = true;
 			}
 		} else {
+			/* argument is not an option but an input filename */
 			compilation_unit_type_t type = forced_unittype;
-			if (type == COMPILATION_UNIT_AUTODETECT) {
-				if (streq(arg, "-")) {
-					/* - implicitly means C source file */
-					type = COMPILATION_UNIT_C;
-				} else {
-					const char *suffix = strrchr(arg, '.');
-					/* Ensure there is at least one char before the suffix */
-					if (suffix != NULL && suffix != arg) {
-						++suffix;
-						type =
-							streq(suffix, "S")   ? COMPILATION_UNIT_ASSEMBLER              :
-							streq(suffix, "a")   ? COMPILATION_UNIT_OBJECT                 :
-							streq(suffix, "c")   ? COMPILATION_UNIT_C                      :
-							streq(suffix, "i")   ? COMPILATION_UNIT_PREPROCESSED_C         :
-							streq(suffix, "C")   ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "cc")  ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "cp")  ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "cpp") ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "CPP") ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "cxx") ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "c++") ? COMPILATION_UNIT_CXX                    :
-							streq(suffix, "ii")  ? COMPILATION_UNIT_PREPROCESSED_CXX       :
-							streq(suffix, "h")   ? COMPILATION_UNIT_C                      :
-							streq(suffix, "ir")  ? COMPILATION_UNIT_IR                     :
-							streq(suffix, "o")   ? COMPILATION_UNIT_OBJECT                 :
-							streq(suffix, "s")   ? COMPILATION_UNIT_PREPROCESSED_ASSEMBLER :
-							streq(suffix, "so")  ? COMPILATION_UNIT_OBJECT                 :
-							COMPILATION_UNIT_OBJECT; /* gcc behavior: unknown file extension means object file */
-					}
-				}
+			if (type == COMPILATION_UNIT_AUTODETECT && streq(arg, "-")) {
+				/* - implicitly means C source file */
+				type = COMPILATION_UNIT_C;
 			}
-
-			compilation_unit_t *entry = OALLOCZ(&file_obst, compilation_unit_t);
-			entry->name = arg;
-			entry->type = type;
-
-			if (last_unit != NULL) {
-				last_unit->next = entry;
-			} else {
-				units = entry;
-			}
-			last_unit = entry;
+			driver_add_input(arg, type);
+			had_inputs = true;
 		}
 	}
 
@@ -2650,7 +1207,7 @@ invalid_o_option:
 	}
 
 	if (print_file_name_file != NULL) {
-		print_file_name(print_file_name_file);
+		driver_print_file_name(print_file_name_file);
 		return EXIT_SUCCESS;
 	}
 
@@ -2678,15 +1235,15 @@ invalid_o_option:
 		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
 			if (streq(pass_to_cpp_and_ld[i], option->option)) {
 				snprintf(buf, sizeof(buf), "-m%s", option->option);
-				add_flag(&cppflags_obst, buf);
-				add_flag(&asflags_obst, buf);
-				add_flag(&ldflags_obst, buf);
+				driver_add_flag(&cppflags_obst, buf);
+				driver_add_flag(&asflags_obst, buf);
+				driver_add_flag(&ldflags_obst, buf);
 				break;
 			}
 		}
 	}
 
-	if (units == NULL) {
+	if (!had_inputs) {
 		errorf(NULL, "no input files specified");
 		argument_errors = true;
 	}
@@ -2696,9 +1253,11 @@ invalid_o_option:
 		return EXIT_FAILURE;
 	}
 
+	init_driver_tools();
+
 	/* apply some effects from switches */
 	if (profile_generate) {
-		add_flag(&ldflags_obst, "-lfirmprof");
+		driver_add_flag(&ldflags_obst, "-lfirmprof");
 		set_be_option("profilegenerate");
 	}
 	if (profile_use) {
@@ -2721,147 +1280,23 @@ invalid_o_option:
 		append_standard_include_paths();
 	append_environment_include_paths();
 	init_preprocessor();
+	if (driver_use_external_preprocessor)
+		init_external_preprocessor();
 	init_ast();
 	init_constfold();
 	init_parser();
 	init_ast2firm();
 	init_mangle();
 
-	if (verbose) {
-		print_include_paths();
-	}
-
 	if (do_timing)
 		timer_init();
 
-	char outnamebuf[4096];
-	if (outname == NULL) {
-		const char *filename = units->name;
-
-		switch (mode) {
-		case MODE_BENCHMARK_PARSER:
-		case MODE_PRINT_AST:
-		case MODE_PRINT_FLUFFY:
-		case MODE_PRINT_JNA:
-		case MODE_PRINT_COMPOUND_SIZE:
-		case MODE_PREPROCESS_ONLY:
-		case MODE_GENERATE_DEPENDENCIES:
-		case MODE_PARSE_ONLY:
-			outname = "-";
-			break;
-		case MODE_COMPILE:
-			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".s");
-			outname = outnamebuf;
-			break;
-		case MODE_COMPILE_ASSEMBLE:
-			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".o");
-			outname = outnamebuf;
-			break;
-		case MODE_COMPILE_DUMP:
-			get_output_name(outnamebuf, sizeof(outnamebuf), dumpfunction,
-			                ".vcg");
-			outname = outnamebuf;
-			break;
-		case MODE_COMPILE_EXPORTIR:
-			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".ir");
-			outname = outnamebuf;
-			break;
-		case MODE_COMPILE_ASSEMBLE_LINK:
-			if (firm_is_windows_os(target.machine)) {
-				outname = "a.exe";
-			} else {
-				outname = "a.out";
-			}
-			break;
-		}
-	}
-
-	assert(outname != NULL);
-
-	FILE *out;
-	if (streq(outname, "-")) {
-		out = stdout;
-	} else {
-		out = fopen(outname, "w");
-		if (out == NULL) {
-			position_t const pos = { outname, 0, 0, 0 };
-			errorf(&pos, "could not open for writing: %s", strerror(errno));
-			return EXIT_FAILURE;
-		}
-	}
-
-	if (produce_statev && units != NULL) {
-		/* attempt to guess a good name for the file */
-		const char *first_cup = units->name;
-		if (first_cup != NULL) {
-			const char *dot = strrchr(first_cup, '.');
-			const char *pos = dot ? dot : first_cup + strlen(first_cup);
-			char        buf[pos-first_cup+1];
-			strncpy(buf, first_cup, pos-first_cup);
-			buf[pos-first_cup] = '\0';
-
-			stat_ev_begin(buf, filtev);
-		}
-	}
-
-	int result = compilation_loop(mode, units, standard, out);
-	if (stat_ev_enabled) {
-		stat_ev_end();
-	}
-
-	if (result != EXIT_SUCCESS) {
-		if (out != stdout)
-			unlink(outname);
-		return result;
-	}
-
-	/* link program file */
-	if (mode == MODE_COMPILE_DUMP) {
-		/* find irg */
-		ident    *id     = new_id_from_str(dumpfunction);
-		ir_graph *irg    = NULL;
-		int       n_irgs = get_irp_n_irgs();
-		for (int i = 0; i < n_irgs; ++i) {
-			ir_graph *tirg   = get_irp_irg(i);
-			ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
-			if (irg_id == id) {
-				irg = tirg;
-				break;
-			}
-		}
-
-		if (irg == NULL) {
-			errorf(NULL, "no graph for function '%s' found", dumpfunction);
-			return EXIT_FAILURE;
-		}
-
-		dump_ir_graph_file(out, irg);
-		fclose(out);
-		return EXIT_SUCCESS;
-	} else if (mode == MODE_COMPILE_EXPORTIR) {
-		ir_export_file(out);
-		if (ferror(out) != 0) {
-			errorf(NULL, "writing to output failed");
-			return EXIT_FAILURE;
-		}
-		return EXIT_SUCCESS;
-	} else if (mode == MODE_COMPILE_ASSEMBLE_LINK) {
-		int const link_result = link_program(units);
-		if (link_result != EXIT_SUCCESS) {
-			if (out != stdout)
-				unlink(outname);
-			return link_result;
-		}
-	}
+	int result = driver_go();
 
 	if (do_timing)
 		timer_term(print_timing ? stderr : NULL);
 
 	free_temp_files();
-	obstack_free(&cppflags_obst, NULL);
-	obstack_free(&ldflags_obst, NULL);
-	obstack_free(&asflags_obst, NULL);
-	obstack_free(&codegenflags_obst, NULL);
 	obstack_free(&file_obst, NULL);
 
 	gen_firm_finish();
@@ -2874,5 +1309,6 @@ invalid_o_option:
 	exit_types();
 	exit_tokens();
 	exit_symbol_table();
-	return EXIT_SUCCESS;
+	exit_driver();
+	return result;
 }
