@@ -50,6 +50,8 @@
 #include "adt/util.h"
 #include "ast2firm.h"
 #include "ast_t.h"
+#include "constfold.h"
+#include "constfoldbits.h"
 #include "diagnostic.h"
 #include "driver/firm_machine.h"
 #include "driver/firm_opt.h"
@@ -1009,7 +1011,6 @@ static void init_types_and_adjust(void)
 	ir_type *const type_ld = be_params->type_long_double;
 	if (type_ld) {
 		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_ld);
-		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_ld);
 	}
 
 	ir_type *const type_ll = be_params->type_long_long;
@@ -2752,6 +2753,7 @@ invalid_o_option:
 	append_environment_include_paths();
 	init_preprocessor();
 	init_ast();
+	init_constfold();
 	init_parser();
 	init_ast2firm();
 	init_mangle();

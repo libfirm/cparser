@@ -16,9 +16,11 @@
 #include "ast2firm.h"
 #include "ast_t.h"
 #include "attribute_t.h"
+#include "constfold.h"
 #include "diagnostic.h"
 #include "format_check.h"
 #include "lang_features.h"
+#include "parser.h"
 #include "preprocessor.h"
 #include "printer.h"
 #include "symbol_t.h"
@@ -9778,14 +9780,12 @@ static void check_enum_cases(const switch_statement_t *statement)
 	if (statement->default_label != NULL)
 		return;
 
-	determine_enum_values(enumt);
-
 	/* FIXME: calculation of value should be done while parsing */
 	/* TODO: quadratic algorithm here. Change to an n log n one */
 	const entity_t *entry = enumt->enume->base.next;
 	for (; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
-		ir_tarval *value = entry->enum_value.tv;
+		ir_tarval *value = get_enum_value(&entry->enum_value);
 		bool       found = false;
 		for (const case_label_statement_t *l = statement->first_case; l != NULL;
 		     l = l->next) {

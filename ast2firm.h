@@ -19,9 +19,4 @@ typedef ident* (*create_ld_ident_func)(entity_t *entity);
 
 void set_create_ld_ident(create_ld_ident_func func);
 
-ir_tarval *fold_expression(const expression_t *expression);
-void determine_enum_values(enum_type_t *type);
-
-extern ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
-
 #endif

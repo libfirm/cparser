@@ -49,6 +49,7 @@ cparser_SOURCES = \
 	ast.c \
 	ast2firm.c \
 	builtins.c \
+	constfold.c \
 	diagnostic.c \
 	driver/firm_machine.c \
 	driver/firm_opt.c \

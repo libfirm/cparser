@@ -26,6 +26,7 @@
 
 #include "adt/error.h"
 #include "adt/util.h"
+#include "constfold.h"
 #include "lang_features.h"
 #include "parser.h"
 #include "printer.h"

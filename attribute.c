@@ -10,6 +10,7 @@
 #include "adt/strutil.h"
 #include "ast_t.h"
 #include "attribute_t.h"
+#include "constfold.h"
 #include "diagnostic.h"
 #include "entity_t.h"
 #include "parser.h"

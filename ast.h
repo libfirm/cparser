@@ -112,10 +112,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
  */
 expression_classification_t is_linker_constant(const expression_t *expression);
 
-long fold_expression_to_int(const expression_t *expression);
-bool fold_expression_to_bool(const expression_t *expression);
-bool folded_expression_is_negative(const expression_t *constant);
-
 /**
  * the type of a literal is usually the biggest type that can hold the value.
  * Since this is backend dependent the parses needs this call exposed.
