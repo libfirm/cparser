@@ -948,20 +948,11 @@ static bool parse_target_triple(const char *arg)
 	return true;
 }
 
-static bool is_ia32_cpu(const char *architecture)
-{
-	return streq(architecture, "i386")
-	    || streq(architecture, "i486")
-	    || streq(architecture, "i586")
-	    || streq(architecture, "i686")
-	    || streq(architecture, "i786");
-}
-
 static const char *setup_isa_from_triple(const machine_triple_t *machine)
 {
 	const char *cpu = machine->cpu_type;
 
-	if (is_ia32_cpu(cpu)) {
+	if (firm_is_ia32_cpu(cpu)) {
 		return "ia32";
 	} else if (streq(cpu, "x86_64")) {
 		return "amd64";
@@ -1037,7 +1028,7 @@ static void init_types_and_adjust(void)
 
 	/* operating system ABI specifics */
 	if (firm_is_darwin_os(target_machine)) {
-		if (is_ia32_cpu(target_machine->cpu_type)) {
+		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
@@ -1046,7 +1037,7 @@ static void init_types_and_adjust(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
 	} else if (firm_is_windows_os(target_machine)) {
-		if (is_ia32_cpu(target_machine->cpu_type)) {
+		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
@@ -1060,7 +1051,7 @@ static void init_types_and_adjust(void)
 		/* on windows long double is not supported */
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	} else if (firm_is_unixish_os(target_machine)) {
-		if (is_ia32_cpu(target_machine->cpu_type)) {
+		if (firm_is_ia32_cpu(target_machine->cpu_type)) {
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
@@ -1411,7 +1402,7 @@ static void add_standard_defines(void)
 	const char *cpu          = target_machine->cpu_type;
 	const char *manufacturer = target_machine->manufacturer;
 	const char *os           = target_machine->operating_system;
-	if (is_ia32_cpu(cpu)) {
+	if (firm_is_ia32_cpu(cpu)) {
 		if (dialect.gnu)
 			add_define("i386",     "1", false);
 		add_define("__i386",   "1", false);
@@ -1695,7 +1686,7 @@ static void append_standard_include_paths(void)
 	else if (target_include_dir == NULL && system_include_dir != NULL) {
 		/* some guessing to find the "gcc-multilib" include dir */
 		assert(obstack_object_size(&file_obst) == 0);
-		if (is_ia32_cpu(target_machine->cpu_type)
+		if (firm_is_ia32_cpu(target_machine->cpu_type)
 			&& firm_is_unixish_os(target_machine)) {
 			obstack_printf(&file_obst, "%s/i386-linux-gnu", system_include_dir);
 	path_from_obst:;

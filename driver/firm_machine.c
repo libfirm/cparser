@@ -47,6 +47,15 @@ bool firm_is_windows_os(const machine_triple_t *machine)
 	return strstart(os, "mingw") || streq(os, "win32");
 }
 
+bool firm_is_ia32_cpu(const char *architecture)
+{
+	return streq(architecture, "i386")
+	    || streq(architecture, "i486")
+	    || streq(architecture, "i586")
+	    || streq(architecture, "i686")
+	    || streq(architecture, "i786");
+}
+
 /**
  * Initialize firm codegeneration for a specific operating system.
  * The argument is the operating system part of a target-triple

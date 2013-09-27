@@ -27,4 +27,6 @@ bool firm_is_darwin_os(const machine_triple_t *machine);
 
 bool firm_is_windows_os(const machine_triple_t *machine);
 
+bool firm_is_ia32_cpu(const char *architecture);
+
 #endif
