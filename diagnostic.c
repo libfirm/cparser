@@ -2,15 +2,16 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "diagnostic.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "diagnostic.h"
 #include "adt/error.h"
+#include "ast.h"
 #include "entity_t.h"
 #include "separator_t.h"
 #include "symbol_t.h"
-#include "ast.h"
 #include "type.h"
 #include "unicode.h"
 

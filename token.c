@@ -7,10 +7,10 @@
 
 #include <assert.h>
 
-#include "lang_features.h"
 #include "adt/array.h"
 #include "adt/error.h"
 #include "adt/util.h"
+#include "lang_features.h"
 #include "symbol_table.h"
 
 symbol_t *token_symbols[T_LAST_TOKEN];

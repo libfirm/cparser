@@ -2,21 +2,22 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "type_t.h"
+
 #include <stdio.h>
 
 #include "adt/bitfiddle.h"
-#include "type_t.h"
-#include "types.h"
-#include "entity_t.h"
-#include "symbol_t.h"
-#include "type_hash.h"
 #include "adt/error.h"
 #include "adt/util.h"
-#include "lang_features.h"
-#include "warning.h"
 #include "diagnostic.h"
+#include "entity_t.h"
+#include "lang_features.h"
 #include "printer.h"
 #include "separator_t.h"
+#include "symbol_t.h"
+#include "type_hash.h"
+#include "types.h"
+#include "warning.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;

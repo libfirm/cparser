@@ -2,15 +2,16 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "warning.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "adt/strutil.h"
 #include "adt/util.h"
-#include "warning.h"
-#include "help.h"
 #include "diagnostic.h"
+#include "help.h"
 
 static warning_switch_t warning[] = {
 	[WARN_ADDRESS]                       = { WARN_STATE_ON,   "address"                       },

@@ -5,8 +5,8 @@
 #ifndef ATTRIBUTE_T_H
 #define ATTRIBUTE_T_H
 
-#include "attribute.h"
 #include "ast.h"
+#include "attribute.h"
 #include "symbol.h"
 
 /**

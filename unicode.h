@@ -6,6 +6,7 @@
 #define UNICODE_H
 
 #include <assert.h>
+
 #include "adt/obst.h"
 #include "input.h"
 

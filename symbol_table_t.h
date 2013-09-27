@@ -5,8 +5,8 @@
 #ifndef SYMBOL_TABLE_T_H
 #define SYMBOL_TABLE_T_H
 
-#include "symbol_table.h"
 #include "symbol.h"
+#include "symbol_table.h"
 
 typedef struct symbol_table_iterator_t symbol_table_iterator_t;
 typedef struct symbol_table_t          symbol_table_t;

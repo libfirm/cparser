@@ -2,9 +2,10 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "type_t.h"
 #include "types.h"
+
 #include "lang_features.h"
+#include "type_t.h"
 
 /** The error type. */
 type_t *type_error_type;

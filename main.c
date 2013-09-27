@@ -4,12 +4,15 @@
  */
 #define _GNU_SOURCE
 
+#include <assert.h>
+#include <errno.h>
+#include <libfirm/be.h>
+#include <libfirm/firm.h>
+#include <libfirm/statev.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <errno.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef _WIN32
 
@@ -41,36 +44,32 @@
 #define HAVE_MKSTEMP
 #endif
 
-#include <libfirm/firm.h>
-#include <libfirm/be.h>
-#include <libfirm/statev.h>
-
-#include <revision.h>
-#include "adt/util.h"
-#include "ast_t.h"
-#include "preprocessor.h"
-#include "token_t.h"
-#include "types.h"
-#include "type_hash.h"
-#include "parser.h"
-#include "type_t.h"
-#include "ast2firm.h"
-#include "diagnostic.h"
-#include "lang_features.h"
-#include "driver/firm_opt.h"
-#include "driver/firm_timing.h"
-#include "driver/firm_machine.h"
+#include "adt/array.h"
 #include "adt/error.h"
 #include "adt/strutil.h"
-#include "adt/array.h"
+#include "adt/util.h"
+#include "ast2firm.h"
+#include "ast_t.h"
+#include "diagnostic.h"
+#include "driver/firm_machine.h"
+#include "driver/firm_opt.h"
+#include "driver/firm_timing.h"
+#include "help.h"
+#include "lang_features.h"
+#include "mangle.h"
+#include "parser.h"
+#include "preprocessor.h"
+#include "printer.h"
 #include "symbol_table.h"
+#include "token_t.h"
+#include "type_hash.h"
+#include "type_t.h"
+#include "types.h"
+#include "warning.h"
+#include "wrappergen/write_compoundsizes.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
-#include "wrappergen/write_compoundsizes.h"
-#include "warning.h"
-#include "help.h"
-#include "mangle.h"
-#include "printer.h"
+#include <revision.h>
 
 #define CPARSER_MAJOR      "0"
 #define CPARSER_MINOR      "9"

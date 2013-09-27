@@ -4,19 +4,19 @@
  */
 #include <assert.h>
 
+#include "adt/array.h"
 #include "adt/bitfiddle.h"
+#include "adt/error.h"
 #include "adt/strutil.h"
 #include "ast_t.h"
-#include "diagnostic.h"
-#include "warning.h"
 #include "attribute_t.h"
-#include "symbol_t.h"
-#include "adt/error.h"
-#include "adt/array.h"
+#include "diagnostic.h"
 #include "entity_t.h"
+#include "parser.h"
+#include "symbol_t.h"
 #include "symbol_table.h"
 #include "type_t.h"
-#include "parser.h"
+#include "warning.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",

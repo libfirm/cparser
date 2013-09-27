@@ -5,8 +5,8 @@
 #ifndef TYPE_H
 #define TYPE_H
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "entity.h"
 #include "symbol.h"

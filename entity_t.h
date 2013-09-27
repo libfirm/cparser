@@ -5,13 +5,14 @@
 #ifndef ENTITY_T_H
 #define ENTITY_T_H
 
-#include "ast.h"
-#include "symbol.h"
-#include "entity.h"
-#include "attribute.h"
 #include <libfirm/firm_types.h>
+
+#include "ast.h"
+#include "attribute.h"
 #include "builtins.h"
+#include "entity.h"
 #include "jump_target.h"
+#include "symbol.h"
 #include "token_t.h"
 
 typedef enum {

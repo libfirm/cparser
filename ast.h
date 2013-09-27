@@ -5,8 +5,9 @@
 #ifndef AST_H
 #define AST_H
 
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 #include "entity.h"
 
 typedef struct expression_base_t                     expression_base_t;

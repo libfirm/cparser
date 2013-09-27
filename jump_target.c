@@ -2,8 +2,9 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Christoph Mallon <christoph.mallon@gmx.de>
  */
-#include "adt/util.h"
 #include "jump_target.h"
+
+#include "adt/util.h"
 
 void jump_from_block_to_target(jump_target *const tgt, ir_node *const block)
 {

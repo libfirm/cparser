@@ -11,8 +11,8 @@
 #ifndef PRINTER_H
 #define PRINTER_H
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include "adt/obst.h"
 

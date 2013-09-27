@@ -5,8 +5,8 @@
 #ifndef SYMBOL_T_H
 #define SYMBOL_T_H
 
-#include "symbol.h"
 #include "entity.h"
+#include "symbol.h"
 #include "token_t.h"
 
 struct symbol_t {

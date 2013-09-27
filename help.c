@@ -2,9 +2,9 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <stdio.h>
-
 #include "help.h"
+
+#include <stdio.h>
 
 void put_help(const char *option, const char *explanation)
 {

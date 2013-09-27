@@ -2,12 +2,12 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <stdbool.h>
-
 #include "type_hash.h"
-#include "type_t.h"
 
 #include <assert.h>
+#include <stdbool.h>
+
+#include "type_t.h"
 
 #define HashSet         type_hash_t
 #define ValueType       type_t*

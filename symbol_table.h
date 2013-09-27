@@ -5,8 +5,8 @@
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
-#include "symbol.h"
 #include "adt/obst.h"
+#include "symbol.h"
 
 symbol_t *symbol_table_insert(const char *string);
 

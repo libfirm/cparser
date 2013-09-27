@@ -6,6 +6,7 @@
 #define ENTITYMAP_T_H
 
 #include <libfirm/firm_types.h>
+
 #include "symbol.h"
 
 typedef struct entitymap_entry_t {

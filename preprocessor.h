@@ -5,8 +5,8 @@
 #ifndef PREPROCESSOR_H
 #define PREPROCESSOR_H
 
-#include "token_t.h"
 #include "input.h"
+#include "token_t.h"
 
 /** initialize just enough so we can use add_define(),add_define_string(),
  * undefine(), append_include_path(), append_env_paths() for commandline

@@ -2,39 +2,38 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <assert.h>
-#include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
-
-#include <libfirm/firm.h>
-#include <libfirm/adt/obst.h>
-#include <libfirm/be.h>
-
 #include "ast2firm.h"
 
-#include "adt/error.h"
+#include <assert.h>
+#include <libfirm/adt/obst.h>
+#include <libfirm/be.h>
+#include <libfirm/firm.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "adt/array.h"
+#include "adt/error.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
+#include "ast_t.h"
+#include "diagnostic.h"
+#include "driver/firm_opt.h"
+#include "entity_t.h"
+#include "entitymap_t.h"
 #include "jump_target.h"
+#include "lang_features.h"
+#include "mangle.h"
+#include "parser.h"
+#include "printer.h"
 #include "symbol_t.h"
 #include "symbol_table.h"
 #include "token_t.h"
 #include "type_t.h"
-#include "ast_t.h"
-#include "entity_t.h"
-#include "parser.h"
-#include "diagnostic.h"
-#include "lang_features.h"
 #include "types.h"
-#include "mangle.h"
 #include "unicode.h"
 #include "walk.h"
 #include "warning.h"
-#include "printer.h"
-#include "entitymap_t.h"
-#include "driver/firm_opt.h"
 
 typedef struct trampoline_region trampoline_region;
 struct trampoline_region {

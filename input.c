@@ -4,10 +4,11 @@
  */
 #include "input.h"
 
-#include <ctype.h>
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
+
 #include "adt/util.h"
 #include "adt/xmalloc.h"
 

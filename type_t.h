@@ -5,10 +5,9 @@
 #ifndef TYPE_T_H
 #define TYPE_T_H
 
-#include <stdbool.h>
 #include <assert.h>
-
 #include <libfirm/firm_types.h>
+#include <stdbool.h>
 
 #include "ast.h"
 #include "type.h"

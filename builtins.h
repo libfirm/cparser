@@ -5,6 +5,8 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
+#include "entity.h"
+
 typedef enum {
 	BUILTIN_NONE,
 	BUILTIN_ALLOCA,

@@ -2,32 +2,33 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "parser.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include "adt/array.h"
+#include "adt/error.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
-#include "parser.h"
+#include "ast2firm.h"
+#include "ast_t.h"
+#include "attribute_t.h"
 #include "diagnostic.h"
 #include "format_check.h"
+#include "lang_features.h"
 #include "preprocessor.h"
+#include "printer.h"
 #include "symbol_t.h"
 #include "symbol_table.h"
 #include "token_t.h"
-#include "types.h"
-#include "type_t.h"
 #include "type_hash.h"
-#include "ast_t.h"
-#include "attribute_t.h"
-#include "lang_features.h"
+#include "type_t.h"
+#include "types.h"
 #include "walk.h"
 #include "warning.h"
-#include "printer.h"
-#include "ast2firm.h"
-#include "adt/error.h"
-#include "adt/array.h"
 
 //#define PRINT_TOKENS
 #define MAX_LOOKAHEAD 1

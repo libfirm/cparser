@@ -2,13 +2,14 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "entity_t.h"
+
 #include <assert.h>
 
-#include "entity_t.h"
-#include "ast_t.h"
 #include "adt/error.h"
-#include "adt/util.h"
 #include "adt/strutil.h"
+#include "adt/util.h"
+#include "ast_t.h"
 
 const char *get_entity_kind_name(entity_kind_t kind)
 {

@@ -2,12 +2,13 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "adt/strutil.h"
 #include "symbol_table_t.h"
-#include "symbol_t.h"
-#include "token_t.h"
+
 #include "adt/hash_string.h"
 #include "adt/obst.h"
+#include "adt/strutil.h"
+#include "symbol_t.h"
+#include "token_t.h"
 
 struct obstack symbol_obstack;
 

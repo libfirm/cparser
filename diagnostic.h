@@ -6,6 +6,7 @@
 #define DIAGNOSTIC_H
 
 #include <stdbool.h>
+
 #include "token_t.h"
 #include "warning.h"
 

@@ -2,12 +2,14 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "walk.h"
+
+#include <libfirm/adt/pset.h>
+
 #include "adt/error.h"
 #include "ast_t.h"
 #include "entity_t.h"
 #include "type_t.h"
-#include "walk.h"
-#include <libfirm/adt/pset.h>
 
 typedef struct walk_env_t {
 	pset *visited_types;

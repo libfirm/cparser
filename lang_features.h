@@ -6,8 +6,9 @@
 #define LANG_FEATURES_H
 
 #include <stdbool.h>
-#include "type.h"
+
 #include "driver/firm_machine.h"
+#include "type.h"
 
 #define BITS_PER_BYTE    8
 

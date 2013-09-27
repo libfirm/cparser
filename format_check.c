@@ -2,20 +2,21 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "format_check.h"
+
 #include <ctype.h>
 
 #include "adt/strutil.h"
 #include "adt/util.h"
-#include "format_check.h"
-#include "symbol_t.h"
 #include "ast_t.h"
-#include "entity_t.h"
 #include "diagnostic.h"
-#include "parser.h"
-#include "types.h"
-#include "type_t.h"
-#include "warning.h"
+#include "entity_t.h"
 #include "lang_features.h"
+#include "parser.h"
+#include "symbol_t.h"
+#include "type_t.h"
+#include "types.h"
+#include "warning.h"
 
 typedef enum format_flag_t {
 	FMT_FLAG_NONE  = 0,

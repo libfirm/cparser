@@ -3,36 +3,36 @@
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
 #define _POSIX_C_SOURCE 199506
+#include "preprocessor.h"
 
 #if defined(__unix__) || defined(__MACH__)
 #include <sys/stat.h>
 #endif
 
 #include <assert.h>
-#include <errno.h>
-#include <string.h>
-#include <stdbool.h>
 #include <ctype.h>
-#include <time.h>
+#include <errno.h>
 #include <libfirm/firm_common.h>
 #include <libfirm/irmode.h>
 #include <libfirm/tv.h>
+#include <stdbool.h>
+#include <string.h>
+#include <time.h>
 
-#include "ast_t.h"
-#include "preprocessor.h"
-#include "symbol_t.h"
 #include "adt/array.h"
-#include "adt/util.h"
 #include "adt/error.h"
-#include "adt/strutil.h"
 #include "adt/strset.h"
-#include "lang_features.h"
+#include "adt/strutil.h"
+#include "adt/util.h"
+#include "ast_t.h"
 #include "diagnostic.h"
-#include "string_rep.h"
 #include "input.h"
-#include "unicode.h"
+#include "lang_features.h"
 #include "separator_t.h"
+#include "string_rep.h"
+#include "symbol_t.h"
 #include "symbol_table_t.h"
+#include "unicode.h"
 
 #define MAX_PUTBACK 3
 #define BUFSIZE     1024

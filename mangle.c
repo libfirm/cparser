@@ -2,16 +2,17 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "mangle.h"
+
 #include <libfirm/firm.h>
 #include <string.h>
 
+#include "adt/error.h"
 #include "adt/obst.h"
 #include "entity_t.h"
-#include "type_t.h"
-#include "symbol_t.h"
-#include "mangle.h"
 #include "lang_features.h"
-#include "adt/error.h"
+#include "symbol_t.h"
+#include "type_t.h"
 
 static struct obstack obst;
 

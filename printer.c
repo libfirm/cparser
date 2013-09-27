@@ -2,11 +2,12 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "adt/util.h"
 #include "printer.h"
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
+
+#include "adt/util.h"
 
 static FILE* out;
 

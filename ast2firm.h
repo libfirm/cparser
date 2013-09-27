@@ -6,6 +6,7 @@
 #define AST2FIRM_H
 
 #include <libfirm/firm.h>
+
 #include "ast.h"
 #include "type.h"
 

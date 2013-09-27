@@ -21,18 +21,18 @@
  *       - Declarations are not preserved, when a definition has been found.
  */
 #include "ast_t.h"
-#include "symbol_t.h"
-#include "type_t.h"
-#include "parser.h"
-#include "lang_features.h"
-#include "printer.h"
-#include "separator_t.h"
-#include "types.h"
 
 #include <ctype.h>
 
 #include "adt/error.h"
 #include "adt/util.h"
+#include "lang_features.h"
+#include "parser.h"
+#include "printer.h"
+#include "separator_t.h"
+#include "symbol_t.h"
+#include "type_t.h"
+#include "types.h"
 
 struct obstack ast_obstack;
 
