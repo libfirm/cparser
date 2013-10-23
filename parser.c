@@ -659,7 +659,7 @@ static symbol_t *expect_identifier(char const *const context,
                                    position_t *const pos)
 {
 	if (!skip_till(T_IDENTIFIER, context))
-		return NULL;
+		return sym_anonymous;
 	symbol_t *const sym = token.base.symbol;
 	if (pos)
 		*pos = *HERE;
@@ -1599,7 +1599,7 @@ static designator_t *parse_designation(void)
 			eat('.');
 			designator->symbol
 				= expect_identifier("while parsing designator", NULL);
-			if (!designator->symbol)
+			if (designator->symbol == sym_anonymous)
 				return NULL;
 			break;
 		default:
@@ -2682,26 +2682,21 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		rem_anchor_token('=');
 
 		symbol_t **prop = NULL;
-		if (prop_sym) {
-			if (streq(prop_sym->string, "put")) {
-				prop = &property->put_symbol;
-			} else if (streq(prop_sym->string, "get")) {
-				prop = &property->get_symbol;
-			} else {
-				errorf(&pos,
-				       "expected put or get in property declspec, but got '%Y'",
-				       prop_sym);
-			}
+		if (streq(prop_sym->string, "put")) {
+			prop = &property->put_symbol;
+		} else if (streq(prop_sym->string, "get")) {
+			prop = &property->get_symbol;
+		} else if (prop_sym != sym_anonymous) {
+			errorf(&pos,
+				   "expected put or get in property declspec, but got '%Y'",
+				   prop_sym);
 		}
 
 		add_anchor_token(T_IDENTIFIER);
 		expect('=');
 		rem_anchor_token(T_IDENTIFIER);
 
-		symbol_t *const sym
-			= expect_identifier("while parsing property declspec", NULL);
-		if (prop != NULL)
-			*prop = sym ? sym : sym_anonymous;
+		*prop = expect_identifier("while parsing property declspec", NULL);
 	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(')');
@@ -3575,6 +3570,8 @@ ptr_operator_end: ;
 		if (env->may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
+		env->symbol = sym_anonymous;
+		env->pos    = *HERE;
 		eat_until_anchor();
 		return NULL;
 	}
@@ -6251,8 +6248,8 @@ static entity_t *parse_qualified_identifier(void)
 	entity_t *entity;
 	while (true) {
 		symbol = expect_identifier("while parsing identifier", &pos);
-		if (!symbol)
-			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
+		if (symbol == sym_anonymous)
+			return create_error_entity(symbol, ENTITY_VARIABLE);
 
 		/* lookup entity */
 		entity = lookup_entity(lookup_scope, symbol, NAMESPACE_NORMAL);
@@ -6566,7 +6563,7 @@ static designator_t *parse_designator(void)
 	designator_t *const result = allocate_ast_zero(sizeof(result[0]));
 	result->symbol = expect_identifier("while parsing member designator",
 	                                   &result->pos);
-	if (!result->symbol)
+	if (result->symbol == sym_anonymous)
 		return NULL;
 
 	designator_t *last_designator = result;
@@ -6576,7 +6573,7 @@ static designator_t *parse_designator(void)
 			designator->symbol
 				= expect_identifier("while parsing member designator",
 				                    &designator->pos);
-			if (!designator->symbol)
+			if (designator->symbol == sym_anonymous)
 				return NULL;
 
 			last_designator->next = designator;
@@ -6863,7 +6860,7 @@ static label_t *get_label(char const *const context)
 	assert(current_function != NULL);
 
 	symbol_t *const sym = expect_identifier(context, NULL);
-	if (!sym)
+	if (sym == sym_anonymous)
 		return NULL;
 
 	entity_t *label = get_entity(sym, NAMESPACE_LABEL);
@@ -7154,7 +7151,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 	next_token();
 
 	symbol_t *const symbol = expect_identifier("while parsing select", NULL);
-	if (!symbol)
+	if (symbol == sym_anonymous)
 		return create_error_expression();
 
 	type_t *const orig_type = addr->base.type;
@@ -10281,7 +10278,7 @@ static statement_t *parse_local_label_declaration(void)
 		position_t pos;
 		symbol_t *const symbol
 			= expect_identifier("while parsing local label declaration", &pos);
-		if (symbol) {
+		if (symbol != sym_anonymous) {
 			entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 			if (entity != NULL && entity->base.parent_scope == current_scope) {
 				errorf(&pos, "multiple definitions of '%N'", entity);
