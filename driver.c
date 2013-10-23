@@ -598,6 +598,8 @@ static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
 		append_standard_include_paths();
 	append_environment_include_paths();
 	init_preprocessor();
+	if (driver_verbose)
+		print_include_paths();
 
 	add_predefined_macros();
 	if (mode == MODE_PREPROCESS_ONLY) {
@@ -1006,8 +1008,6 @@ int action_compile(const char *argv0)
 
 	if (do_timing)
 		timer_init();
-	if (driver_verbose)
-		print_include_paths();
 
 	char outnamebuf[4096];
 	if (outname == NULL) {
