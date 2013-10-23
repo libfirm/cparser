@@ -285,6 +285,16 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 		obstack_1grow(&cppflags_obst, ' ');
 		obstack_grow(&cppflags_obst, flags, len);
 	}
+	if (!is_warn_on(WARN_TRIGRAPHS))
+		driver_add_flag(&cppflags_obst, "-Wno-trigraphs");
+	if (is_warn_on(WARN_UNDEF))
+		driver_add_flag(&cppflags_obst, "-Wundef");
+	if (is_warn_on(WARN_MISSING_INCLUDE_DIRS))
+		driver_add_flag(&cppflags_obst, "-Wmissing-include-dirs");
+	if (is_warn_on(WARN_ENDIF_LABELS))
+		driver_add_flag(&cppflags_obst, "-Wendif-labels");
+	if (is_warn_on(WARN_COMMENT))
+		driver_add_flag(&cppflags_obst, "-Wcomment");
 
 	/* handle dependency generation */
 	if (construct_dep_target) {

@@ -41,6 +41,7 @@ typedef enum warning_t {
 	WARN_MISSING_VARIABLE_DECLARATIONS, /**< Warn if a global variable is defined without a previous declaration */
 	WARN_MISSING_NORETURN,              /**< Warn about functions which might be candidates for attribute 'noreturn' */
 	WARN_MISSING_PROTOTYPES,            /**< Warn if a global function is defined without a previous prototype declaration */
+	WARN_MISSING_INCLUDE_DIRS,
 	WARN_MULTICHAR,                     /**< Warn if a multicharacter constant ('FOOF') is used. */
 	WARN_NESTED_EXTERNS,                /**< Warn if an 'extern' declaration is encountered within a function. */
 	WARN_NONNULL,                       /**< Warn about passing a null pointer for arguments marked nonnull. */
@@ -62,6 +63,7 @@ typedef enum warning_t {
 	WARN_SWITCH_ENUM,                   /**< Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch? */
 	WARN_SYSTEM,                        /**< Show warnings in system headers. */
 	WARN_TRADITIONAL,                   /**< Warn about certain constructs that behave differently in traditional and ISO C */
+	WARN_TRIGRAPHS,
 	WARN_UNDEF,                         /**< Warn if an undefined identifier is evaluated in an '#if' directive */
 	WARN_UNINITIALIZED,                 /**< Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call. */
 	WARN_UNKNOWN_PRAGMAS,               /**< Warn when a #pragma directive is encountered which is not understood */

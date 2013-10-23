@@ -468,12 +468,7 @@ bool options_parse_diagnostics(options_state_t *s)
 		dialect.strict = true;
 		set_warning_opt("pedantic");
 	} else if (option[0] == 'W') {
-		if (streq(option + 1, "no-trigraphs")
-		 || streq(option + 1, "undef")
-		 || streq(option + 1, "missing-include-dirs")
-		 || streq(option + 1, "endif-labels")) {
-			driver_add_flag(&cppflags_obst, "%s", full_option);
-		} else if (streq(option+1, "init-self")) {
+		if (streq(option+1, "init-self")) {
 			/* ignored (same as gcc does) */
 		} else if (streq(option+1, "format-y2k")
 		        || streq(option+1, "format-security")
