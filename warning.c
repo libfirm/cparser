@@ -119,6 +119,10 @@ void set_warning_opt(const char *const opt)
 			return;
 		}
 	}
+	if (streq(s, "comments")) {
+		warning[WARN_COMMENT].state = (warning[WARN_COMMENT].state & ~off) | on;
+		return;
+	}
 
 	if (s[0] == '\0') { // -W is an alias for -Wextra
 		goto extra;
