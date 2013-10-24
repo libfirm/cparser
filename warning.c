@@ -21,6 +21,7 @@ static warning_switch_t warning[] = {
 	[WARN_CAST_QUAL]                     = { WARN_STATE_NONE, "cast-qual"                     },
 	[WARN_CHAR_SUBSCRIPTS]               = { WARN_STATE_ON,   "char-subscripts"               },
 	[WARN_COMMENT]                       = { WARN_STATE_NONE, "comment"                       },
+	[WARN_COMPAT_OPTION]                 = { WARN_STATE_ON,   "compat-option"                 },
 	[WARN_CONVERSION]                    = { WARN_STATE_NONE, "conversion"                    },
 	[WARN_DECLARATION_AFTER_STATEMENT]   = { WARN_STATE_NONE, "declaration-after-statement"   },
 	[WARN_DEPRECATED_DECLARATIONS]       = { WARN_STATE_ON,   "deprecated-declarations"       },

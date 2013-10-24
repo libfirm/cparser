@@ -244,7 +244,8 @@ bool options_parse_driver(options_state_t *s)
 			streq(arg, "iso9899:1999")   ? STANDARD_C99     :
 			streq(arg, "iso9899:199x")   ? STANDARD_C99     : // deprecated
 			streq(arg, "iso9899:2011")   ? STANDARD_C11     :
-			(fprintf(stderr, "warning: ignoring gcc option '-%s'\n", option), standard);
+			(warningf(WARN_COMPAT_OPTION, NULL,
+			          "ignoring gcc option '-%s'", option), standard);
 	} else if (streq(option, "ansi")) {
 		standard = STANDARD_ANSI;
 	} else if (streq(option, "-gcc")) {
@@ -380,7 +381,8 @@ bool options_parse_codegen(options_state_t *s)
 	if ((arg = equals_arg("falign-loops=", s)) != NULL
      || (arg = equals_arg("falign-jumps=", s)) != NULL
      || (arg = equals_arg("falign-functions=", s)) != NULL) {
-		fprintf(stderr, "ignoring gcc option '%s'\n", full_option);
+		warningf(WARN_COMPAT_OPTION, NULL,
+				 "ignoring gcc option '%s'", full_option);
 	} else if ((arg = equals_arg("fvisibility=", s)) != NULL) {
 		elf_visibility_tag_t visibility = get_elf_visibility_from_string(arg);
 		if (visibility == ELF_VISIBILITY_ERROR) {
@@ -441,7 +443,8 @@ bool options_parse_codegen(options_state_t *s)
 					   streq(fopt, "stack-protector-all")) {
 				/* better warn the user for these as he might have expected
 				 * that something happens */
-				fprintf(stderr, "ignoring gcc option '-f%s'\n", option);
+				warningf(WARN_COMPAT_OPTION, NULL,
+				         "ignoring gcc option '-f%s'", option);
 			} else if (firm_option(fopt)) {
 				/* parsed a firm option */
 			} else {
