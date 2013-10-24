@@ -44,6 +44,7 @@ static warning_switch_t warning[] = {
 	[WARN_MULTICHAR]                     = { WARN_STATE_ON,   "multichar"                     },
 	[WARN_NESTED_EXTERNS]                = { WARN_STATE_NONE, "nested-externs"                },
 	[WARN_NONNULL]                       = { WARN_STATE_ON,   "nonnull"                       },
+	[WARN_NOT_COMPOUND_ASSIGN]           = { WARN_STATE_ON,   "not-compound-assign"           },
 	[WARN_OLD_STYLE_DEFINITION]          = { WARN_STATE_NONE, "old-style-definition"          },
 	[WARN_OTHER]                         = { WARN_STATE_ON,   "other"                         },
 	[WARN_PACKED]                        = { WARN_STATE_NONE, "packed"                        },

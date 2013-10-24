@@ -8792,7 +8792,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	if (expression->base.kind == EXPR_BINARY_ASSIGN &&
 	    is_ambiguous_unary_expression_kind(expression->right->kind)) {
 		if (are_positions_contiguous(&expression->base.pos, &expression->right->base.pos)) {
-			warningf(WARN_OTHER, &expression->base.pos,
+			warningf(WARN_NOT_COMPOUND_ASSIGN, &expression->base.pos,
 			         "use of unary operator that may be intended as compound assignment (%hs%E)",
 			         "=", expression->right);
 		}

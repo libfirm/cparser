@@ -44,6 +44,7 @@ typedef enum warning_t {
 	WARN_MULTICHAR,                     /**< Warn if a multicharacter constant ('FOOF') is used. */
 	WARN_NESTED_EXTERNS,                /**< Warn if an 'extern' declaration is encountered within a function. */
 	WARN_NONNULL,                       /**< Warn about passing a null pointer for arguments marked nonnull. */
+	WARN_NOT_COMPOUND_ASSIGN,           /**< Warn for constructs like x =+ 2 which are probably mistyped compound assignments. */
 	WARN_OLD_STYLE_DEFINITION,          /**< Warn if an old-style function definition is used. */
 	WARN_OTHER,                         /**< Warnings not covered by any other option */
 	WARN_PACKED,                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
