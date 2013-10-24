@@ -3537,7 +3537,7 @@ ptr_operator_end: ;
 	switch (token.kind) {
 	case T_IDENTIFIER:
 		if (env->must_be_abstract) {
-			errorf(HERE, "no identifier expected in typename");
+			errorf(HERE, "type name must not have an identifier");
 		} else {
 			env->symbol = token.base.symbol;
 			env->pos    = *HERE;
@@ -5844,7 +5844,7 @@ static type_t *parse_typename(void)
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
-		errorf(&specifiers.pos, "typename must not have a storage class");
+		errorf(&specifiers.pos, "type name must not have a storage class");
 	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
@@ -7914,7 +7914,7 @@ static void semantic_incdec(unary_expression_t *expression)
 	           (!GNU_MODE || !is_type_complex(type)) && is_type_valid(type)) {
 		/* TODO: improve error message */
 		errorf(&expression->base.pos,
-		       "operation needs an arithmetic or pointer type");
+		       "operation needs an arithmetic or pointer type, but got '%T'", type);
 		orig_type = type = type_error_type;
 	}
 	if (!is_lvalue(expression->value)) {
