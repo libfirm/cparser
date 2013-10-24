@@ -84,7 +84,10 @@ CPARSEROS = $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
 CPARSEROS_E = $(cparser_SOURCES:%.c=$(builddir)/cpbe/%.o)
 CPARSEROS2 = $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
 
-Q = @
+# This hides the noisy commandline outputs. Show them with "make V=1"
+ifneq ($(V),1)
+Q ?= @
+endif
 
 GOAL = $(builddir)/cparser
 all: $(GOAL)
