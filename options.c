@@ -445,7 +445,7 @@ bool options_parse_codegen(options_state_t *s)
 				 * that something happens */
 				warningf(WARN_COMPAT_OPTION, NULL,
 				         "ignoring gcc option '-f%s'", option);
-			} else if (firm_option(fopt)) {
+			} else if (firm_option(&option[1])) {
 				/* parsed a firm option */
 			} else {
 				return false;
