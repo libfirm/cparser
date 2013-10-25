@@ -998,6 +998,33 @@ void driver_add_input(const char *filename, compilation_unit_type_t type)
 	last_unit = entry;
 }
 
+static void init_driver_tools(void)
+{
+	assert(obstack_object_size(&file_obst) == 0);
+	/* decide which linker, preprocessor, assembler to use */
+	driver_preprocessor = getenv("CPARSER_PP");
+	if (driver_preprocessor == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", PREPROCESSOR);
+		driver_preprocessor = obstack_finish(&file_obst);
+	}
+	driver_assembler = getenv("CPARSER_AS");
+	if (driver_assembler == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", ASSEMBLER);
+		driver_assembler = obstack_finish(&file_obst);
+	}
+	driver_linker = getenv("CPARSER_LINK");
+	if (driver_linker == NULL) {
+		if (target.triple != NULL)
+			obstack_printf(&file_obst, "%s-", target.triple);
+		obstack_printf(&file_obst, "%s", LINKER);
+		driver_linker = obstack_finish(&file_obst);
+	}
+}
+
 int action_compile(const char *argv0)
 {
 	(void)argv0;
@@ -1005,6 +1032,8 @@ int action_compile(const char *argv0)
 		errorf(NULL, "no input files specified");
 		return EXIT_FAILURE;
 	}
+
+	init_driver_tools();
 
 	if (do_timing)
 		timer_init();
@@ -1143,33 +1172,6 @@ static int detect_color_terminal(void)
 	return 8;
 }
 
-static void init_driver_tools(void)
-{
-	assert(obstack_object_size(&file_obst) == 0);
-	/* decide which linker, preprocessor, assembler to use */
-	driver_preprocessor = getenv("CPARSER_PP");
-	if (driver_preprocessor == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", PREPROCESSOR);
-		driver_preprocessor = obstack_finish(&file_obst);
-	}
-	driver_assembler = getenv("CPARSER_AS");
-	if (driver_assembler == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", ASSEMBLER);
-		driver_assembler = obstack_finish(&file_obst);
-	}
-	driver_linker = getenv("CPARSER_LINK");
-	if (driver_linker == NULL) {
-		if (target.triple != NULL)
-			obstack_printf(&file_obst, "%s-", target.triple);
-		obstack_printf(&file_obst, "%s", LINKER);
-		driver_linker = obstack_finish(&file_obst);
-	}
-}
-
 void init_driver(void)
 {
 	obstack_init(&codegenflags_obst);
@@ -1178,8 +1180,6 @@ void init_driver(void)
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
-
-	init_driver_tools();
 
 	colorterm = detect_color_terminal();
 	diagnostic_enable_color(colorterm);
