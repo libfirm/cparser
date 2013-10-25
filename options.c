@@ -403,7 +403,7 @@ bool options_parse_codegen(options_state_t *s)
 			|| streq(option, "g2") || streq(option, "g3")) {
 		set_be_option("debug=frameinfo");
 		set_be_option("ia32-optcc=false");
-	} else if (option[0] == 'm') {
+	} else if (option[0] == 'm' && !strstart(option, "mtarget")) {
 		arg = &option[1];
 		/* remember option for backend */
 		assert(obstack_object_size(&codegenflags_obst) == 0);
@@ -712,8 +712,7 @@ bool options_parse_meta(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
-	} else if ((arg = equals_arg("mtarget=", s)) != NULL
-	        || (arg = equals_arg("mtriple=", s)) != NULL) {
+	} else if ((arg = equals_arg("mtarget=", s)) != NULL) {
 		if (parse_target_triple(arg)) {
 			const char *isa = setup_target_machine();
 			snprintf(firm_be, sizeof(firm_be), "%s", isa);
