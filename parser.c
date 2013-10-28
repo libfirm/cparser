@@ -2226,6 +2226,8 @@ error_parse_next:
 
 end_error:
 	skip_initializers();
+	if (result == NULL)
+		result = create_empty_initializer();
 out:
 	DEL_ARR_F(initializers);
 	ascend_to(path, top_path_level+1);
