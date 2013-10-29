@@ -76,6 +76,7 @@ typedef enum warning_t {
 	WARN_UNUSED_VALUE,                  /**< Warn whenever a statement computes a result that is explicitly not used */
 	WARN_UNUSED_VARIABLE,               /**< Warn whenever a local variable or non-constant static variable is unused aside from its declaration */
 	WARN_WRITE_STRINGS,                 /**< Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char *' pointer will get a warning */
+	WARN_UNKNOWN_WARNING_OPTION,        /**< Warn whenever an unknown warning is requested */
 } warning_t;
 
 typedef enum warn_state_t {

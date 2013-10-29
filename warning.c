@@ -76,6 +76,7 @@ static warning_switch_t warning[] = {
 	[WARN_UNUSED_VALUE]                  = { WARN_STATE_ON,   "unused-value"                  },
 	[WARN_UNUSED_VARIABLE]               = { WARN_STATE_NONE, "unused-variable"               },
 	[WARN_WRITE_STRINGS]                 = { WARN_STATE_NONE, "write-strings"                 },
+	[WARN_UNKNOWN_WARNING_OPTION]        = { WARN_STATE_ON,   "unknown-warning-option"        },
 };
 
 warning_switch_t const *get_warn_switch(warning_t const w)
@@ -194,7 +195,7 @@ extra:
 		/* GCC legacy: This way it only can be activated. */
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
 	} else {
-		warningf(WARN_OTHER, NULL, "ignoring unknown option %hs%hs", "-W", opt);
+		warningf(WARN_UNKNOWN_WARNING_OPTION, NULL, "ignoring unknown option %hs%hs", "-W", opt);
 	}
 }
 
