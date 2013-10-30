@@ -1007,6 +1007,7 @@ static void init_driver_tools(void)
 		if (target.triple != NULL)
 			obstack_printf(&file_obst, "%s-", target.triple);
 		obstack_printf(&file_obst, "%s", PREPROCESSOR);
+		obstack_1grow(&file_obst, '\0');
 		driver_preprocessor = obstack_finish(&file_obst);
 	}
 	driver_assembler = getenv("CPARSER_AS");
@@ -1014,6 +1015,7 @@ static void init_driver_tools(void)
 		if (target.triple != NULL)
 			obstack_printf(&file_obst, "%s-", target.triple);
 		obstack_printf(&file_obst, "%s", ASSEMBLER);
+		obstack_1grow(&file_obst, '\0');
 		driver_assembler = obstack_finish(&file_obst);
 	}
 	driver_linker = getenv("CPARSER_LINK");
@@ -1021,6 +1023,7 @@ static void init_driver_tools(void)
 		if (target.triple != NULL)
 			obstack_printf(&file_obst, "%s-", target.triple);
 		obstack_printf(&file_obst, "%s", LINKER);
+		obstack_1grow(&file_obst, '\0');
 		driver_linker = obstack_finish(&file_obst);
 	}
 }
