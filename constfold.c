@@ -332,6 +332,9 @@ void determine_enum_values(enum_type_t *const type)
 
 		expression_t *const init = entry->enum_value.value;
 		if (init != NULL) {
+			type_t *const type = skip_typeref(init->base.type);
+			if (!is_type_valid(type))
+				continue;
 			tv_next = fold_expression(init);
 		}
 		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);

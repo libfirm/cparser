@@ -17,6 +17,7 @@
 #include "ast_t.h"
 #include "attribute_t.h"
 #include "constfold.h"
+#include "constfoldbits.h"
 #include "diagnostic.h"
 #include "format_check.h"
 #include "lang_features.h"
@@ -2430,10 +2431,9 @@ static void parse_enum_entries(type_t *const enum_type)
 		if (accept('=')) {
 			expression_t *value
 				= parse_integer_constant_expression("enumeration value");
-			value = create_implicit_cast(value, enum_type);
+			if (value->base.type != type_error_type)
+				value = create_implicit_cast(value, type_int);
 			entity->enum_value.value = value;
-
-			/* TODO semantic */
 		}
 
 		record_entity(entity, true);
@@ -2510,6 +2510,23 @@ static type_t *parse_enum_specifier(void)
 		       "'%T' used before definition (incomplete enums are a GNU extension)",
 		       type);
 	}
+
+	/* choose base kind */
+	bool has_negative_value = false;
+	for (const entity_t *entry = entity->base.next;
+	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	     entry = entry->base.next) {
+		ir_tarval *val = get_enum_value(&entry->enum_value);
+		/* in error cases val may be NULL */
+		if (val == NULL)
+			continue;
+		if (tarval_is_negative(val)) {
+			has_negative_value = true;
+			break;
+		}
+	}
+	if (!has_negative_value)
+		type->enumt.base.akind = ATOMIC_TYPE_UINT;
 
 	return type;
 }
@@ -6170,7 +6187,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		if (is_declaration(entity)) {
 			return entity->declaration.type;
 		} else if (entity->kind == ENTITY_ENUM_VALUE) {
-			return entity->enum_value.enum_type;
+			return type_int;
 		} else {
 			panic("no declaration or enum in reference");
 		}
@@ -6303,7 +6320,7 @@ static expression_t *parse_reference(void)
 	if (is_declaration(entity)) {
 		orig_type = entity->declaration.type;
 	} else if (entity->kind == ENTITY_ENUM_VALUE) {
-		orig_type = entity->enum_value.enum_type;
+		orig_type = type_int;
 	} else {
 		panic("expected declaration or enum value in reference");
 	}
@@ -9561,12 +9578,13 @@ static statement_t *parse_case_statement(void)
 
 	expression_t *expression = parse_integer_constant_expression("case label");
 	type_t       *type       = expression->base.type;
-	if (expression->base.type == type_error_type) {
+	if (type == type_error_type) {
 		statement->case_label.is_bad = true;
 	} else {
 		if (current_switch != NULL) {
 			type_t *switch_type = current_switch->expression->base.type;
 			if (is_type_valid(skip_typeref(switch_type))) {
+				type       = switch_type;
 				expression = create_implicit_cast(expression, switch_type);
 			}
 		}
@@ -9815,7 +9833,9 @@ static void check_enum_cases(const switch_statement_t *statement)
 	const entity_t *entry = enumt->enume->base.next;
 	for (; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
+		ir_mode   *mode  = get_ir_mode_arithmetic(type);
 		ir_tarval *value = get_enum_value(&entry->enum_value);
+		value = tarval_convert_to(value, mode);
 		bool       found = false;
 		for (const case_label_statement_t *l = statement->first_case; l != NULL;
 		     l = l->next) {
