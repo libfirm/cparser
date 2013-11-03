@@ -50,7 +50,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression);
 entity_t *record_entity(entity_t *entity, bool is_definition);
 
 /** set default elf visbility */
-void set_default_visibility(elf_visibility_tag_t visibility);
+void set_default_visibility(elf_visibility_t visibility);
 
 /** array of entities using attribute((alias())) */
 extern entity_t **alias_entities;

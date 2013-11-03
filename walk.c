@@ -255,6 +255,9 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 	case ENTITY_LABEL:
 	case ENTITY_LOCAL_LABEL:
 		return;
+	case ENTITY_ASM_ARGUMENT:
+		walk_expression(entity->asm_argument.expression, env);
+		return;
 	}
 	panic("invalid entity");
 }

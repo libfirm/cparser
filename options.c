@@ -384,7 +384,7 @@ bool options_parse_codegen(options_state_t *s)
 		warningf(WARN_COMPAT_OPTION, NULL,
 				 "ignoring gcc option '%s'", full_option);
 	} else if ((arg = equals_arg("fvisibility=", s)) != NULL) {
-		elf_visibility_tag_t visibility = get_elf_visibility_from_string(arg);
+		elf_visibility_t visibility = get_elf_visibility_from_string(arg);
 		if (visibility == ELF_VISIBILITY_ERROR) {
 			errorf(NULL, "invalid visibility '%s' specified", arg);
 			s->argument_errors = true;

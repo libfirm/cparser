@@ -8,26 +8,25 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "adt/util.h"
 #include "string_rep.h"
 #include "symbol.h"
 
-typedef enum token_kind_tag_t {
+typedef enum token_kind_t {
 	T_NULL  =  0,
 #define T(mode, x, str, val, is_keyword) x val,
 #include "tokens.h"
 #undef T
 	T_LAST_TOKEN
-} token_kind_tag_t;
-typedef unsigned short token_kind_t;
+} token_kind_t;
 
-typedef enum pp_token_kind_tag_t {
+typedef enum pp_token_kind_t {
 	TP_NULL = 0,
 #define T(token) TP_##token,
 #include "tokens_preprocessor.h"
 #undef T
 	TP_LAST_TOKEN
-} pp_token_kind_tag_t;
-typedef unsigned short pp_token_kind_t;
+} pp_token_kind_t;
 
 typedef struct position_t position_t;
 struct position_t {
@@ -48,7 +47,7 @@ typedef struct macro_parameter_t macro_parameter_t;
 typedef union  token_t           token_t;
 
 struct token_base_t {
-	token_kind_t kind;
+	ENUMBF(token_kind_t) kind : 16;
 	/** there was whitespace (no newline) before the token. Used for
 	 * saving macro expansion lists */
 	bool         space_before        : 1;
@@ -69,7 +68,7 @@ struct macro_parameter_t {
 };
 
 union token_t {
-	token_kind_t      kind;
+	ENUMBF(token_kind_t) kind : 16;
 	token_base_t      base;
 	literal_t         literal;
 	macro_parameter_t macro_parameter;

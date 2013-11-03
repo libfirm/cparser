@@ -606,12 +606,16 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 		return false;
-	case ENTITY_TYPEDEF:
+	case ENTITY_ASM_ARGUMENT:
+	case ENTITY_CLASS:
 	case ENTITY_ENUM:
 	case ENTITY_ENUM_VALUE:
-	case ENTITY_NAMESPACE:
 	case ENTITY_LABEL:
 	case ENTITY_LOCAL_LABEL:
+	case ENTITY_NAMESPACE:
+	case ENTITY_STRUCT:
+	case ENTITY_TYPEDEF:
+	case ENTITY_UNION:
 		break;
 	}
 	panic("entity is not a declaration");
@@ -732,8 +736,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	handle_decl_modifiers(irentity, entity);
 
 	if (!nested_function) {
-		storage_class_tag_t const storage_class
-			= (storage_class_tag_t) entity->declaration.storage_class;
+		storage_class_t const storage_class = entity->declaration.storage_class;
 		if (storage_class == STORAGE_CLASS_STATIC) {
 		    set_entity_visibility(irentity, ir_visibility_local);
 		} else {
@@ -4275,11 +4278,10 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_global_variable(entity_t *entity)
 {
-	ir_linkage          linkage    = IR_LINKAGE_DEFAULT;
-	ir_visibility       visibility = ir_visibility_external;
-	storage_class_tag_t storage
-		= (storage_class_tag_t)entity->declaration.storage_class;
-	decl_modifiers_t    modifiers  = entity->declaration.modifiers;
+	ir_linkage       linkage    = IR_LINKAGE_DEFAULT;
+	ir_visibility    visibility = ir_visibility_external;
+	storage_class_t  storage    = entity->declaration.storage_class;
+	decl_modifiers_t modifiers  = entity->declaration.modifiers;
 	assert(entity->kind == ENTITY_VARIABLE);
 
 	switch (storage) {
@@ -4325,7 +4327,7 @@ static void create_local_declaration(entity_t *entity)
 		return;
 	}
 
-	switch ((storage_class_tag_t) entity->declaration.storage_class) {
+	switch (entity->declaration.storage_class) {
 	case STORAGE_CLASS_STATIC:
 		if (entity->kind == ENTITY_FUNCTION) {
 			(void)get_function_entity(entity, NULL);
@@ -5182,14 +5184,16 @@ static ir_entity *get_irentity(entity_t *entity)
 	case ENTITY_VARIABLE:        return entity->variable.v.entity;
 	case ENTITY_FUNCTION:        return entity->function.irentity;
 	case ENTITY_COMPOUND_MEMBER: return entity->compound_member.entity;
-	case ENTITY_TYPEDEF:
+	case ENTITY_ASM_ARGUMENT:
 	case ENTITY_CLASS:
-	case ENTITY_STRUCT:
-	case ENTITY_UNION:
 	case ENTITY_ENUM:
 	case ENTITY_ENUM_VALUE:
+	case ENTITY_LABEL:
+	case ENTITY_LOCAL_LABEL:
 	case ENTITY_NAMESPACE:
-	case ENTITY_ASM_ARGUMENT:
+	case ENTITY_STRUCT:
+	case ENTITY_TYPEDEF:
+	case ENTITY_UNION:
 		return NULL;
 	}
 	panic("invalid entity kind");
@@ -5216,6 +5220,8 @@ static void scope_to_firm(scope_t *scope)
 			break;
 		case ENTITY_NAMESPACE:
 			scope_to_firm(&entity->namespacee.members);
+			break;
+		default:
 			break;
 		}
 	}
@@ -5255,6 +5261,8 @@ static void scope_to_firm(scope_t *scope)
 			}
 			break;
 		}
+		default:
+			break;
 		}
 	}
 }

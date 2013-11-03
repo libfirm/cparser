@@ -42,6 +42,12 @@
  */
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
+#ifdef __GNUC__
+#define ENUMBF(type) __extension__ type
+#else
+#define ENUMBF(type) unsigned
+#endif
+
 #define endof(x) ((x) + ARRAY_SIZE(x))
 
 #undef MAX

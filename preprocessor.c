@@ -1187,6 +1187,7 @@ static string_encoding_t identify_encoding_prefix(symbol_t *const sym)
 	case TP_U:  enc = STRING_ENCODING_CHAR32; break;
 	case TP_u:  enc = STRING_ENCODING_CHAR16; break;
 	case TP_u8: enc = STRING_ENCODING_UTF8;   break;
+	default: break;
 	}
 	return dialect.c11 ? enc : STRING_ENCODING_CHAR;
 }
@@ -1507,6 +1508,7 @@ static bool concat_tokens(const position_t *pos,
 		case '<':         set_punctuator(T_LESSLESS);            return true;
 		case T_LESSEQUAL: set_punctuator(T_LESSLESSEQUAL);       return true;
 		case '=':         set_punctuator(T_LESSEQUAL);           return true;
+		default: break;
 		}
 		break;
 	case T_LESSLESS:
@@ -1521,6 +1523,8 @@ static bool concat_tokens(const position_t *pos,
 		case T_GREATEREQUAL: {
 			set_punctuator(T_GREATERGREATEREQUAL);
 			return true;
+		default:
+			break;
 		}
 		}
 		break;

@@ -13,7 +13,7 @@
 
 const char *get_entity_kind_name(entity_kind_t kind)
 {
-	switch ((entity_kind_tag_t) kind) {
+	switch (kind) {
 	case ENTITY_FUNCTION:        return "function";
 	case ENTITY_VARIABLE:        return "variable";
 	case ENTITY_PARAMETER:       return "parameter";
@@ -77,7 +77,7 @@ entity_t *allocate_entity_zero(entity_kind_t const kind, entity_namespace_t cons
 	return entity;
 }
 
-elf_visibility_tag_t get_elf_visibility_from_string(const char *string)
+elf_visibility_t get_elf_visibility_from_string(const char *string)
 {
 	if (streq(string, "default")) {
 		return ELF_VISIBILITY_DEFAULT;

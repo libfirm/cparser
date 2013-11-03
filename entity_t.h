@@ -30,26 +30,23 @@ typedef enum {
 	ENTITY_LOCAL_LABEL,
 	ENTITY_NAMESPACE,
 	ENTITY_ASM_ARGUMENT,
-} entity_kind_tag_t;
-typedef unsigned char entity_kind_t;
+} entity_kind_t;
 
-typedef enum namespace_tag_t {
+typedef enum entity_namespace_t {
 	NAMESPACE_NORMAL = 1,
 	NAMESPACE_TAG,
 	NAMESPACE_LABEL,
 	NAMESPACE_ASM_ARGUMENT,
-} namespace_tag_t;
-typedef unsigned char entity_namespace_t;
+} entity_namespace_t;
 
-typedef enum storage_class_tag_t {
+typedef enum storage_class_t {
 	STORAGE_CLASS_NONE,
 	STORAGE_CLASS_EXTERN,
 	STORAGE_CLASS_STATIC,
 	STORAGE_CLASS_TYPEDEF,
 	STORAGE_CLASS_AUTO,
 	STORAGE_CLASS_REGISTER,
-} storage_class_tag_t;
-typedef unsigned char storage_class_t;
+} storage_class_t;
 
 typedef enum decl_modifier_t {
 	DM_NONE              = 0,
@@ -84,13 +81,13 @@ typedef enum decl_modifier_t {
 	DM_LEAF              = 1 << 28,
 } decl_modifier_t;
 
-typedef enum elf_visibility_tag_t {
+typedef enum elf_visibility_t {
 	ELF_VISIBILITY_DEFAULT,
 	ELF_VISIBILITY_HIDDEN,
 	ELF_VISIBILITY_INTERNAL,
 	ELF_VISIBILITY_PROTECTED,
 	ELF_VISIBILITY_ERROR
-} elf_visibility_tag_t;
+} elf_visibility_t;
 
 /**
  * A scope containing entities.
@@ -107,13 +104,13 @@ struct scope_t {
  * (a symbol)
  */
 struct entity_base_t {
-	entity_kind_t       kind;
-	entity_namespace_t  namespc;
-	symbol_t           *symbol;
-	position_t          pos;
-	scope_t            *parent_scope;    /**< The scope where this entity
-										      is contained in */
-	entity_t           *parent_entity;
+	ENUMBF(entity_kind_t)      kind    : 8;
+	ENUMBF(entity_namespace_t) namespc : 8;
+	symbol_t                  *symbol;
+	position_t                 pos;
+	scope_t                   *parent_scope;  /**< The scope where this entity
+	                                               is contained in */
+	entity_t                  *parent_entity;
 
 	/** next declaration in a scope */
 	entity_t           *next;
@@ -178,8 +175,8 @@ struct typedef_t {
 struct declaration_t {
 	entity_base_t     base;
 	type_t           *type;
-	storage_class_t   declared_storage_class;
-	storage_class_t   storage_class;
+	ENUMBF(storage_class_t) declared_storage_class : 8;
+	ENUMBF(storage_class_t) storage_class          : 8;
 	decl_modifiers_t  modifiers;
 	il_alignment_t    alignment;
 	attribute_t      *attributes;
@@ -260,19 +257,19 @@ struct asm_argument_t {
 };
 
 union entity_t {
-	entity_kind_t     kind;
-	entity_base_t     base;
-	compound_t        compound;
-	enum_t            enume;
-	enum_value_t      enum_value;
-	label_t           label;
-	namespace_t       namespacee;
-	typedef_t         typedefe;
-	declaration_t     declaration;
-	variable_t        variable;
-	function_t        function;
-	compound_member_t compound_member;
-	asm_argument_t    asm_argument;
+	ENUMBF(entity_kind_t) kind : 8;
+	entity_base_t         base;
+	compound_t            compound;
+	enum_t                enume;
+	enum_value_t          enum_value;
+	label_t               label;
+	namespace_t           namespacee;
+	typedef_t             typedefe;
+	declaration_t         declaration;
+	variable_t            variable;
+	function_t            function;
+	compound_member_t     compound_member;
+	asm_argument_t        asm_argument;
 };
 
 #define DECLARATION_KIND_CASES \
@@ -295,7 +292,7 @@ const char *get_entity_kind_name(entity_kind_t kind);
 
 entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*, position_t const*);
 
-elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
+elf_visibility_t get_elf_visibility_from_string(const char *string);
 
 entity_t *skip_unnamed_bitfields(entity_t*);
 

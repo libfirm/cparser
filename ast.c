@@ -1142,7 +1142,7 @@ void print_statement(statement_t const *const stmt)
  *
  * @param storage_class   the storage class
  */
-static void print_storage_class(storage_class_tag_t storage_class)
+static void print_storage_class(storage_class_t storage_class)
 {
 	switch (storage_class) {
 	case STORAGE_CLASS_NONE:     return;
@@ -1315,7 +1315,7 @@ void print_declaration(const entity_t *entity)
 	assert(is_declaration(entity));
 	const declaration_t *declaration = &entity->declaration;
 
-	print_storage_class((storage_class_tag_t)declaration->declared_storage_class);
+	print_storage_class(declaration->declared_storage_class);
 	if (entity->kind == ENTITY_FUNCTION) {
 		function_t *function = (function_t*)declaration;
 		if (function->is_inline) {
@@ -1386,7 +1386,7 @@ void print_entity(const entity_t *entity)
 	if (entity->base.namespc != NAMESPACE_NORMAL && entity->base.symbol == NULL)
 		return;
 
-	switch ((entity_kind_tag_t)entity->kind) {
+	switch (entity->kind) {
 	case ENTITY_VARIABLE:
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
@@ -1524,7 +1524,7 @@ static expression_classification_t is_object_with_linker_constant_address(
 		if (!is_declaration(entity))
 			return EXPR_CLASS_VARIABLE;
 
-		switch ((storage_class_tag_t)entity->declaration.storage_class) {
+		switch (entity->declaration.storage_class) {
 		case STORAGE_CLASS_NONE:
 		case STORAGE_CLASS_EXTERN:
 		case STORAGE_CLASS_STATIC:

@@ -219,7 +219,7 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 		errorf(&attribute->pos, "__attribute__((visibility(X))) requires a string argument");
 		return;
 	}
-	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string->begin);
+	elf_visibility_t visibility = get_elf_visibility_from_string(string->begin);
 	if (visibility == ELF_VISIBILITY_ERROR) {
 		errorf(&attribute->pos, "unknown visibility type '%S'", string);
 		return;

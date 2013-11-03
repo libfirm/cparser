@@ -96,7 +96,7 @@ static symbol_t            *symbol_main;
 static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
-static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
+static elf_visibility_t     default_visibility = ELF_VISIBILITY_DEFAULT;
 entity_t                  **alias_entities;
 
 #define PUSH_CURRENT_ENTITY(entity) \
@@ -695,11 +695,11 @@ static void scope_pop(scope_t *old_scope)
  * Search an entity by its symbol in a given namespace.
  */
 static entity_t *get_entity(const symbol_t *const symbol,
-                            namespace_tag_t namespc)
+                            entity_namespace_t namespc)
 {
 	for (entity_t *entity = symbol->entity; entity != NULL;
 	     entity = entity->base.symbol_next) {
-		if ((namespace_tag_t)entity->base.namespc == namespc)
+		if (entity->base.namespc == namespc)
 			return entity;
 	}
 
@@ -752,10 +752,10 @@ static void note_prev_decl(entity_t const *const entity)
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
  * possible. */
 static entity_t *get_tag(symbol_t const *const symbol,
-		entity_kind_tag_t const kind, position_t const *const pos)
+                         entity_kind_t const kind, position_t const *const pos)
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
-	if (entity != NULL && (entity_kind_tag_t)entity->kind != kind) {
+	if (entity != NULL && entity->kind != kind) {
 		char const *const tag = get_entity_kind_name(kind);
 		errorf(pos, "'%s %Y' defined as wrong kind of tag, should be '%N'", tag, symbol, entity);
 		note_prev_decl(entity);
@@ -2346,7 +2346,7 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 		attributes = parse_attributes(NULL);
 	}
 
-	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
+	entity_kind_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
 	if (token.kind == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
 		symbol = token.base.symbol;
@@ -2607,7 +2607,7 @@ typedef enum specifiers_t {
 } specifiers_t;
 
 static entity_t *create_error_entity(symbol_t *const symbol,
-                                     entity_kind_tag_t const kind)
+                                     entity_kind_t const kind)
 {
 	entity_t *const entity
 		= allocate_entity_zero(kind, NAMESPACE_NORMAL, symbol, HERE);
@@ -2652,7 +2652,7 @@ static type_t *parse_typedef_name(void)
 	entity_t *const tagent = get_entity(symbol, NAMESPACE_TAG);
 	if (tagent) {
 		errorf(HERE, "'%Y' does not name a type; assuming '%N'", symbol, tagent);
-		switch ((entity_kind_tag_t)tagent->kind) {
+		switch (tagent->kind) {
 		case ENTITY_ENUM: {
 			type_t *const type = allocate_type_zero(TYPE_ENUM);
 			type->enumt.enume      = &tagent->enume;
@@ -4139,9 +4139,9 @@ static void merge_into_decl(entity_t *decl, const entity_t *other)
 
 entity_t *record_entity(entity_t *entity, const bool is_definition)
 {
-	const symbol_t *const symbol  = entity->base.symbol;
-	const namespace_tag_t namespc = (namespace_tag_t)entity->base.namespc;
-	const position_t     *pos     = &entity->base.pos;
+	const symbol_t    *const symbol  = entity->base.symbol;
+	const entity_namespace_t namespc = entity->base.namespc;
+	const position_t        *pos     = &entity->base.pos;
 
 	assert(symbol != NULL);
 	assert(!entity->base.parent_scope);
@@ -4152,7 +4152,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	/* pushing the same entity twice will break the stack structure */
 	assert(previous != entity);
 
-	entity_kind_tag_t const kind = (entity_kind_tag_t)entity->kind;
+	entity_kind_t const kind = entity->kind;
 	if (kind == ENTITY_FUNCTION) {
 		type_t *const orig_type = entity->declaration.type;
 		type_t *const type      = skip_typeref(orig_type);
@@ -5443,6 +5443,8 @@ static void parse_external_declaration(void)
 		parse_declaration_rest(ndeclaration, &specifiers, record_entity,
 		                       DECL_FLAGS_NONE);
 		return;
+	default:
+		break;
 	}
 
 	/* must be a function definition */
@@ -6236,7 +6238,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
  * Uses current scope if scope is NULL
  */
 static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
-                               namespace_tag_t namespc)
+                               entity_namespace_t namespc)
 {
 	if (scope == NULL) {
 		return get_entity(symbol, namespc);
@@ -6246,8 +6248,7 @@ static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
 	   construct a hashmap here... */
 	entity_t *entity = scope->entities;
 	for ( ; entity != NULL; entity = entity->base.next) {
-		if (entity->base.symbol == symbol
-		    && (namespace_tag_t)entity->base.namespc == namespc)
+		if (entity->base.symbol == symbol && entity->base.namespc == namespc)
 			break;
 	}
 
@@ -7008,6 +7009,8 @@ static expression_t *parse_primary_expression(void)
 		errorf(&pos, "encountered type '%T' while parsing expression", type);
 		return create_error_expression();
 	}
+	default:
+		break;
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
@@ -10139,7 +10142,7 @@ static bool is_local_variable(const entity_t *entity)
 	if (entity->kind != ENTITY_VARIABLE)
 		return false;
 
-	switch ((storage_class_tag_t) entity->declaration.storage_class) {
+	switch (entity->declaration.storage_class) {
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER: {
 		const type_t *type = skip_typeref(entity->declaration.type);
@@ -10949,7 +10952,7 @@ static void resolve_aliases(void)
 	}
 }
 
-void set_default_visibility(elf_visibility_tag_t visibility)
+void set_default_visibility(elf_visibility_t visibility)
 {
 	default_visibility = visibility;
 }
