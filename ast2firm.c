@@ -3432,10 +3432,12 @@ static size_t get_compound_member_count(const compound_type_t *type)
 
 static ir_initializer_t *get_initializer_entry(type_path_t *path)
 {
+#ifndef NDEBUG
 	type_t *orig_top_type = path->top_type;
 	type_t *top_type      = skip_typeref(orig_top_type);
 
 	assert(is_type_compound(top_type) || is_type_array(top_type));
+#endif
 
 	if (ARR_LEN(path->path) == 0) {
 		return NULL;
