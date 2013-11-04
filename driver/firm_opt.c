@@ -769,12 +769,6 @@ void generate_code(FILE *out, const char *input_filename)
 		timer_pop(t_verify);
 	}
 
-	/* BEWARE: kill unreachable code before doing compound lowering */
-	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
-		ir_graph *irg = get_irp_irg(i);
-		do_irg_opt(irg, "control-flow");
-	}
-
 	if (firm_dump.statistic & STAT_BEFORE_OPT)
 		stat_dump_snapshot(input_filename, "noopt");
 
