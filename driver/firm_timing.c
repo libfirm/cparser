@@ -44,10 +44,8 @@ void timer_init(void)
 
 void timer_term(FILE *f)
 {
-	timer_info_t *info;
-	timer_info_t *next;
-
-	for (info = infos; info != NULL; info = next) {
+	for (timer_info_t *next, *info = infos; info != NULL; info = next) {
+		next = info->next;
 		ir_timer_t *timer = info->timer;
 		if (f != NULL) {
 			double      val         = (double)ir_timer_elapsed_usec(timer) / 1000.0;
@@ -57,7 +55,6 @@ void timer_term(FILE *f)
 
 		ir_timer_free(timer);
 		free(info->description);
-		next = info->next;
 		free(info);
 	}
 	infos = NULL;

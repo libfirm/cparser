@@ -444,9 +444,8 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	config->u.transform_irg(irg);
 	timer_stop(config->timer);
 
-	if (firm_dump.all_phases && firm_dump.ir_graph) {
+	if (firm_dump.all_phases && firm_dump.ir_graph)
 		dump_ir_graph(irg, name);
-	}
 
 	if (firm_opt.verify) {
 		timer_push(t_verify);
@@ -470,17 +469,15 @@ static void do_irp_opt(const char *name)
 	timer_stop(config->timer);
 
 	if (firm_dump.ir_graph && firm_dump.all_phases) {
-		int i;
-		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 			ir_graph *irg = get_irp_irg(i);
 			dump_ir_graph(irg, name);
 		}
 	}
 
 	if (firm_opt.verify) {
-		int i;
 		timer_push(t_verify);
-		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 			irg_assert_verify(get_irp_irg(i));
 		}
 		timer_pop(t_verify);
@@ -527,12 +524,9 @@ static void enable_safe_defaults(void)
  */
 static void do_firm_optimizations(const char *input_filename)
 {
-	size_t   i;
-	unsigned aa_opt;
-
 	set_opt_alias_analysis(firm_opt.alias_analysis);
 
-	aa_opt = aa_opt_no_opt;
+	unsigned aa_opt = aa_opt_no_opt;
 	if (firm_opt.strict_alias)
 		aa_opt |= aa_opt_type_based | aa_opt_byte_type_may_alias;
 	if (firm_opt.no_alias)
@@ -549,7 +543,7 @@ static void do_firm_optimizations(const char *input_filename)
 		set_opt_enabled("remove-phi-cycles", false);
 
 	/* first step: kill dead code */
-	for (i = 0; i < get_irp_n_irgs(); i++) {
+	for (size_t i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "rts");
 		do_irg_opt(irg, "combo");
@@ -558,14 +552,14 @@ static void do_firm_optimizations(const char *input_filename)
 	}
 
 	do_irp_opt("remove-unused");
-	for (i = 0; i < get_irp_n_irgs(); ++i) {
+	for (size_t i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "opt-tail-rec");
 	}
 	do_irp_opt("opt-func-call");
 	do_irp_opt("lower-const");
 
-	for (i = 0; i < get_irp_n_irgs(); i++) {
+	for (size_t i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
 
 		do_irg_opt(irg, "scalar-replace");
@@ -618,7 +612,7 @@ static void do_firm_optimizations(const char *input_filename)
 	do_irp_opt("inline");
 	do_irp_opt("opt-proc-clone");
 
-	for (i = 0; i < get_irp_n_irgs(); i++) {
+	for (size_t i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "control-flow");
@@ -636,7 +630,7 @@ static void do_firm_optimizations(const char *input_filename)
 
 	if (firm_dump.ir_graph) {
 		/* recompute backedges for nicer dumps */
-		for (i = 0; i < get_irp_n_irgs(); i++)
+		for (size_t i = 0; i < get_irp_n_irgs(); i++)
 			construct_cf_backedges(get_irp_irg(i));
 	}
 
@@ -653,14 +647,12 @@ static void do_firm_optimizations(const char *input_filename)
  */
 static void do_firm_lowering(const char *input_filename)
 {
-	int i;
-
 	/* enable architecture dependent optimizations */
 	arch_dep_set_opts((arch_dep_opts_t)
 			((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
 			 (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
 			 (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "reassociation");
 		do_irg_opt(irg, "local");
@@ -671,7 +663,7 @@ static void do_firm_lowering(const char *input_filename)
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
 
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 		ir_graph *irg = get_irp_irg(i);
 
 		do_irg_opt(irg, "local");
@@ -747,8 +739,6 @@ void gen_firm_init(void)
  */
 void generate_code(FILE *out, const char *input_filename)
 {
-	int i;
-
 	/* initialize implicit opts, just to be sure because really the frontend
 	 * should have called it already before starting graph construction */
 	init_implicit_optimizations();
@@ -768,9 +758,8 @@ void generate_code(FILE *out, const char *input_filename)
 	ir_timer_init_parent(t_vcg_dump);
 	timer_start(t_all_opt);
 
-	if (firm_dump.all_types) {
+	if (firm_dump.all_types)
 		dump_ir_prog_ext(dump_typegraph, "types.vcg");
-	}
 
 	dump_all("");
 
@@ -781,14 +770,13 @@ void generate_code(FILE *out, const char *input_filename)
 	}
 
 	/* BEWARE: kill unreachable code before doing compound lowering */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "control-flow");
 	}
 
-	if (firm_dump.statistic & STAT_BEFORE_OPT) {
+	if (firm_dump.statistic & STAT_BEFORE_OPT)
 		stat_dump_snapshot(input_filename, "noopt");
-	}
 
 	do_firm_optimizations(input_filename);
 	do_firm_lowering(input_filename);
