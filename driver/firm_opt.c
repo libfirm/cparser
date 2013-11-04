@@ -538,6 +538,10 @@ static void do_firm_optimizations(const char *input_filename)
 	set_opt_enabled("confirm", firm_opt.confirm);
 	set_opt_enabled("remove-confirms", firm_opt.confirm);
 
+	/* first remove unused functions, to avoid spending unnecessary time
+	 * optimizing them */
+	do_irp_opt("remove-unused");
+
 	/* osr supersedes remove_phi_cycles */
 	if (get_opt_enabled("ivopts"))
 		set_opt_enabled("remove-phi-cycles", false);
@@ -551,13 +555,16 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "control-flow");
 	}
 
-	do_irp_opt("remove-unused");
 	for (size_t i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "opt-tail-rec");
 	}
 	do_irp_opt("opt-func-call");
 	do_irp_opt("lower-const");
+
+	/* 2nd round of unused function removal before we perform expensive
+	 * optimisations */
+	do_irp_opt("remove-unused");
 
 	for (size_t i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
