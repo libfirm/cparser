@@ -424,6 +424,18 @@ static bool get_opt_enabled(const char *name)
 	return (config->flags & OPT_FLAG_ENABLED) != 0;
 }
 
+static void after_transform(ir_graph *irg, const char *name)
+{
+	if (firm_dump.all_phases && firm_dump.ir_graph)
+		dump_ir_graph(irg, name);
+
+	if (firm_opt.verify) {
+		timer_push(t_verify);
+		irg_assert_verify(irg);
+		timer_pop(t_verify);
+	}
+}
+
 /**
  * perform an optimization on a single graph
  *
@@ -444,14 +456,7 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	config->u.transform_irg(irg);
 	timer_stop(config->timer);
 
-	if (firm_dump.all_phases && firm_dump.ir_graph)
-		dump_ir_graph(irg, name);
-
-	if (firm_opt.verify) {
-		timer_push(t_verify);
-		irg_assert_verify(irg);
-		timer_pop(t_verify);
-	}
+	after_transform(irg, name);
 
 	current_ir_graph = old_irg;
 	return true;
@@ -524,6 +529,7 @@ static void enable_safe_defaults(void)
  */
 static void do_firm_optimizations(const char *input_filename)
 {
+	be_set_after_transform_func(after_transform);
 	set_opt_alias_analysis(firm_opt.alias_analysis);
 
 	unsigned aa_opt = aa_opt_no_opt;
