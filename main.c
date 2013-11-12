@@ -141,11 +141,7 @@ static void init_types_and_adjust(void)
 	}
 
 	target.byte_order_big_endian = be_params->byte_order_big_endian;
-	if (be_params->modulo_shift_efficient) {
-		target.modulo_shift = machine_size;
-	} else {
-		target.modulo_shift = 0;
-	}
+	target.modulo_shift          = be_params->modulo_shift;
 
 	/* initialize firm pointer modes */
 	char     name[64];
