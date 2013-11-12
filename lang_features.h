@@ -6,6 +6,7 @@
 #define LANG_FEATURES_H
 
 #include <stdbool.h>
+#include <libfirm/irmode.h>
 
 #include "driver/firm_machine.h"
 #include "type.h"
@@ -43,6 +44,7 @@ typedef struct target_t {
 	 * on the shift amount, if yes this equals to the machine_size.
 	 */
 	unsigned int modulo_shift;
+	float_int_conversion_overflow_style_t float_int_overflow;
 	/** byte-order: true = big-endian, false = little-endian */
 	bool byte_order_big_endian : 1;
 	/** enable hack to add call to __main into the main function (mingw) */

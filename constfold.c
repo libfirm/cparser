@@ -969,8 +969,12 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	unsigned size  = get_atomic_type_size(kind);
 	if (flags & ATOMIC_TYPE_FLAG_FLOAT) {
 		switch (size) {
-		case 4:  return get_modeF();
-		case 8:  return get_modeD();
+		case 4:
+			return new_float_mode("F32", irma_ieee754, 8, 23,
+			                      target.float_int_overflow);
+		case 8:
+			return new_float_mode("F64", irma_ieee754, 11, 52,
+			                      target.float_int_overflow);
 		default: panic("unexpected kind");
 		}
 	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {

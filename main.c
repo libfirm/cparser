@@ -142,6 +142,7 @@ static void init_types_and_adjust(void)
 
 	target.byte_order_big_endian = be_params->byte_order_big_endian;
 	target.modulo_shift          = be_params->modulo_shift;
+	target.float_int_overflow    = be_params->float_int_overflow;
 
 	/* initialize firm pointer modes */
 	char     name[64];
