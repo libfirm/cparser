@@ -4178,7 +4178,9 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	}
 
 	if (previous != NULL) {
-		if (previous->base.parent_scope == &current_function->parameters &&
+		char *cfp = current_function;
+		cfp += offsetof(function_t, parameters);
+		if (previous->base.parent_scope == cfp &&
 		    previous->base.parent_scope->depth+1 == current_scope->depth) {
 			assert(previous->kind == ENTITY_PARAMETER);
 			errorf(pos, "declaration of '%N' redeclares '%N'", entity, previous);
