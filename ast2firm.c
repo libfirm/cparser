@@ -1348,7 +1348,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		n_parameters = get_method_n_params(ir_method_type);
 	}
 
-	ir_node *in[n_parameters];
+  /* variable length array must have length > 0 */
+	ir_node *in[n_parameters==0?1:n_parameters];
 
 	const call_argument_t *argument = call->arguments;
 	for (int n = 0; n < n_parameters; ++n) {
