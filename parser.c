@@ -4178,7 +4178,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	}
 
 	if (previous != NULL) {
-		char *cfp = current_function;
+		char *cfp = (char*)current_function;
 		cfp += offsetof(function_t, parameters);
 		if (previous->base.parent_scope == cfp &&
 		    previous->base.parent_scope->depth+1 == current_scope->depth) {
