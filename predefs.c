@@ -172,7 +172,7 @@ static void define_float_properties(const char *prefix,
 	    d = 1;
 	} else if (get_mode_arithmetic(mode) == irma_x86_extended_float
 	           && get_mode_exponent_size(mode) == 15
-	           && get_mode_mantissa_size(mode) == 63) {
+	           && get_mode_mantissa_size(mode) == 64) {
 		d = 2;
 	} else if (get_mode_arithmetic(mode) == irma_ieee754
 	           && get_mode_exponent_size(mode) == 15
