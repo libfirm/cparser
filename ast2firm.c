@@ -251,7 +251,8 @@ static type_t *get_parameter_type(type_t *orig_type)
 	return type;
 }
 
-static ir_type *create_method_type(const function_type_t *function_type, bool for_closure)
+static ir_type *create_method_type(const function_type_t *function_type,
+                                   bool for_closure)
 {
 	type_t        *return_type  = skip_typeref(function_type->return_type);
 
@@ -283,7 +284,7 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 
 	bool is_variadic = function_type->variadic;
 
-	if (is_variadic)
+	if (is_variadic || function_type->unspecified_parameters)
 		set_method_variadicity(irtype, variadicity_variadic);
 
 	unsigned cc = get_method_calling_convention(irtype);
