@@ -283,8 +283,7 @@ static ir_type *create_method_type(const function_type_t *function_type,
 	}
 
 	bool is_variadic = function_type->variadic;
-
-	if (is_variadic || function_type->unspecified_parameters)
+	if (is_variadic)
 		set_method_variadicity(irtype, variadicity_variadic);
 
 	unsigned cc = get_method_calling_convention(irtype);
@@ -1331,8 +1330,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
 		               get_method_additional_properties(ir_method_type));
-		set_method_variadicity(new_method_type,
-		                       get_method_variadicity(ir_method_type));
+		set_method_variadicity(new_method_type, variadicity_variadic);
 
 		for (int i = 0; i < n_res; ++i) {
 			set_method_res_type(new_method_type, i,
