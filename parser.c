@@ -4131,7 +4131,7 @@ static void merge_into_decl(entity_t *decl, const entity_t *other)
 	} else if (decl->kind == ENTITY_VARIABLE) {
 		if (other->variable.alias.symbol != NULL) {
 			assert(decl->variable.alias.symbol == NULL);
-			decl->variable.alias.symbol = other->function.alias.symbol;
+			decl->variable.alias.symbol = other->variable.alias.symbol;
 			ARR_APP1(entity_t*, alias_entities, decl);
 		}
 	}
