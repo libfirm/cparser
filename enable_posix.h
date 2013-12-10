@@ -25,7 +25,7 @@
 #define unlink(filename)         _unlink(filename)
 
 #else
-#define _POSIX_C_SOURCE 2000112L
+#define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #define HAVE_MKSTEMP
 #endif
