@@ -2,12 +2,8 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#define _POSIX_C_SOURCE 199506
+#include "enable_posix.h"
 #include "preprocessor.h"
-
-#if defined(__unix__) || defined(__MACH__)
-#include <sys/stat.h>
-#endif
 
 #include <assert.h>
 #include <ctype.h>
@@ -2667,7 +2663,7 @@ static void update_time(pp_definition_t *definition)
 
 static void update_timestamp(pp_definition_t *definition)
 {
-#if defined(__unix__) || defined(__MACH__)
+#if defined(HAVE_FILENO) && defined(HAVE_ASCTIME_R) && defined(HAVE_FSTAT)
 	FILE *const file = input_get_file(input.input);
 	if (file == NULL)
 		goto unknown_timestamp;
@@ -2688,9 +2684,9 @@ static void update_timestamp(pp_definition_t *definition)
 	/* update definition */
 	update_definition_string(definition, str);
 	return;
+unknown_timestamp:
 #endif
 
-unknown_timestamp:
 	update_definition_string(definition, "??? ??? ?? ??:??:?? ????");
 }
 
