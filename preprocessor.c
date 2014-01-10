@@ -1667,12 +1667,15 @@ static unsigned skip_multiline_comment(void)
 	position_t const start_pos = input.pos;
 	while (true) {
 		switch (input.c) {
-		case '/':
+		case '/': {
+			position_t pos = input.pos;
 			eat('/');
 			if (input.c == '*') {
-				/* TODO: nested comment, warn here */
+				warningf(WARN_COMMENT, &pos, "'/*' within block comment");
 			}
 			break;
+		}
+
 		case '*':
 			eat('*');
 			if (input.c == '/') {
