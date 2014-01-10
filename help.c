@@ -60,7 +60,7 @@ static void print_help_basic(const char *argv0)
 
 static void print_help_preprocessor(void)
 {
-	put_help("--external-pp",            "Use an external preprocessor (default)");
+	put_help("-no-integrated-cpp",       "Use an external preprocessor");
 	put_help("-nostdinc",                "Do not search standard system include directories");
 	put_help("-trigraphs",               "Support ISO C trigraphs");
 	put_help("-isystem",                 "");

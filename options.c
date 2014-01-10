@@ -172,10 +172,10 @@ bool options_parse_preprocessor(options_state_t *s)
 		driver_add_flag(&cppflags_obst, arg);
 	} else if (strstart(option, "Wp,")) {
 		driver_add_flag(&cppflags_obst, "%s", full_option);
-	} else if (streq(option, "-external-pp")) {
-		driver_use_external_preprocessor = true;
-	} else if (streq(option, "-no-external-pp")) {
-		driver_use_external_preprocessor = false;
+	} else if (streq(option, "integrated-cpp")) {
+		driver_use_integrated_preprocessor = true;
+	} else if (streq(option, "no-integrated-cpp")) {
+		driver_use_integrated_preprocessor = false;
 	} else if (streq(option, "-trigraphs")) {
 		/* pass these through to the preprocessor */
 		driver_add_flag(&cppflags_obst, "-%s", option);
