@@ -1347,25 +1347,33 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		n_parameters = get_method_n_params(ir_method_type);
 	}
 
-  /* variable length array must have length > 0 */
+	/* variable length array must have length > 0 */
 	ir_node *in[n_parameters==0?1:n_parameters];
 
-	const call_argument_t *argument = call->arguments;
+	const call_argument_t *argument               = call->arguments;
+	bool                   has_compound_parameter = false;
 	for (int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
 		type_t *const arg_type = skip_typeref(expression->base.type);
 		if (is_type_complex(arg_type)) {
 			complex_value value = expression_to_complex(expression);
 			in[n] = complex_to_memory(dbgi, arg_type, value);
+			has_compound_parameter = true;
 		} else {
-			in[n] = conv_to_storage_type(dbgi, expression_to_value(expression), arg_type);
+			if (is_type_compound(arg_type))
+				has_compound_parameter = true;
+			in[n] = conv_to_storage_type(dbgi, expression_to_value(expression),
+			                             arg_type);
 		}
 
 		argument = argument->next;
 	}
 
+	/* Const function don't read memory and need no memory input. However
+	 * we cannot model compound types as direct values in firm yet and
+	 * resort to memory in these cases. */
 	ir_node *store;
-	if (function_type->modifiers & DM_CONST) {
+	if ((function_type->modifiers & DM_CONST) && !has_compound_parameter) {
 		store = get_irg_no_mem(current_ir_graph);
 	} else {
 		store = get_store();
