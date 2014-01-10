@@ -91,7 +91,8 @@ extern const char     *driver_linker;
 extern const char     *driver_preprocessor;
 extern const char     *driver_assembler;
 extern const char     *driver_default_exe_output;
-extern bool            driver_use_external_preprocessor;
+/** -1: auto (use if not crosscompiling), 0 - no, 1 - yes */
+extern int             driver_use_integrated_preprocessor;
 extern bool            driver_verbose;
 extern bool            driver_no_stdinc;
 extern bool            do_timing;

@@ -79,7 +79,7 @@ const char     *filtev;
 const char     *dumpfunction;
 lang_standard_t standard;
 int             colorterm;
-bool            driver_use_external_preprocessor = true;
+int             driver_use_integrated_preprocessor = -1;
 bool            driver_verbose;
 bool            driver_no_stdinc;
 const char     *driver_linker;
@@ -785,17 +785,18 @@ again:
 			init_c_dialect_for_unit(unit);
 			/* FALLTHROUGH */
 		case COMPILATION_UNIT_ASSEMBLER:
-			if (driver_use_external_preprocessor) {
-				if (!run_external_preprocessor(unit, out, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-				goto again;
-			} else {
-				if (!start_preprocessing(unit, out, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
+			if (driver_use_integrated_preprocessor == -1) {
+				/* don't use the integrated preprocessor when crosscompiling
+				 * since we probably don't have the correct location of the
+				 * system headers compiled in. */
+				driver_use_integrated_preprocessor = target.triple == NULL;
+			}
+			bool (*preproc)(compilation_unit_t*, FILE*, compile_mode_t)
+				= driver_use_integrated_preprocessor
+				? start_preprocessing : run_external_preprocessor;
+			if (!preproc(unit, out, mode)) {
+				result = EXIT_FAILURE;
+				break;
 			}
 			goto again;
 
