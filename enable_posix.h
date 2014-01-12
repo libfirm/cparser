@@ -26,9 +26,10 @@
 
 #else
 #define _POSIX_C_SOURCE 200809L
+#define _BSD_SOURCE
 #include <unistd.h>
 #include <sys/stat.h>
-#define HAVE_MKSTEMP
+#define HAVE_MKSTEMPS
 #define HAVE_FILENO
 #define HAVE_ASCTIME_R
 #define HAVE_FSTAT
