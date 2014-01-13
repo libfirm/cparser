@@ -30,6 +30,7 @@ static warning_switch_t warning[] = {
 	[WARN_EMPTY_STATEMENT]               = { WARN_STATE_NONE, "empty-statement"               },
 	[WARN_ENDIF_LABELS]                  = { WARN_STATE_ON,   "endif-labels"                  },
 	[WARN_ERROR]                         = { WARN_STATE_NONE, "error"                         },
+	[WARN_EXPERIMENTAL]                  = { WARN_STATE_ON,   "experimental"                  },
 	[WARN_FATAL_ERRORS]                  = { WARN_STATE_NONE, "fatal-errors"                  },
 	[WARN_FLOAT_EQUAL]                   = { WARN_STATE_NONE, "float-equal"                   },
 	[WARN_FORMAT]                        = { WARN_STATE_ON,   "format"                        },

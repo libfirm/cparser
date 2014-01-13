@@ -30,6 +30,7 @@ typedef enum warning_t {
 	WARN_EMPTY_STATEMENT,               /**< Warn about empty statements, i.e. lone ';'  */
 	WARN_ENDIF_LABELS,                  /**< Warn whenever an '#else' or an '#endif' are followed by text */
 	WARN_ERROR,                         /**< Treat warnings as errors */
+	WARN_EXPERIMENTAL,                  /**< warn if experimental/unstable compiler features are used */
 	WARN_FATAL_ERRORS,                  /**< First error stops the compilation */
 	WARN_FLOAT_EQUAL,                   /**< Warn if floating point values are used in equality comparisons */
 	WARN_FORMAT,                        /**< Check printf-style format strings */
