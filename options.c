@@ -9,22 +9,30 @@
 #include <string.h>
 
 #include "actions.h"
+#include "adt/error.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast2firm.h"
 #include "ast_t.h"
 #include "diagnostic.h"
-#include "driver.h"
 #include "driver/firm_opt.h"
+#include "driver.h"
 #include "help.h"
 #include "lang_features.h"
 #include "mangle.h"
 #include "parser.h"
 #include "predefs.h"
 #include "preprocessor.h"
+#include "target.h"
 #include "wrappergen/write_compoundsizes.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
+
+codegen_option_t  *codegen_options        = NULL;
+codegen_option_t **codegen_options_anchor = &codegen_options;
+char               firm_isa[16];
+bool               profile_generate;
+bool               profile_use;
 
 static compilation_unit_type_t forced_unittype = COMPILATION_UNIT_AUTODETECT;
 
@@ -110,8 +118,8 @@ static const char *f_no_arg(bool *truth_value, options_state_t *s)
 static void set_be_option(const char *arg)
 {
 	int res = be_parse_arg(arg);
-	(void) res;
-	assert(res);
+	if (!res)
+		panic("setting firm backend option failed");
 }
 
 bool options_parse_preprocessor(options_state_t *s)
@@ -357,19 +365,6 @@ bool options_parse_assembler(options_state_t *s)
 	return true;
 }
 
-typedef struct codegen_option_t codegen_option_t;
-
-struct codegen_option_t {
-	codegen_option_t *next;
-	char              option[];
-};
-
-static codegen_option_t  *codegen_options        = NULL;
-static codegen_option_t **codegen_options_anchor = &codegen_options;
-static char               firm_be[16]            = "ia32";
-static bool               profile_generate;
-static bool               profile_use;
-
 bool options_parse_codegen(options_state_t *s)
 {
 	const char *full_option = s->argv[s->i];
@@ -393,7 +388,7 @@ bool options_parse_codegen(options_state_t *s)
 		}
 	} else if (option[0] == 'b') {
 		if ((arg = equals_arg("bisa=", s)) != NULL) {
-			snprintf(firm_be, sizeof(firm_be), "%s", arg);
+			snprintf(firm_isa, sizeof(firm_isa), "%s", arg);
 		}
 		if (be_parse_arg(&option[1]))
 			return true;
@@ -587,49 +582,6 @@ bool options_parse_help(options_state_t *s)
 	return true;
 }
 
-void pass_options_to_firm_be(options_state_t *s)
-{
-	/* pass options to firm backend (this happens delayed because we first
-	 * had to decide which backend is actually used) */
-	for (codegen_option_t *option = codegen_options; option != NULL;
-	     option = option->next) {
-		char        buf[256];
-	    const char *opt = option->option;
-	    /* pass option along to firm backend (except the -m32, -m64 stuff) */
-	    if (opt[0] < '0' || opt[0] > '9') {
-			snprintf(buf, sizeof(buf), "%s-%s", firm_be, opt);
-			if (be_parse_arg(buf) == 0) {
-				errorf(NULL, "Unknown codegen option '-m%s'", opt);
-				s->argument_errors = true;
-				continue;
-			}
-		}
-
-		/* hack to emulate the behaviour of some gcc spec files which filter
-		 * flags to pass to cpp/ld/as */
-		static char const *const pass_to_cpp_and_ld[] = {
-			"soft-float", "32", "64", "16"
-		};
-		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
-			if (streq(pass_to_cpp_and_ld[i], option->option)) {
-				snprintf(buf, sizeof(buf), "-m%s", option->option);
-				driver_add_flag(&cppflags_obst, buf);
-				driver_add_flag(&asflags_obst, buf);
-				driver_add_flag(&ldflags_obst, buf);
-				break;
-			}
-		}
-	}
-
-	if (profile_generate) {
-		driver_add_flag(&ldflags_obst, "-lfirmprof");
-		set_be_option("profilegenerate");
-	}
-	if (profile_use) {
-		set_be_option("profileuse");
-	}
-}
-
 static bool parse_target_triple(const char *arg)
 {
 	machine_triple_t *triple = firm_parse_machine_triple(arg);
@@ -639,64 +591,6 @@ static bool parse_target_triple(const char *arg)
 	}
 	target.machine = triple;
 	return true;
-}
-
-static bool init_os_support(void)
-{
-	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
-	dialect.intmax_predefs           = false;
-	target.enable_main_collect2_hack = false;
-	driver_default_exe_output        = "a.out";
-
-	if (firm_is_unixish_os(target.machine)) {
-		set_create_ld_ident(create_name_linux_elf);
-		target.user_label_prefix = "";
-	} else if (firm_is_darwin_os(target.machine)) {
-		set_create_ld_ident(create_name_macho);
-		target.user_label_prefix = "_";
-		dialect.intmax_predefs   = true;
-	} else if (firm_is_windows_os(target.machine)) {
-		set_create_ld_ident(create_name_win32);
-		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
-		target.enable_main_collect2_hack = true;
-		target.user_label_prefix         = "_";
-		driver_default_exe_output        = "a.exe";
-	} else {
-		return false;
-	}
-
-	return true;
-}
-
-static const char *setup_isa_from_triple(const machine_triple_t *machine)
-{
-	const char *cpu = machine->cpu_type;
-
-	if (firm_is_ia32_cpu(cpu)) {
-		return "ia32";
-	} else if (streq(cpu, "x86_64")) {
-		return "amd64";
-	} else if (streq(cpu, "sparc")) {
-		return "sparc";
-	} else if (streq(cpu, "arm")) {
-		return "arm";
-	} else {
-		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
-		return NULL;
-	}
-}
-
-const char *setup_target_machine(void)
-{
-	if (!setup_firm_for_machine(target.machine))
-		exit(1);
-
-	const char *isa = setup_isa_from_triple(target.machine);
-	if (isa == NULL)
-		exit(1);
-
-	init_os_support();
-	return isa;
 }
 
 bool options_parse_meta(options_state_t *s)
@@ -714,8 +608,6 @@ bool options_parse_meta(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-lpthread");
 	} else if ((arg = equals_arg("mtarget=", s)) != NULL) {
 		if (parse_target_triple(arg)) {
-			const char *isa = setup_target_machine();
-			snprintf(firm_be, sizeof(firm_be), "%s", isa);
 			target.triple = arg;
 		} else {
 			s->argument_errors = true;

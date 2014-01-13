@@ -35,6 +35,7 @@
 #include "preprocessor.h"
 #include "printer.h"
 #include "symbol_table.h"
+#include "target.h"
 #include "tempfile.h"
 #include "type_hash.h"
 #include "type_t.h"
@@ -46,129 +47,6 @@ c_dialect_t dialect = {
 	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
 	.char_is_signed = true,
 };
-target_t target;
-
-/**
- * initialize cparser type properties based on a firm type
- */
-static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
-{
-	props->size             = get_type_size_bytes(type);
-	props->alignment        = get_type_alignment_bytes(type);
-	props->struct_alignment = props->alignment;
-}
-
-/**
- * Copy atomic type properties except the integer conversion rank
- */
-static void copy_typeprops(atomic_type_properties_t *dest,
-                           const atomic_type_properties_t *src)
-{
-	dest->size             = src->size;
-	dest->alignment        = src->alignment;
-	dest->struct_alignment = src->struct_alignment;
-	dest->flags            = src->flags;
-}
-
-static void init_types_and_adjust(void)
-{
-	const backend_params *be_params = be_get_backend_param();
-	unsigned machine_size = be_params->machine_size;
-	init_types(machine_size);
-
-	atomic_type_properties_t *props = atomic_type_properties;
-
-	/* adjust types as requested by target architecture */
-	ir_type *const type_ld = be_params->type_long_double;
-	if (type_ld) {
-		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_ld);
-	}
-
-	ir_type *const type_ll = be_params->type_long_long;
-	if (type_ll)
-		set_typeprops_type(&props[ATOMIC_TYPE_LONGLONG], type_ll);
-
-	ir_type *const type_ull = be_params->type_unsigned_long_long;
-	if (type_ull)
-		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_ull);
-
-	/* operating system ABI specifics */
-	if (firm_is_darwin_os(target.machine)) {
-		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
-			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
-			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
-			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
-			props[ATOMIC_TYPE_LONG_DOUBLE].size             = 16;
-			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
-			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
-		}
-	} else if (firm_is_windows_os(target.machine)) {
-		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
-			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
-			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
-			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
-		} else if (machine_size == 64) {
-			/* to ease porting of old c-code microsoft decided to use 32bits
-			 * even for long */
-			props[ATOMIC_TYPE_LONG]  = props[ATOMIC_TYPE_INT];
-			props[ATOMIC_TYPE_ULONG] = props[ATOMIC_TYPE_UINT];
-		}
-
-		/* on windows long double is not supported */
-		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-	} else if (firm_is_unixish_os(target.machine)) {
-		if (firm_is_ia32_cpu(target.machine->cpu_type)) {
-			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
-			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
-			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
-		}
-	}
-
-	/* stuff decided after processing operating system specifics and
-	 * commandline flags */
-	if (dialect.char_is_signed) {
-		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
-	} else {
-		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
-	}
-	/* copy over wchar_t properties (including rank) */
-	props[ATOMIC_TYPE_WCHAR_T] = props[dialect.wchar_atomic_kind];
-
-	/* initialize defaults for unsupported types */
-	if (!type_ld) {
-		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
-		               &props[ATOMIC_TYPE_DOUBLE]);
-	}
-
-	target.byte_order_big_endian = be_params->byte_order_big_endian;
-	target.modulo_shift          = be_params->modulo_shift;
-	target.float_int_overflow    = be_params->float_int_overflow;
-
-	/* initialize firm pointer modes */
-	char     name[64];
-	unsigned bit_size     = machine_size;
-	unsigned modulo_shift = target.modulo_shift;
-
-	snprintf(name, sizeof(name), "p%u", machine_size);
-	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
-
-	if (machine_size == 16) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Hs);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Hu);
-	} else if (machine_size == 32) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Is);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Iu);
-	} else if (machine_size == 64) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Ls);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Lu);
-	} else {
-		panic("strange machine_size when determining pointer modes");
-	}
-
-	/* Hmm, pointers should be machine size */
-	set_modeP_data(ptr_mode);
-	set_modeP_code(ptr_mode);
-}
 
 int main(int argc, char **argv)
 {
@@ -214,11 +92,7 @@ invalid_o_option:
 		}
 	}
 
-	if (target.machine == NULL) {
-		target.machine = firm_get_host_machine();
-	}
 	choose_optimization_pack(opt_level);
-	setup_target_machine();
 
 	/* parse rest of options */
 	for (state.i = 1; state.i < argc; ++state.i) {
@@ -256,7 +130,7 @@ unknown_arg:
 		}
 	}
 
-	pass_options_to_firm_be(&state);
+	target_setup(&state);
 
 	if (state.argument_errors) {
 		help_usage(argv[0]);
@@ -267,7 +141,6 @@ unknown_arg:
 	 * are processing the first source file... */
 	init_c_dialect(false, standard != STANDARD_DEFAULT ? standard
 	                                                   : STANDARD_GNU99);
-	init_types_and_adjust();
 	init_typehash();
 	init_basic_types();
 	if (dialect.cpp) {

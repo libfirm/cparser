@@ -28,8 +28,7 @@ bool options_parse_linker(options_state_t *state);
 bool options_parse_meta(options_state_t *state);
 bool options_parse_preprocessor(options_state_t *state);
 
-void pass_options_to_firm_be(options_state_t *state);
 bool action_print_help(const char *argv0);
-const char *setup_target_machine(void);
+void setup_target_machine(void);
 
 #endif

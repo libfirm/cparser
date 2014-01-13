@@ -9,41 +9,25 @@
 #include "adt/xmalloc.h"
 #include <libfirm/firm.h>
 
-static void set_be_option(const char *arg)
+bool firm_is_unixish_os(const char *os)
 {
-	int res = be_parse_arg(arg);
-	(void) res;
-	assert(res);
-}
-
-static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
-{
-	(void)mt;
-	return id;
-}
-
-static ident *compilerlib_name_mangle_underscore(ident *id, ir_type *mt)
-{
-	(void)mt;
-	return id_mangle3("_", id, "");
-}
-
-bool firm_is_unixish_os(const machine_triple_t *machine)
-{
-	const char *os = machine->operating_system;
 	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
-		|| strstart(os, "solaris");
+	    || strstart(os, "solaris");
 }
 
-bool firm_is_darwin_os(const machine_triple_t *machine)
+bool firm_is_elf_os(const char *os)
 {
-	const char *os = machine->operating_system;
+	return firm_is_unixish_os(os) || streq(os, "elf") || streq(os, "octopos")
+	    || streq(os, "irtss");
+}
+
+bool firm_is_darwin_os(const char *os)
+{
 	return strstart(os, "darwin");
 }
 
-bool firm_is_windows_os(const machine_triple_t *machine)
+bool firm_is_windows_os(const char *os)
 {
-	const char *os = machine->operating_system;
 	return strstart(os, "mingw") || streq(os, "win32");
 }
 
@@ -54,74 +38,6 @@ bool firm_is_ia32_cpu(const char *architecture)
 	    || streq(architecture, "i586")
 	    || streq(architecture, "i686")
 	    || streq(architecture, "i786");
-}
-
-/**
- * Initialize firm codegeneration for a specific operating system.
- * The argument is the operating system part of a target-triple
- */
-static bool setup_os_support(const machine_triple_t *machine)
-{
-	if (firm_is_unixish_os(machine)
-	|| streq(machine->operating_system, "elf")
-	|| streq(machine->operating_system, "octopos")
-	|| streq(machine->operating_system, "irtss")) {
-		set_be_option("ia32-gasmode=elf");
-		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
-	} else if (firm_is_darwin_os(machine)) {
-		set_be_option("ia32-gasmode=macho");
-		set_be_option("ia32-stackalign=4");
-		set_be_option("pic=true");
-		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
-	} else if (firm_is_windows_os(machine)) {
-		set_be_option("ia32-gasmode=mingw");
-		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
-	} else {
-		return false;
-	}
-
-	return true;
-}
-
-bool setup_firm_for_machine(const machine_triple_t *machine)
-{
-	const char *cpu = machine->cpu_type;
-
-	if (streq(cpu, "i386")) {
-		set_be_option("isa=ia32");
-		set_be_option("ia32-arch=i386");
-	} else if (streq(cpu, "i486")) {
-		set_be_option("isa=ia32");
-		set_be_option("ia32-arch=i486");
-	} else if (streq(cpu, "i586")) {
-		set_be_option("isa=ia32");
-		set_be_option("ia32-arch=i586");
-	} else if (streq(cpu, "i686")) {
-		set_be_option("isa=ia32");
-		set_be_option("ia32-arch=i686");
-	} else if (streq(cpu, "i786")) {
-		set_be_option("isa=ia32");
-		set_be_option("ia32-arch=pentium4");
-	} else if (streq(cpu, "x86_64")) {
-		set_be_option("isa=amd64");
-	} else if (streq(cpu, "sparc")) {
-		set_be_option("isa=sparc");
-		const char *manufacturer = machine->manufacturer;
-		if (streq(manufacturer, "leon") || streq(manufacturer, "invasic"))
-			set_be_option("sparc-cpu=leon");
-	} else if (streq(cpu, "arm")) {
-		set_be_option("isa=arm");
-	} else {
-		fprintf(stderr, "Unknown cpu '%s' in target-triple\n", cpu);
-		return false;
-	}
-
-	/* process operating system */
-	if (!setup_os_support(machine)) {
-		fprintf(stderr, "Unknown operating system '%s' in target-triple\n", machine->operating_system);
-		return false;
-	}
-	return true;
 }
 
 machine_triple_t *firm_get_host_machine(void)

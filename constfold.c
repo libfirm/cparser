@@ -12,6 +12,7 @@
 #include "adt/util.h"
 #include "ast_t.h"
 #include "lang_features.h"
+#include "target.h"
 #include "type_t.h"
 #include "types.h"
 #include "unicode.h"

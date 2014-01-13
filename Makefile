@@ -5,29 +5,13 @@ top_srcdir   ?= .
 top_builddir ?= build
 VPATH        ?= $(top_srcdir)
 
+include config.default.mak
+
 variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverage)
 srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
 
-# Use libfirm subdir if it exists, otherwise use pkg-config
-ifneq ("$(wildcard $(top_srcdir)/libfirm)", "")
-FIRM_HOME     ?= $(top_srcdir)/libfirm
-FIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
-FIRM_LIBS     ?= -lm
-LIBFIRM_FILE_BASE ?= build/$(variant)/libfirm.a
-LIBFIRM_FILE  ?= $(FIRM_HOME)/$(LIBFIRM_FILE_BASE)
-else
-FIRM_CPPFLAGS ?= `pkg-config --cflags libfirm`
-FIRM_LIBS     ?= `pkg-config --libs libfirm`
-LIBFIRM_FILE =
-endif
-
-SYSTEM_INCLUDE_DIR   ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
-LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
-COMPILER_INCLUDE_DIR ?= -DCOMPILER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
-HOST_TRIPLE          ?=
-
-CPPFLAGS  = -I$(top_srcdir) -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR)
+CPPFLAGS  = -I$(top_srcdir) -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
@@ -70,6 +54,7 @@ cparser_SOURCES = \
 	printer.c \
 	string_rep.c \
 	symbol_table.c \
+	target.c \
 	tempfile.c \
 	token.c \
 	type.c \

@@ -260,22 +260,23 @@ void add_predefined_macros(void)
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
 
-	if (firm_is_unixish_os(target.machine)) {
+	const char *operating_system = target.machine->operating_system;
+	if (firm_is_unixish_os(operating_system)) {
 		if (dialect.gnu)
 			add_define("unix",     "1", false);
 		add_define("__unix",   "1", false);
 		add_define("__unix__", "1", false);
 		add_define("__ELF__",  "1", false);
-		if (strstr(target.machine->operating_system, "linux") != NULL) {
+		if (strstr(operating_system, "linux") != NULL) {
 			if (dialect.gnu)
 				add_define("linux",     "1", false);
 			add_define("__linux",   "1", false);
 			add_define("__linux__", "1", false);
-			if (strstr(target.machine->operating_system, "gnu") != NULL) {
+			if (strstr(operating_system, "gnu") != NULL) {
 				add_define("__gnu_linux__", "1", false);
 			}
 		}
-	} else if (firm_is_darwin_os(target.machine)) {
+	} else if (firm_is_darwin_os(operating_system)) {
 		add_define("__MACH__",     "1", false);
 		add_define("__APPLE__",    "1", false);
 		add_define("__APPLE_CC__", "1", false);
@@ -312,7 +313,6 @@ void add_predefined_macros(void)
 
 	const char *cpu          = target.machine->cpu_type;
 	const char *manufacturer = target.machine->manufacturer;
-	const char *os           = target.machine->operating_system;
 	if (firm_is_ia32_cpu(cpu)) {
 		if (dialect.gnu)
 			add_define("i386",     "1", false);
@@ -352,7 +352,7 @@ void add_predefined_macros(void)
 		/* TODO: test, what about
 		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
 		add_define("__arm__",   "1", false);
-		if (strstr(os, "eabi") != NULL) {
+		if (strstr(operating_system, "eabi") != NULL) {
 			add_define("__ARM_EABI__", "1", false);
 		}
 	} else if (streq(cpu, "x86_64")) {

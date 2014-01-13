@@ -24,6 +24,7 @@
 #include "predefs.h"
 #include "preprocessor.h"
 #include "printer.h"
+#include "target.h"
 #include "type_t.h"
 #include "types.h"
 #include "version.h"
@@ -49,16 +50,12 @@
 #ifndef LOCAL_INCLUDE_DIR
 #define LOCAL_INCLUDE_DIR NULL
 #endif
-#ifndef TARGET_INCLUDE_DIR
-#define TARGET_INCLUDE_DIR NULL
-#endif
 #ifndef SYSTEM_INCLUDE_DIR
 #define SYSTEM_INCLUDE_DIR NULL
 #endif
 
 static const char *compiler_include_dir = COMPILER_INCLUDE_DIR;
 static const char *local_include_dir    = LOCAL_INCLUDE_DIR;
-static const char *target_include_dir   = TARGET_INCLUDE_DIR;
 static const char *system_include_dir   = SYSTEM_INCLUDE_DIR;
 
 compile_mode_t  mode = MODE_COMPILE_ASSEMBLE_LINK;
@@ -558,25 +555,27 @@ static void append_standard_include_paths(void)
 {
 	if (compiler_include_dir != NULL)
 		append_include_path(&system_searchpath, compiler_include_dir);
+#ifdef APPEND_MULTILIB_DIRS
+	assert(obstack_object_size(&file_obst) == 0);
+	const char *triple = multilib_directory_target_triple != NULL
+					   ? multilib_directory_target_triple : target.triple;
+	if (triple != NULL) {
+		obstack_printf(&file_obst, "%s/%s", local_include_dir, triple);
+		obstack_1grow(&file_obst, '\0');
+		char *path = obstack_finish(&file_obst);
+		append_include_path(&system_searchpath, path);
+	}
+#endif
 	if (local_include_dir != NULL)
 		append_include_path(&system_searchpath, local_include_dir);
-	if (target_include_dir != NULL)
-		append_include_path(&system_searchpath, target_include_dir);
-	else if (target_include_dir == NULL && system_include_dir != NULL) {
-		/* some guessing to find the "gcc-multilib" include dir */
-		assert(obstack_object_size(&file_obst) == 0);
-		if (firm_is_ia32_cpu(target.machine->cpu_type)
-			&& firm_is_unixish_os(target.machine)) {
-			obstack_printf(&file_obst, "%s/i386-linux-gnu", system_include_dir);
-	path_from_obst:;
-			obstack_1grow(&file_obst, '\0');
-			char *path = obstack_finish(&file_obst);
-			append_include_path(&system_searchpath, path);
-		} else if (target.triple != NULL) {
-			obstack_printf(&file_obst, "%s/%s", system_include_dir, target.triple);
-			goto path_from_obst;
-		}
+#ifdef APPEND_MULTILIB_DIRS
+	if (triple != NULL) {
+		obstack_printf(&file_obst, "%s/%s", system_include_dir, triple);
+		obstack_1grow(&file_obst, '\0');
+		char *path = obstack_finish(&file_obst);
+		append_include_path(&system_searchpath, path);
 	}
+#endif
 	if (system_include_dir != NULL)
 		append_include_path(&system_searchpath, system_include_dir);
 }
