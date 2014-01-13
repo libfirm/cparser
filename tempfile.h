@@ -4,10 +4,10 @@
 #include <stdio.h>
 
 /**
- * custom version of tmpnam, which: writes to an obstack, emits no warnings
- * during linking (like glibc/gnu ld do for tmpnam)...
+ * Creates temporary files named $name_orig inside a temporary
+ * directory created with mkdtemp().
  */
-FILE *make_temp_file(const char *prefix, const char **name_result);
+FILE *make_temp_file(const char *name_orig, const char **name_result);
 
 void init_temp_files(void);
 void free_temp_files(void);

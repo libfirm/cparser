@@ -19,6 +19,7 @@
 #define fdopen(fd, mode)         _fdopen(fd, mode)
 #define isatty(fd)               _isatty(fd)
 #define mktemp(tmpl)             _mktemp(tmpl)
+#define mkdir(name, mode)        _mkdir(name)
 #define open(fname, oflag, mode) _open(fname, oflag, mode)
 #define pclose(file)             _pclose(file)
 #define popen(cmd, mode)         _popen(cmd, mode)
@@ -28,7 +29,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <sys/stat.h>
-#define HAVE_MKSTEMP
+#define HAVE_MKDTEMP
 #define HAVE_FILENO
 #define HAVE_ASCTIME_R
 #define HAVE_FSTAT
