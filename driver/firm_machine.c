@@ -126,17 +126,48 @@ bool setup_firm_for_machine(const machine_triple_t *machine)
 
 machine_triple_t *firm_get_host_machine(void)
 {
+#ifdef HOST_TRIPLE
+	/* a triple for the host machine was defined in the Makefile
+	 * or config.mak */
+	return firm_parse_machine_triple(HOST_TRIPLE);
+#else
+	/* no host triple specified, we do some guessing based on preprocessor
+	 * defines (look into predefs.c for inspiration) */
 	machine_triple_t *machine = XMALLOC(machine_triple_t);
+
+#if defined(__x86_64__)
+	machine->cpu_type = xstrdup("x86_64");
+#elif defined(__i686__)
+	machine->cpu_type = xstrdup("i686");
+#elif defined(__i386__)
 	machine->cpu_type = xstrdup("i386");
+#elif defined(__sparc__)
+	machine->cpu_type = xstrdup("sparc");
+#elif defined(__arm__)
+	machine->cpu_type = xstrdup("arm");
+#endif
+
+#if defined(__leon__)
+	machine->manufacturer = xstrdup("leon");
+#else
 	machine->manufacturer = xstrdup("unknown");
+#endif
+
 #if defined(_WIN32) || defined(__CYGWIN__)
 	machine->operating_system = xstrdup("win32");
 #elif defined(__APPLE__)
 	machine->operating_system = xstrdup("darwin");
-#else
+#elif defined(__gnu_linux__)
+	machine->operating_system = xstrdup("linux-gnu");
+#elif defined(__linux__)
 	machine->operating_system = xstrdup("linux");
+#elif defined(__ELF__)
+	machine->operating_system = xstrdup("elf");
+#else
+	machine->operating_system = xstrdup("unknown");
 #endif
 	return machine;
+#endif
 }
 
 void firm_free_machine_triple(machine_triple_t *machine)

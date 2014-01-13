@@ -25,6 +25,7 @@ endif
 SYSTEM_INCLUDE_DIR   ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
 LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
 COMPILER_INCLUDE_DIR ?= -DCOMPILER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
+HOST_TRIPLE          ?=
 
 CPPFLAGS  = -I$(top_srcdir) -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR)
 CPPFLAGS += $(FIRM_CPPFLAGS)
