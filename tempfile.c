@@ -16,6 +16,7 @@
 
 static char         **temp_files;
 static struct obstack file_obst;
+static const char    *tempsubdir;
 
 static const char *try_dir(const char *dir)
 {
@@ -58,32 +59,43 @@ static const char *get_tempdir(void)
 	return tmpdir;
 }
 
-#ifndef HAVE_MKSTEMP
-/* cheap and nasty mkstemp replacement */
-static int mkstemp(char *templ)
+#ifndef HAVE_MKDTEMP
+/* cheap and nasty mkdtemp replacement */
+static int mkdtemp(char *templ)
 {
 	mktemp(templ);
-	return open(templ, O_RDWR|O_CREAT|O_EXCL|O_BINARY, 0600);
+	return mkdir(templ, 0700);
 }
 #endif
 
-FILE *make_temp_file(const char *prefix, const char **name_result)
+static const char *make_tempsubdir(const char *tempdir)
 {
-	const char *tempdir = get_tempdir();
 	assert(obstack_object_size(&file_obst) == 0);
-	obstack_printf(&file_obst, "%s/%sXXXXXX", tempdir, prefix);
+	obstack_printf(&file_obst, "%s/XXXXXX", tempdir);
+	obstack_1grow(&file_obst, '\0');
+
+	char *templ = obstack_finish(&file_obst);
+	const char *dir = mkdtemp(templ);
+	if (dir == NULL) {
+		fprintf(stderr, "error: mkdtemp could not create a directory"
+			" from template: %s\n", templ);
+		panic("abort");
+	}
+	return dir;
+}
+
+FILE *make_temp_file(const char *name_orig, const char **name_result)
+{
+	assert(obstack_object_size(&file_obst) == 0);
+	obstack_printf(&file_obst, "%s/%s", tempsubdir, name_orig);
 	obstack_1grow(&file_obst, '\0');
 
 	char *name = obstack_finish(&file_obst);
-	int fd = mkstemp(name);
-	if (fd == -1) {
+	FILE *out = fopen(name, "w");
+	if (out == NULL) {
 		fprintf(stderr, "error: could not create temporary file: %s",
 		        strerror(errno));
 		panic("abort");
-	}
-	FILE *out = fdopen(fd, "w");
-	if (out == NULL) {
-		panic("could not open temporary file as FILE*");
 	}
 
 	ARR_APP1(char*, temp_files, name);
@@ -93,10 +105,11 @@ FILE *make_temp_file(const char *prefix, const char **name_result)
 
 void init_temp_files(void)
 {
+	obstack_init(&file_obst);
+
+	tempsubdir = make_tempsubdir(get_tempdir());
 	temp_files = NEW_ARR_F(char*, 0);
 	atexit(free_temp_files);
-
-	obstack_init(&file_obst);
 }
 
 void free_temp_files(void)
@@ -112,6 +125,8 @@ void free_temp_files(void)
 	}
 	DEL_ARR_F(temp_files);
 	temp_files = NULL;
+
+	remove(tempsubdir);
 
 	obstack_free(&file_obst, NULL);
 }

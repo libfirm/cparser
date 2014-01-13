@@ -762,11 +762,14 @@ static bool read_ir_file(compilation_unit_t *unit)
 }
 
 static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
-							lang_standard_t standard, FILE *out)
+                            lang_standard_t standard, FILE *out)
 {
-	int  result                   = EXIT_SUCCESS;
+	int  result = EXIT_SUCCESS;
+	char tmpname[128];  /* used to change input filename extension */
+
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
-		const char *const inputname = unit->name;
+		const char *const inputname = unit->name ?
+			unit->name : "stdin.c";
 
 		determine_unit_standard(unit, standard);
 
@@ -871,7 +874,8 @@ again:
 			if (mode == MODE_COMPILE) {
 				asm_out = out;
 			} else {
-				asm_out = make_temp_file("ccs", &unit->name);
+				get_output_name(tmpname, sizeof(tmpname)-1, inputname, ".s");
+				asm_out = make_temp_file(tmpname, &unit->name);
 			}
 			ir_timer_t *t_opt_codegen = ir_timer_new();
 			timer_register(t_opt_codegen, "Optimization and Codegeneration");
@@ -898,7 +902,8 @@ again:
 				fclose(out);
 				unit->name = outname;
 			} else {
-				FILE *tempf = make_temp_file("cco", &unit->name);
+				get_output_name(tmpname, sizeof(tmpname)-1, inputname, ".o");
+				FILE *tempf = make_temp_file(tmpname, &unit->name);
 				/* hackish... */
 				fclose(tempf);
 			}
