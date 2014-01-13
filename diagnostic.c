@@ -90,6 +90,8 @@ static void diagnosticvf(position_t const *const pos,
 		} else {
 			fprintf(out, "%s%s: ", colors.highlight, pos->input_name);
 		}
+	} else {
+		fputs(colors.highlight, out);
 	}
 
 	fprintf(out, "%s%s:%s ", kind_color, kind, colors.reset_all);
