@@ -137,17 +137,8 @@ unknown_arg:
 		return EXIT_FAILURE;
 	}
 
-	/* TODO/FIXME we should have nothing depending on c dialect before we
-	 * are processing the first source file... */
-	init_c_dialect(false, standard != STANDARD_DEFAULT ? standard
-	                                                   : STANDARD_GNU99);
 	init_typehash();
 	init_basic_types();
-	if (dialect.cpp) {
-		init_wchar_types(ATOMIC_TYPE_WCHAR_T);
-	} else {
-		init_wchar_types(dialect.wchar_atomic_kind);
-	}
 	init_ast();
 	init_constfold();
 	init_parser();

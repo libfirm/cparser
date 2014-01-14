@@ -409,7 +409,7 @@ compilation_unit_type_t get_unit_type_from_string(const char *string)
 	return COMPILATION_UNIT_UNKNOWN;
 }
 
-void init_c_dialect(bool is_cpp, lang_standard_t standard)
+static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 {
 	lang_features_t features = 0;
 	if (!is_cpp) {
@@ -471,6 +471,8 @@ void init_c_dialect(bool is_cpp, lang_standard_t standard)
 	    dialect.ms = true;
 	if (features & _CXX)
 	    dialect.c89 = dialect.cpp = true;
+
+	init_types_dialect();
 }
 
 static void init_c_dialect_for_unit(const compilation_unit_t *unit)

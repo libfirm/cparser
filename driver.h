@@ -98,8 +98,6 @@ extern bool            driver_no_stdinc;
 extern bool            do_timing;
 extern bool            print_timing;
 
-void init_c_dialect(bool is_cpp, lang_standard_t standard);
-
 compilation_unit_type_t get_unit_type_from_string(const char *string);
 
 void driver_add_input(const char *filename, compilation_unit_type_t type);
