@@ -58,24 +58,37 @@ static const char *get_tempdir(void)
 	return tmpdir;
 }
 
-#ifndef HAVE_MKSTEMP
-/* cheap and nasty mkstemp replacement */
-static int mkstemp(char *templ)
+#ifndef HAVE_MKSTEMPS
+/* cheap and nasty mkstemps replacement */
+static int mkstemps(char *templ, int suffix_len)
 {
+	char old, *end;
+	(void)suffix_len;
+
+	end = strstr(templ, "XXXXXX");
+	if (end == NULL)
+		return -1;
+	
+	end += 6;  /* strlen("XXXXXX") */
+	old = *end;
+	*end = '\0';
+
 	mktemp(templ);
+	*end = old;
+
 	return open(templ, O_RDWR|O_CREAT|O_EXCL|O_BINARY, 0600);
 }
 #endif
 
-FILE *make_temp_file(const char *prefix, const char **name_result)
+FILE *make_temp_file(const char *suffix, const char **name_result)
 {
 	const char *tempdir = get_tempdir();
 	assert(obstack_object_size(&file_obst) == 0);
-	obstack_printf(&file_obst, "%s/%sXXXXXX", tempdir, prefix);
+	obstack_printf(&file_obst, "%s/XXXXXX%s", tempdir, suffix);
 	obstack_1grow(&file_obst, '\0');
 
 	char *name = obstack_finish(&file_obst);
-	int fd = mkstemp(name);
+	int fd = mkstemps(name, strlen(suffix));
 	if (fd == -1) {
 		fprintf(stderr, "error: could not create temporary file: %s",
 		        strerror(errno));

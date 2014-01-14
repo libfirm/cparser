@@ -41,7 +41,7 @@
 #endif
 
 #ifndef ASSEMBLER
-#define ASSEMBLER "gcc -c -xassembler"
+#define ASSEMBLER "gcc -c"
 #endif
 
 #ifndef COMPILER_INCLUDE_DIR
@@ -869,7 +869,7 @@ again:
 			if (mode == MODE_COMPILE) {
 				asm_out = out;
 			} else {
-				asm_out = make_temp_file("ccs", &unit->name);
+				asm_out = make_temp_file(".s", &unit->name);
 			}
 			ir_timer_t *t_opt_codegen = ir_timer_new();
 			timer_register(t_opt_codegen, "Optimization and Codegeneration");
@@ -896,7 +896,7 @@ again:
 				fclose(out);
 				unit->name = outname;
 			} else {
-				FILE *tempf = make_temp_file("cco", &unit->name);
+				FILE *tempf = make_temp_file(".o", &unit->name);
 				/* hackish... */
 				fclose(tempf);
 			}
