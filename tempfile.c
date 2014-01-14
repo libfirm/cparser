@@ -86,6 +86,9 @@ static const char *make_tempsubdir(const char *tempdir)
 
 FILE *make_temp_file(const char *name_orig, const char **name_result)
 {
+	if (tempsubdir == NULL)
+		tempsubdir = make_tempsubdir(get_tempdir());
+
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s/%s", tempsubdir, name_orig);
 	obstack_1grow(&file_obst, '\0');
@@ -107,7 +110,7 @@ void init_temp_files(void)
 {
 	obstack_init(&file_obst);
 
-	tempsubdir = make_tempsubdir(get_tempdir());
+	tempsubdir = NULL;
 	temp_files = NEW_ARR_F(char*, 0);
 	atexit(free_temp_files);
 }
@@ -125,8 +128,11 @@ void free_temp_files(void)
 	}
 	DEL_ARR_F(temp_files);
 	temp_files = NULL;
-	
-	remove(tempsubdir);
+
+	if (tempsubdir != NULL) {
+		remove(tempsubdir);
+		tempsubdir = NULL;
+	}
 
 	obstack_free(&file_obst, NULL);
 }
