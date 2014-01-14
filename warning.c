@@ -125,10 +125,6 @@ void set_warning_opt(const char *const opt)
 			return;
 		}
 	}
-	if (streq(s, "comments")) {
-		warning[WARN_COMMENT].state = (warning[WARN_COMMENT].state & ~off) | on;
-		return;
-	}
 
 	if (s[0] == '\0') { // -W is an alias for -Wextra
 		goto extra;
@@ -166,6 +162,9 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_UNUSED_PARAMETER);
 		SET(WARN_UNUSED_VALUE);
 		SET(WARN_UNUSED_VARIABLE);
+	}
+	OPTX("comments") {
+		SET(WARN_COMMENT);
 	}
 	OPTX("extra") {
 extra:
