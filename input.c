@@ -234,7 +234,6 @@ realign:
 						break;
 					}
 				} while ((*src & 0xC0) == 0x80 || (*src & 0xF8) == 0xF8);
-				continue;
 			}
 			*dst++ = decoded;
 		}
