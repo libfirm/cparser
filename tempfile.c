@@ -46,11 +46,11 @@ static const char *get_tempdir(void)
 #endif
 
 	if (tmpdir == NULL)
+		tmpdir = try_dir("/tmp");
+	if (tmpdir == NULL)
 		tmpdir = try_dir("/var/tmp");
 	if (tmpdir == NULL)
 		tmpdir = try_dir("/usr/tmp");
-	if (tmpdir == NULL)
-		tmpdir = try_dir("/tmp");
 
 	if (tmpdir == NULL)
 		tmpdir = ".";
