@@ -874,7 +874,7 @@ again:
 			if (mode == MODE_COMPILE) {
 				asm_out = out;
 			} else {
-				get_output_name(tmpname, sizeof(tmpname)-1, inputname, ".s");
+				get_output_name(tmpname, sizeof(tmpname), inputname, ".s");
 				asm_out = make_temp_file(tmpname, &unit->name);
 			}
 			ir_timer_t *t_opt_codegen = ir_timer_new();
@@ -902,7 +902,7 @@ again:
 				fclose(out);
 				unit->name = outname;
 			} else {
-				get_output_name(tmpname, sizeof(tmpname)-1, inputname, ".o");
+				get_output_name(tmpname, sizeof(tmpname), inputname, ".o");
 				FILE *tempf = make_temp_file(tmpname, &unit->name);
 				/* hackish... */
 				fclose(tempf);
