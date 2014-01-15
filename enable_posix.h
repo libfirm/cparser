@@ -26,6 +26,9 @@
 #define unlink(filename)         _unlink(filename)
 
 #else
+#	ifdef __APPLE__
+#		define _DARWIN_C_SOURCE /* Required for mkdtemp(). */
+#	endif
 #define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <sys/stat.h>
