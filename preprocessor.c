@@ -141,7 +141,6 @@ token_t                      pp_token;
 input_decoder_t             *input_decoder = &input_decode_utf8;
 bool                         allow_dollar_in_symbol   = true;
 static bool                  resolve_escape_sequences = true;
-static bool                  error_on_unknown_chars   = true;
 static bool                  skip_mode;
 static bool                  stop_at_newline;
 static FILE                 *out;
@@ -2172,24 +2171,17 @@ digraph_percentcolon:
 		/* FALLTHROUGH */
 	default:
 dollar_sign:
-		if (error_on_unknown_chars) {
-			errorf(&pp_token.base.pos, "unknown character '%lc' found", input.c);
-			next_char();
-			goto restart;
-		} else {
-			assert(obstack_object_size(&symbol_obstack) == 0);
-			obstack_grow_utf8(&symbol_obstack, input.c);
-			obstack_1grow(&symbol_obstack, '\0');
-			char     *const string = obstack_finish(&symbol_obstack);
-			symbol_t *const symbol = symbol_table_insert(string);
-			if (symbol->string != string)
-				obstack_free(&symbol_obstack, string);
+		assert(obstack_object_size(&symbol_obstack) == 0);
+		obstack_grow_utf8(&symbol_obstack, input.c);
+		obstack_1grow(&symbol_obstack, '\0');
+		char     *const string = obstack_finish(&symbol_obstack);
+		symbol_t *const symbol = symbol_table_insert(string);
+		if (symbol->string != string)
+			obstack_free(&symbol_obstack, string);
 
-			pp_token.kind        = T_UNKNOWN_CHAR;
-			pp_token.base.symbol = symbol;
-			next_char();
-			return;
-		}
+		pp_token.kind        = T_UNKNOWN_CHAR;
+		pp_token.base.symbol = symbol;
+		next_char();
 	}
 }
 
@@ -2267,13 +2259,7 @@ static bool emit_newlines(void)
 void set_preprocessor_output(FILE *output)
 {
 	out = output;
-	if (out != NULL) {
-		error_on_unknown_chars   = false;
-		resolve_escape_sequences = false;
-	} else {
-		error_on_unknown_chars   = true;
-		resolve_escape_sequences = true;
-	}
+	resolve_escape_sequences = out == NULL;
 }
 
 void emit_pp_token(void)
@@ -2326,14 +2312,9 @@ void emit_pp_token(void)
 
 static void eat_pp_directive(void)
 {
-	bool const old_error_on_unknown_char = error_on_unknown_chars;
-	error_on_unknown_chars = false;
-
 	while (pp_token.kind != '\n' && pp_token.kind != T_EOF) {
 		next_input_token();
 	}
-
-	error_on_unknown_chars = old_error_on_unknown_char;
 }
 
 static bool strings_equal(const string_t *string1, const string_t *string2)

@@ -78,7 +78,7 @@ T(_ALL, T_NUMBER,             "number constant",    , false)
 T(_ALL, T_CHARACTER_CONSTANT, "character constant", , false)
 T(_ALL, T_STRING_LITERAL,     "string literal",     , false)
 T(_ALL, T_MACRO_PARAMETER,    "macro parameter",    , false)
-T(_ALL, T_UNKNOWN_CHAR,       "unknown character",  , false)
+T(_ALL, T_UNKNOWN_CHAR,       "character",          , false)
 
 /* keywords */
 KEY(_ALL,   auto)
