@@ -10859,8 +10859,7 @@ static void parse_external(void)
 
 	case ';':
 		if (!dialect.strict) {
-			warningf(WARN_STRAY_SEMICOLON, HERE,
-			         "stray ';' outside of function");
+			warningf(WARN_STRAY_SEMICOLON, HERE, "stray %k outside of function", ';');
 			eat(';');
 			return;
 		}
