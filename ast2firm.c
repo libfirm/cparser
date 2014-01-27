@@ -797,17 +797,15 @@ entity_created:
 }
 
 /**
- * Creates a SymConst for a given entity.
+ * Creates an EntConst for a given entity.
  *
  * @param dbgi    debug info
  * @param entity  the entity
  */
-static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
+static ir_node *create_address(dbg_info *dbgi, ir_entity *entity)
 {
 	assert(entity != NULL);
-	union symconst_symbol sym;
-	sym.entity_p = entity;
-	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
+	return new_d_EntConst(dbgi, mode_P, entity, entconst_addr);
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -827,7 +825,7 @@ static ir_node *conv_to_storage_type(dbg_info *const dbgi, ir_node *const val, t
 }
 
 /**
- * Creates a SymConst node representing a string constant.
+ * Creates a node representing a string constant.
  *
  * @param src_pos    the source position of the string constant
  * @param id_prefix  a prefix for the name of the generated string constant
@@ -891,7 +889,7 @@ finish:;
 	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, initializer);
 
-	return create_symconst(dbgi, entity);
+	return create_address(dbgi, entity);
 }
 
 static bool try_create_integer(literal_expression_t *literal, type_t *type)
@@ -1026,7 +1024,7 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 	assert(entity != NULL);
 	ir_node *in[3];
 	in[0] = get_trampoline_region(dbgi, entity);
-	in[1] = create_symconst(dbgi, entity);
+	in[1] = create_address(dbgi, entity);
 	in[2] = get_irg_frame(current_ir_graph);
 
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
@@ -1123,7 +1121,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		 * as an indicator for no real address) */
 		return NULL;
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		ir_node *const addr = create_symconst(dbgi, entity->variable.v.entity);
+		ir_node *const addr = create_address(dbgi, entity->variable.v.entity);
 		return addr;
 	}
 
@@ -1139,7 +1137,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		return entity->variable.v.vla_base;
 
 	case DECLARATION_KIND_FUNCTION: {
-		return create_symconst(dbgi, entity->function.irentity);
+		return create_address(dbgi, entity->function.irentity);
 	}
 
 	case DECLARATION_KIND_INNER_FUNCTION: {
@@ -1147,7 +1145,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
 			/* inner function not using the closure */
-			return create_symconst(dbgi, entity->function.irentity);
+			return create_address(dbgi, entity->function.irentity);
 		} else {
 			/* need trampoline here */
 			return create_trampoline(dbgi, mode, entity->function.irentity);
@@ -1802,12 +1800,12 @@ static ir_node *create_cast(unary_expression_t const *const expr)
 		const variable_t *to_var   = type->pointer.base_variable;
 		if (from_var != to_var) {
 			if (from_var != NULL) {
-				ir_node *const addr = create_symconst(dbgi, from_var->v.entity);
+				ir_node *const addr = create_address(dbgi, from_var->v.entity);
 				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
 				value = new_d_Add(dbgi, value, base, mode);
 			}
 			if (to_var != NULL) {
-				ir_node *const addr = create_symconst(dbgi, to_var->v.entity);
+				ir_node *const addr = create_address(dbgi, to_var->v.entity);
 				ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
 				value = new_d_Sub(dbgi, value, base, mode);
 			}
@@ -1836,7 +1834,7 @@ static ir_node *dereference_to_firm(unary_expression_t const *const expr)
 	/* check for __based */
 	variable_t const *const base_var = value_type->pointer.base_variable;
 	if (base_var) {
-		ir_node *const addr = create_symconst(dbgi, base_var->v.entity);
+		ir_node *const addr = create_address(dbgi, base_var->v.entity);
 		ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
 		value = new_d_Add(dbgi, value, base, get_ir_mode_storage(value_type));
 	}
@@ -2179,7 +2177,7 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	      is_constant_initializer(initializer) != EXPR_CLASS_VARIABLE
 	    )) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
-		return create_symconst(dbgi, entity);
+		return create_address(dbgi, entity);
 	} else {
 		/* create an entity on the stack */
 		ident   *const id     = id_unique("CompLit.%u");
@@ -2475,10 +2473,9 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	prepare_label_target(label->label);
 	POP_IRG();
 
-	symconst_symbol value;
-	value.entity_p = create_Block_entity(label->label->indirect_block);
-	dbg_info *const dbgi = get_dbg_info(&label->base.pos);
-	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
+	dbg_info  *const dbgi   = get_dbg_info(&label->base.pos);
+	ir_entity *const entity = create_Block_entity(label->label->indirect_block);
+	return new_d_EntConst(dbgi, mode_P_code, entity, entconst_addr);
 }
 
 static ir_node *expression_to_value(expression_t const *const expr)
@@ -3987,7 +3984,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	/* create a "template" entity which is copied to the entity on the stack */
 	ir_entity *const init_entity
 		= create_initializer_entity(dbgi, initializer, type);
-	ir_node *const src_addr = create_symconst(dbgi, init_entity);
+	ir_node *const src_addr = create_address(dbgi, init_entity);
 	ir_type *const irtype   = get_ir_type(type);
 	ir_cons_flags flags     = get_entity_volatility(entity) == volatility_is_volatile ?
 	                          cons_volatile : cons_none;
@@ -5055,8 +5052,7 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ident     *ide          = id_unique(unique_template);
 	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
 	ir_graph  *irg          = get_const_code_irg();
-	ir_node   *val          = new_rd_SymConst_addr_ent(NULL, irg, mode_P_code,
-	                                                   method);
+	ir_node   *val          = new_r_EntConst(irg, mode_P_code, method, entconst_addr);
 
 	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
 	set_entity_compiler_generated(ptr, 1);
