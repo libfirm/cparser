@@ -130,6 +130,7 @@ void create_gnu_builtins(void)
 	type_t *template     = type_builtin_template;
 	type_t *template_ptr = type_builtin_template_ptr;
 	s(ir_bk_compare_swap, "__sync_val_compare_and_swap", make_function_type(template, 3, (type_t*[]) { template_ptr, template, template }, DM_NONE));
+	s(ir_bk_may_alias,    "__builtin_may_alias",         make_function_type(type_int, 2, (type_t*[]) { type_const_void_ptr, type_const_void_ptr }, DM_NONE));
 
 	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
 	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));
