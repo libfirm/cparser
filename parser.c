@@ -6642,6 +6642,13 @@ static expression_t *parse_offsetof(void)
 	expression->offsetofe.type       = type;
 	expression->offsetofe.designator = designator;
 
+	type_t *type_skipped = skip_typeref(type);
+	if (is_type_scalar(type_skipped)) {
+		errorf(&expression->base.pos, "offsetof called on scalar type '%T'",
+		       type);
+		return create_error_expression();
+	}
+
 	type_path_t path;
 	memset(&path, 0, sizeof(path));
 	path.top_type = type;
