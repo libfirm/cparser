@@ -826,8 +826,10 @@ bool is_type_complete(type_t const *const type)
 	case TYPE_ARRAY:
 		return type->array.size_expression || type->array.size_constant;
 
-	case TYPE_ATOMIC:
 	case TYPE_ENUM:
+		return type->enumt.enume->complete;
+
+	case TYPE_ATOMIC:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
 	case TYPE_FUNCTION:
