@@ -6657,11 +6657,11 @@ static expression_t *parse_offsetof(void)
 	descend_into_subtype(&path);
 
 	if (!walk_designator(&path, designator, true)) {
+		DEL_ARR_F(path.path);
 		return create_error_expression();
 	}
 
 	DEL_ARR_F(path.path);
-
 	return expression;
 }
 
