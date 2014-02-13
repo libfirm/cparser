@@ -2138,6 +2138,7 @@ finish_designator:
 					goto error_parse_next;
 				}
 
+excess_elements:;
 				position_t const* const pos = &expression->base.pos;
 				if (env->entity != NULL) {
 					warningf(WARN_OTHER, pos,
@@ -2184,6 +2185,8 @@ finish_designator:
 				}
 
 				descend_into_subtype(path);
+				if (path->top_type == NULL)
+					goto excess_elements;
 			}
 		}
 
