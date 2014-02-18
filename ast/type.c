@@ -10,14 +10,14 @@
 #include "adt/error.h"
 #include "adt/separator_t.h"
 #include "adt/util.h"
-#include "diagnostic.h"
+#include "driver/diagnostic.h"
+#include "driver/lang_features.h"
+#include "driver/warning.h"
 #include "entity_t.h"
-#include "lang_features.h"
 #include "printer.h"
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "types.h"
-#include "warning.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;

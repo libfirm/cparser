@@ -2,7 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "enable_posix.h"
+#include "driver/enable_posix.h"
 #include "preprocessor.h"
 
 #include <assert.h>
@@ -26,9 +26,9 @@
 #include "ast/string_rep.h"
 #include "ast/symbol_t.h"
 #include "ast/symbol_table_t.h"
-#include "diagnostic.h"
+#include "driver/diagnostic.h"
+#include "driver/lang_features.h"
 #include "input.h"
-#include "lang_features.h"
 
 #define MAX_PUTBACK 3
 #define BUFSIZE     1024

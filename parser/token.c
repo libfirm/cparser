@@ -9,7 +9,7 @@
 #include "adt/util.h"
 #include "ast/symbol_t.h"
 #include "ast/symbol_table.h"
-#include "lang_features.h"
+#include "driver/lang_features.h"
 #include "token_t.h"
 
 symbol_t *token_symbols[T_LAST_TOKEN];

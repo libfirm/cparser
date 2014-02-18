@@ -12,7 +12,7 @@
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
-#include "lang_features.h"
+#include "driver/lang_features.h"
 
 static struct obstack obst;
 

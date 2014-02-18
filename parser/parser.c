@@ -24,14 +24,14 @@
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "ast/walk.h"
-#include "diagnostic.h"
+#include "driver/diagnostic.h"
+#include "driver/lang_features.h"
+#include "driver/warning.h"
 #include "firm/ast2firm.h"
 #include "format_check.h"
-#include "lang_features.h"
 #include "parser.h"
 #include "preprocessor.h"
 #include "token_t.h"
-#include "warning.h"
 
 //#define PRINT_TOKENS
 #define MAX_LOOKAHEAD 1

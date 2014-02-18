@@ -28,14 +28,14 @@
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "ast/walk.h"
-#include "diagnostic.h"
+#include "driver/diagnostic.h"
+#include "driver/lang_features.h"
+#include "driver/warning.h"
 #include "entitymap_t.h"
 #include "firm/firm_opt.h"
 #include "jump_target.h"
-#include "lang_features.h"
 #include "mangle.h"
 #include "parser/parser.h"
-#include "warning.h"
 
 typedef struct trampoline_region trampoline_region;
 struct trampoline_region {

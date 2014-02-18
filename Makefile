@@ -26,7 +26,6 @@ LINKFLAGS_coverage = --coverage
 LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
 cparser_SOURCES = \
-	actions.c \
 	adt/pset_new.c \
 	adt/strset.c \
 	adt/strutil.c \
@@ -41,28 +40,29 @@ cparser_SOURCES = \
 	ast/type_hash.c \
 	ast/types.c \
 	ast/walk.c \
-	diagnostic.c \
-	driver.c \
+	driver/actions.c \
+	driver/diagnostic.c \
+	driver/driver.c \
+	driver/help.c \
+	driver/machine_triple.c \
+	driver/options.c \
+	driver/predefs.c \
+	driver/target.c \
+	driver/tempfile.c \
+	driver/warning.c \
 	firm/ast2firm.c \
 	firm/entitymap.c \
 	firm/firm_opt.c \
 	firm/firm_timing.c \
 	firm/jump_target.c \
 	firm/mangle.c \
-	help.c \
-	machine_triple.c \
 	main.c \
-	options.c \
 	parser/builtins.c \
 	parser/format_check.c \
 	parser/input.c \
 	parser/parser.c \
 	parser/preprocessor.c \
 	parser/token.c \
-	predefs.c \
-	target.c \
-	tempfile.c \
-	warning.c \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c \
 	wrappergen/write_compoundsizes.c

@@ -32,7 +32,7 @@
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
-#include "lang_features.h"
+#include "driver/lang_features.h"
 #include "parser/parser.h"
 
 struct obstack ast_obstack;

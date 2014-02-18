@@ -4,7 +4,7 @@
  */
 #include "types.h"
 
-#include "lang_features.h"
+#include "driver/lang_features.h"
 #include "type_t.h"
 
 /** The error type. */

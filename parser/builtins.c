@@ -10,7 +10,7 @@
 #include "ast/symbol_table.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
-#include "lang_features.h"
+#include "driver/lang_features.h"
 #include "parser.h"
 
 static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,

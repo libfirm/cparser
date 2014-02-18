@@ -12,8 +12,8 @@
 #include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast_t.h"
-#include "lang_features.h"
-#include "target.h"
+#include "driver/lang_features.h"
+#include "driver/target.h"
 #include "type_t.h"
 #include "types.h"
 

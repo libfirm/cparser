@@ -13,10 +13,10 @@
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
-#include "diagnostic.h"
-#include "lang_features.h"
+#include "driver/diagnostic.h"
+#include "driver/lang_features.h"
+#include "driver/warning.h"
 #include "parser.h"
-#include "warning.h"
 
 typedef enum format_flag_t {
 	FMT_FLAG_NONE  = 0,

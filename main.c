@@ -2,7 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "enable_posix.h"
+#include "driver/enable_posix.h"
 
 #include <errno.h>
 #include <libfirm/be.h>
@@ -25,23 +25,23 @@
 #include "ast/type_hash.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
-#include "diagnostic.h"
-#include "driver.h"
+#include "driver/diagnostic.h"
+#include "driver/driver.h"
+#include "driver/help.h"
+#include "driver/lang_features.h"
+#include "driver/machine_triple.h"
+#include "driver/options.h"
+#include "driver/predefs.h"
+#include "driver/target.h"
+#include "driver/tempfile.h"
+#include "driver/version.h"
+#include "driver/warning.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
 #include "firm/firm_timing.h"
 #include "firm/mangle.h"
-#include "help.h"
-#include "lang_features.h"
-#include "machine_triple.h"
-#include "options.h"
 #include "parser/parser.h"
 #include "parser/preprocessor.h"
-#include "predefs.h"
-#include "target.h"
-#include "tempfile.h"
-#include "version.h"
-#include "warning.h"
 
 c_dialect_t dialect = {
 	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */

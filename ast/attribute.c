@@ -11,13 +11,13 @@
 #include "ast_t.h"
 #include "attribute_t.h"
 #include "constfold.h"
-#include "diagnostic.h"
+#include "driver/diagnostic.h"
+#include "driver/warning.h"
 #include "entity_t.h"
 #include "parser/parser.h"
 #include "symbol_t.h"
 #include "symbol_table.h"
 #include "type_t.h"
-#include "warning.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",
