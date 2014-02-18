@@ -17,4 +17,7 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type);
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity);
 type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type);
 
+/** array of entities using attribute((alias())) */
+extern entity_t **alias_entities;
+
 #endif

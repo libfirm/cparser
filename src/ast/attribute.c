@@ -14,10 +14,11 @@
 #include "driver/diagnostic.h"
 #include "driver/warning.h"
 #include "entity_t.h"
-#include "parser/parser.h"
 #include "symbol_t.h"
 #include "symbol_table.h"
 #include "type_t.h"
+
+entity_t                  **alias_entities;
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",

@@ -97,7 +97,6 @@ static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
 static elf_visibility_t     default_visibility = ELF_VISIBILITY_DEFAULT;
-entity_t                  **alias_entities;
 
 #define PUSH_CURRENT_ENTITY(entity) \
 	entity_t *const new_current_entity = (entity); \
