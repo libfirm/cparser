@@ -21,6 +21,7 @@
 #include "ast/constfold.h"
 #include "ast/constfoldbits.h"
 #include "ast/entity_t.h"
+#include "ast/position.h"
 #include "ast/printer.h"
 #include "ast/symbol_t.h"
 #include "ast/symbol_table.h"
@@ -34,7 +35,6 @@
 #include "lang_features.h"
 #include "mangle.h"
 #include "parser/parser.h"
-#include "parser/token_t.h"
 #include "warning.h"
 
 typedef struct trampoline_region trampoline_region;

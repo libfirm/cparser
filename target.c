@@ -7,6 +7,7 @@
 
 #include "adt/error.h"
 #include "adt/strutil.h"
+#include "adt/util.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "diagnostic.h"

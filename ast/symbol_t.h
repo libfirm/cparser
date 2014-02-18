@@ -7,6 +7,7 @@
 
 #include "entity.h"
 #include "parser/token_t.h"
+#include "position.h"
 #include "symbol.h"
 
 struct symbol_t {

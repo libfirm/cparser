@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 
-#include "parser/token_t.h"
+#include "ast/position.h"
 #include "warning.h"
 
 /**

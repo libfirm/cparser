@@ -7,13 +7,14 @@
 
 #include <libfirm/firm_types.h>
 
+#include "adt/util.h"
 #include "ast/ast.h"
 #include "ast/attribute.h"
 #include "ast/entity.h"
 #include "ast/symbol.h"
 #include "firm/jump_target.h"
 #include "parser/builtins.h"
-#include "parser/token_t.h"
+#include "position.h"
 
 typedef enum {
 	ENTITY_VARIABLE = 1,

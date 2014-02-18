@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "adt/util.h"
+#include "ast/position.h"
 #include "ast/string_rep.h"
 #include "ast/symbol.h"
 
@@ -28,18 +29,7 @@ typedef enum pp_token_kind_t {
 	TP_LAST_TOKEN
 } pp_token_kind_t;
 
-typedef struct position_t position_t;
-struct position_t {
-	const char *input_name;
-	unsigned    lineno;
-	unsigned    colno            : 31;
-	unsigned    is_system_header : 1;
-};
-
 extern symbol_t *token_symbols[];
-
-/* position used for "builtin" declarations/types */
-extern const position_t builtin_position;
 
 typedef struct token_base_t      token_base_t;
 typedef struct literal_t         literal_t;
