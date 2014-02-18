@@ -3,7 +3,7 @@
 
 top_srcdir   ?= .
 top_builddir ?= build
-VPATH        ?= $(top_srcdir)
+VPATH        ?= $(top_srcdir)/src
 
 include config.default.mak
 
@@ -11,7 +11,7 @@ variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverag
 srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
 
-CPPFLAGS  = -I$(top_srcdir) -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
+CPPFLAGS  = -I$(top_srcdir)/src -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
