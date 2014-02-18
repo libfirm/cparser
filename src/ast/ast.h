@@ -8,7 +8,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "ast/entity.h"
+#include "entity.h"
+#include "type.h"
 
 typedef struct expression_base_t                     expression_base_t;
 typedef struct literal_expression_t                  literal_expression_t;
@@ -118,5 +119,11 @@ expression_classification_t is_linker_constant(const expression_t *expression);
  * Works for EXPR_LITERAL_* expressions.
  */
 void determine_literal_type(literal_expression_t *literal);
+
+/**
+ * reverts the automatic casts of array to pointer types and function
+ * to function-pointer types as defined §6.3.2.1
+ */
+type_t *revert_automatic_type_conversion(const expression_t *expression);
 
 #endif

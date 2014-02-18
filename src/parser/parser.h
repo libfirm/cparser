@@ -38,12 +38,6 @@ void parse(void);
 translation_unit_t *finish_parsing(void);
 
 /**
- * reverts the automatic casts of array to pointer types and function
- * to function-pointer types as defined §6.3.2.1
- */
-type_t *revert_automatic_type_conversion(const expression_t *expression);
-
-/**
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
  */

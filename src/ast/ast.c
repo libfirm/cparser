@@ -33,7 +33,6 @@
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "driver/lang_features.h"
-#include "parser/parser.h"
 
 struct obstack ast_obstack;
 
@@ -1955,6 +1954,58 @@ check_type:
 		return EXPR_CLASS_ERROR;
 	}
 	panic("invalid expression");
+}
+
+type_t *revert_automatic_type_conversion(const expression_t *expression)
+{
+	switch (expression->kind) {
+	case EXPR_REFERENCE: {
+		entity_t *entity = expression->reference.entity;
+		if (is_declaration(entity)) {
+			return entity->declaration.type;
+		} else if (entity->kind == ENTITY_ENUM_VALUE) {
+			return type_int;
+		} else {
+			panic("no declaration or enum in reference");
+		}
+	}
+
+	case EXPR_SELECT: {
+		entity_t *entity = expression->select.compound_entry;
+		assert(is_declaration(entity));
+		type_t   *type   = entity->declaration.type;
+		return get_qualified_type(type, expression->base.type->base.qualifiers);
+	}
+
+	case EXPR_UNARY_DEREFERENCE: {
+		const expression_t *const value = expression->unary.value;
+		type_t             *const type  = skip_typeref(value->base.type);
+		if (!is_type_pointer(type))
+			return type_error_type;
+		return type->pointer.points_to;
+	}
+
+	case EXPR_ARRAY_ACCESS: {
+		const expression_t *array_ref = expression->array_access.array_ref;
+		type_t             *type_left = skip_typeref(array_ref->base.type);
+		if (!is_type_pointer(type_left))
+			return type_error_type;
+		return type_left->pointer.points_to;
+	}
+
+	case EXPR_STRING_LITERAL: {
+		size_t  const size = get_string_len(&expression->string_literal.value) + 1;
+		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
+		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
+	}
+
+	case EXPR_COMPOUND_LITERAL:
+		return expression->compound_literal.type;
+
+	default:
+		break;
+	}
+	return expression->base.type;
 }
 
 void init_ast(void)
