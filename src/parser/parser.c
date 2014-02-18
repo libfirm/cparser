@@ -28,7 +28,6 @@
 #include "driver/diagnostic.h"
 #include "driver/lang_features.h"
 #include "driver/warning.h"
-#include "firm/ast2firm.h"
 #include "format_check.h"
 #include "parser.h"
 #include "preprocessor.h"
