@@ -13,7 +13,7 @@
 #include "adt/error.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
-#include "ast2firm.h"
+#include "firm/ast2firm.h"
 #include "ast_t.h"
 #include "attribute_t.h"
 #include "constfold.h"

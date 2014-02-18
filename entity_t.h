@@ -11,7 +11,7 @@
 #include "attribute.h"
 #include "builtins.h"
 #include "entity.h"
-#include "jump_target.h"
+#include "firm/jump_target.h"
 #include "symbol.h"
 #include "token_t.h"
 

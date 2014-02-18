@@ -4,10 +4,9 @@
  */
 #include <assert.h>
 #include <stdbool.h>
-#include "firm_machine.h"
+#include "machine_triple.h"
 #include "adt/strutil.h"
 #include "adt/xmalloc.h"
-#include <libfirm/firm.h>
 
 bool firm_is_unixish_os(const char *os)
 {

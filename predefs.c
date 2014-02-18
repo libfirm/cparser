@@ -9,10 +9,10 @@
 
 #include "adt/error.h"
 #include "adt/strutil.h"
-#include "ast2firm.h"
 #include "constfoldbits.h"
-#include "driver/firm_machine.h"
+#include "firm/ast2firm.h"
 #include "lang_features.h"
+#include "machine_triple.h"
 #include "preprocessor.h"
 #include "type_t.h"
 #include "types.h"

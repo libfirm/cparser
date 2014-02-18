@@ -27,28 +27,29 @@ LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
 cparser_SOURCES = \
 	actions.c \
+	adt/pset_new.c \
 	adt/strset.c \
 	adt/strutil.c \
-	adt/pset_new.c \
-	attribute.c \
-	parser.c \
 	ast.c \
-	ast2firm.c \
+	attribute.c \
 	builtins.c \
 	constfold.c \
 	diagnostic.c \
 	driver.c \
-	driver/firm_machine.c \
-	driver/firm_opt.c \
-	driver/firm_timing.c \
 	entity.c \
-	entitymap.c \
+	firm/ast2firm.c \
+	firm/entitymap.c \
+	firm/firm_opt.c \
+	firm/firm_timing.c \
+	firm/jump_target.c \
+	firm/mangle.c \
 	format_check.c \
+	help.c \
 	input.c \
-	jump_target.c \
+	machine_triple.c \
 	main.c \
-	mangle.c \
 	options.c \
+	parser.c \
 	predefs.c \
 	preprocessor.c \
 	printer.c \
@@ -60,9 +61,8 @@ cparser_SOURCES = \
 	type.c \
 	type_hash.c \
 	types.c \
-	help.c \
-	warning.c \
 	walk.c \
+	warning.c \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c \
 	wrappergen/write_compoundsizes.c

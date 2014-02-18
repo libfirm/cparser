@@ -8,7 +8,7 @@
 #include <libfirm/be.h>
 #include <stdio.h>
 
-#include "driver/firm_opt.h"
+#include "firm/firm_opt.h"
 #include "warning.h"
 
 help_sections_t help;

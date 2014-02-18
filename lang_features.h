@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <libfirm/irmode.h>
 
-#include "driver/firm_machine.h"
+#include "machine_triple.h"
 #include "type.h"
 
 #define BITS_PER_BYTE    8

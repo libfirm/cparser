@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 
-#include "driver/firm_machine.h"
+#include "machine_triple.h"
 #include "options.h"
 
 void target_setup(options_state_t *state);
