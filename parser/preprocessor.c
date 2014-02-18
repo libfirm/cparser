@@ -17,18 +17,18 @@
 
 #include "adt/array.h"
 #include "adt/error.h"
+#include "adt/separator_t.h"
 #include "adt/strset.h"
 #include "adt/strutil.h"
+#include "adt/unicode.h"
 #include "adt/util.h"
-#include "ast_t.h"
+#include "ast/ast_t.h"
+#include "ast/string_rep.h"
+#include "ast/symbol_t.h"
+#include "ast/symbol_table_t.h"
 #include "diagnostic.h"
 #include "input.h"
 #include "lang_features.h"
-#include "separator_t.h"
-#include "string_rep.h"
-#include "symbol_t.h"
-#include "symbol_table_t.h"
-#include "unicode.h"
 
 #define MAX_PUTBACK 3
 #define BUFSIZE     1024

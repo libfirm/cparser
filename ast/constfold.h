@@ -2,8 +2,8 @@
 #define CONSTFOLD_H
 
 #include <libfirm/firm_types.h>
-#include "ast_t.h"
-#include "type.h"
+#include "ast/ast_t.h"
+#include "ast/type.h"
 
 bool fold_expression_to_bool(const expression_t *expression);
 long fold_expression_to_int(const expression_t *expression);

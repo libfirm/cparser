@@ -8,14 +8,14 @@
 
 #include "adt/strutil.h"
 #include "adt/util.h"
-#include "ast_t.h"
+#include "ast/ast_t.h"
+#include "ast/entity_t.h"
+#include "ast/symbol_t.h"
+#include "ast/type_t.h"
+#include "ast/types.h"
 #include "diagnostic.h"
-#include "entity_t.h"
 #include "lang_features.h"
 #include "parser.h"
-#include "symbol_t.h"
-#include "type_t.h"
-#include "types.h"
 #include "warning.h"
 
 typedef enum format_flag_t {

@@ -9,13 +9,13 @@
 
 #include "adt/error.h"
 #include "adt/strutil.h"
-#include "constfoldbits.h"
+#include "ast/constfoldbits.h"
+#include "ast/type_t.h"
+#include "ast/types.h"
 #include "firm/ast2firm.h"
 #include "lang_features.h"
 #include "machine_triple.h"
-#include "preprocessor.h"
-#include "type_t.h"
-#include "types.h"
+#include "parser/preprocessor.h"
 #include "version.h"
 
 const char *user_label_prefix = "";

@@ -30,38 +30,38 @@ cparser_SOURCES = \
 	adt/pset_new.c \
 	adt/strset.c \
 	adt/strutil.c \
-	ast.c \
-	attribute.c \
-	builtins.c \
-	constfold.c \
+	ast/ast.c \
+	ast/attribute.c \
+	ast/constfold.c \
+	ast/entity.c \
+	ast/printer.c \
+	ast/string_rep.c \
+	ast/symbol_table.c \
+	ast/type.c \
+	ast/type_hash.c \
+	ast/types.c \
+	ast/walk.c \
 	diagnostic.c \
 	driver.c \
-	entity.c \
 	firm/ast2firm.c \
 	firm/entitymap.c \
 	firm/firm_opt.c \
 	firm/firm_timing.c \
 	firm/jump_target.c \
 	firm/mangle.c \
-	format_check.c \
 	help.c \
-	input.c \
 	machine_triple.c \
 	main.c \
 	options.c \
-	parser.c \
+	parser/builtins.c \
+	parser/format_check.c \
+	parser/input.c \
+	parser/parser.c \
+	parser/preprocessor.c \
+	parser/token.c \
 	predefs.c \
-	preprocessor.c \
-	printer.c \
-	string_rep.c \
-	symbol_table.c \
 	target.c \
 	tempfile.c \
-	token.c \
-	type.c \
-	type_hash.c \
-	types.c \
-	walk.c \
 	warning.c \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c \

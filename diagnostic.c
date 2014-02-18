@@ -8,12 +8,12 @@
 #include <stdio.h>
 
 #include "adt/error.h"
-#include "ast.h"
-#include "entity_t.h"
-#include "separator_t.h"
-#include "symbol_t.h"
-#include "type.h"
-#include "unicode.h"
+#include "adt/separator_t.h"
+#include "adt/unicode.h"
+#include "ast/ast.h"
+#include "ast/entity_t.h"
+#include "ast/symbol_t.h"
+#include "ast/type.h"
 
 typedef struct colorscheme_t {
 	const char *fatal;

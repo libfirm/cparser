@@ -8,12 +8,12 @@
 
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
+#include "adt/separator_t.h"
 #include "adt/util.h"
 #include "diagnostic.h"
 #include "entity_t.h"
 #include "lang_features.h"
 #include "printer.h"
-#include "separator_t.h"
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "types.h"

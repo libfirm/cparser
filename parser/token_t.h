@@ -9,8 +9,8 @@
 #include <stdio.h>
 
 #include "adt/util.h"
-#include "string_rep.h"
-#include "symbol.h"
+#include "ast/string_rep.h"
+#include "ast/symbol.h"
 
 typedef enum token_kind_t {
 	T_NULL  =  0,

@@ -2,16 +2,15 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "token_t.h"
-#include "symbol_t.h"
-
 #include <assert.h>
 
 #include "adt/array.h"
 #include "adt/error.h"
 #include "adt/util.h"
+#include "ast/symbol_t.h"
+#include "ast/symbol_table.h"
 #include "lang_features.h"
-#include "symbol_table.h"
+#include "token_t.h"
 
 symbol_t *token_symbols[T_LAST_TOKEN];
 

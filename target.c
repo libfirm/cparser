@@ -7,14 +7,14 @@
 
 #include "adt/error.h"
 #include "adt/strutil.h"
+#include "ast/type_t.h"
+#include "ast/types.h"
 #include "diagnostic.h"
 #include "driver.h"
 #include "firm/ast2firm.h"
 #include "firm/mangle.h"
 #include "lang_features.h"
 #include "target.h"
-#include "type_t.h"
-#include "types.h"
 #include "warning.h"
 
 target_t    target;

@@ -8,7 +8,10 @@
 #include <assert.h>
 
 #include "adt/obst.h"
-#include "input.h"
+
+typedef unsigned int utf32;
+#define UTF32_PRINTF_FORMAT "%u"
+#define UTF32_EOF           ((utf32)-1)
 
 /**
  * "parse" an utf8 character from a string.

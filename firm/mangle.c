@@ -9,10 +9,10 @@
 
 #include "adt/error.h"
 #include "adt/obst.h"
-#include "entity_t.h"
+#include "ast/entity_t.h"
+#include "ast/symbol_t.h"
+#include "ast/type_t.h"
 #include "lang_features.h"
-#include "symbol_t.h"
-#include "type_t.h"
 
 static struct obstack obst;
 

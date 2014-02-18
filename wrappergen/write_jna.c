@@ -4,19 +4,19 @@
  */
 #include <string.h>
 
-#include "adt/strutil.h"
-#include "write_jna.h"
-#include "symbol_t.h"
-#include "ast_t.h"
-#include "type_t.h"
-#include "entity_t.h"
-#include "type.h"
-#include "printer.h"
 #include "adt/error.h"
-#include "adt/xmalloc.h"
 #include "adt/pset_new.h"
-#include "separator_t.h"
-#include "symbol_table.h"
+#include "adt/separator_t.h"
+#include "adt/strutil.h"
+#include "adt/xmalloc.h"
+#include "ast/ast_t.h"
+#include "ast/entity_t.h"
+#include "ast/printer.h"
+#include "ast/symbol_t.h"
+#include "ast/symbol_table.h"
+#include "ast/type.h"
+#include "ast/type_t.h"
+#include "write_jna.h"
 
 typedef struct output_limit {
 	const char          *filename;

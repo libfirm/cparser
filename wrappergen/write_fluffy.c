@@ -2,15 +2,15 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "write_fluffy.h"
-#include "separator_t.h"
-#include "symbol_t.h"
-#include "ast_t.h"
-#include "type_t.h"
-#include "entity_t.h"
-#include "type.h"
 #include "adt/error.h"
-#include "printer.h"
+#include "adt/separator_t.h"
+#include "ast/ast_t.h"
+#include "ast/entity_t.h"
+#include "ast/printer.h"
+#include "ast/symbol_t.h"
+#include "ast/type.h"
+#include "ast/type_t.h"
+#include "write_fluffy.h"
 
 static const scope_t *global_scope;
 static FILE          *out;

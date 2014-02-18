@@ -7,7 +7,7 @@
 
 #include <libfirm/firm_types.h>
 
-#include "symbol.h"
+#include "ast/symbol.h"
 
 typedef struct entitymap_entry_t {
 	symbol_t  *symbol;

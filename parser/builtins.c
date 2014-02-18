@@ -5,13 +5,13 @@
 #include "builtins.h"
 
 #include "adt/strutil.h"
-#include "entity_t.h"
+#include "ast/entity_t.h"
+#include "ast/symbol_t.h"
+#include "ast/symbol_table.h"
+#include "ast/type_t.h"
+#include "ast/types.h"
 #include "lang_features.h"
 #include "parser.h"
-#include "symbol_t.h"
-#include "symbol_table.h"
-#include "type_t.h"
-#include "types.h"
 
 static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
                                          type_t *function_type)

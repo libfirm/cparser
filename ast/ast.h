@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "entity.h"
+#include "ast/entity.h"
 
 typedef struct expression_base_t                     expression_base_t;
 typedef struct literal_expression_t                  literal_expression_t;

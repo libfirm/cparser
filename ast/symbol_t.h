@@ -6,8 +6,8 @@
 #define SYMBOL_T_H
 
 #include "entity.h"
+#include "parser/token_t.h"
 #include "symbol.h"
-#include "token_t.h"
 
 struct symbol_t {
 	char const      *string;

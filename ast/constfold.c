@@ -9,13 +9,13 @@
 #include <libfirm/irmode.h>
 
 #include "adt/error.h"
+#include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast_t.h"
 #include "lang_features.h"
 #include "target.h"
 #include "type_t.h"
 #include "types.h"
-#include "unicode.h"
 
 static ir_mode *mode_float_arithmetic;
 ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];

@@ -8,7 +8,7 @@
 #include "adt/obst.h"
 #include "adt/strutil.h"
 #include "symbol_t.h"
-#include "token_t.h"
+#include "parser/token_t.h"
 
 struct obstack symbol_obstack;
 

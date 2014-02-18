@@ -6,8 +6,8 @@
 #define DRIVER_H
 
 #include "adt/obst.h"
-#include "ast.h"
-#include "input.h"
+#include "ast/ast.h"
+#include "parser/input.h"
 #include "tempfile.h"
 
 typedef enum compile_mode_t {

@@ -7,8 +7,8 @@
 
 #include <libfirm/firm.h>
 
-#include "ast.h"
-#include "type.h"
+#include "ast/ast.h"
+#include "ast/type.h"
 
 void translation_unit_to_firm(translation_unit_t *unit);
 

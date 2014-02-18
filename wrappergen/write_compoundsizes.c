@@ -2,10 +2,10 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "type_t.h"
-#include "ast_t.h"
-#include "entity_t.h"
-#include "attribute_t.h"
+#include "ast/ast_t.h"
+#include "ast/attribute_t.h"
+#include "ast/entity_t.h"
+#include "ast/type_t.h"
 #include "write_compoundsizes.h"
 
 void write_compoundsizes(FILE *output, const translation_unit_t *unit)

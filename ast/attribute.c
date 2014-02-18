@@ -13,7 +13,7 @@
 #include "constfold.h"
 #include "diagnostic.h"
 #include "entity_t.h"
-#include "parser.h"
+#include "parser/parser.h"
 #include "symbol_t.h"
 #include "symbol_table.h"
 #include "type_t.h"

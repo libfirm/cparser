@@ -5,9 +5,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "ast.h"
-#include "entity_t.h"
-#include "type.h"
+#include "ast/ast.h"
+#include "ast/entity_t.h"
+#include "ast/type.h"
 
 typedef struct environment_entry_t environment_entry_t;
 

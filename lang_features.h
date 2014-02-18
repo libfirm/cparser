@@ -8,8 +8,8 @@
 #include <stdbool.h>
 #include <libfirm/irmode.h>
 
+#include "ast/type.h"
 #include "machine_triple.h"
-#include "type.h"
 
 #define BITS_PER_BYTE    8
 

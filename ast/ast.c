@@ -25,15 +25,15 @@
 #include <ctype.h>
 
 #include "adt/error.h"
+#include "adt/separator_t.h"
 #include "adt/util.h"
-#include "constfold.h"
+#include "ast/constfold.h"
+#include "ast/printer.h"
+#include "ast/symbol_t.h"
+#include "ast/type_t.h"
+#include "ast/types.h"
 #include "lang_features.h"
-#include "parser.h"
-#include "printer.h"
-#include "separator_t.h"
-#include "symbol_t.h"
-#include "type_t.h"
-#include "types.h"
+#include "parser/parser.h"
 
 struct obstack ast_obstack;
 
