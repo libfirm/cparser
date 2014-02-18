@@ -24,6 +24,7 @@
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "ast/walk.h"
+#include "builtins.h"
 #include "driver/diagnostic.h"
 #include "driver/lang_features.h"
 #include "driver/warning.h"

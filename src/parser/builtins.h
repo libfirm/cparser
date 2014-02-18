@@ -7,21 +7,6 @@
 
 #include "ast/entity.h"
 
-typedef enum {
-	BUILTIN_NONE,
-	BUILTIN_ALLOCA,
-	BUILTIN_INF,
-	BUILTIN_NAN,
-	BUILTIN_EXPECT,
-	BUILTIN_VA_END,
-	BUILTIN_OBJECT_SIZE,
-	BUILTIN_ROTL,
-	BUILTIN_ROTR,
-	BUILTIN_LIBC,
-	BUILTIN_LIBC_CHECK,
-	BUILTIN_FIRM,
-} builtin_kind_t;
-
 /**
  * Create predefined gnu builtins.
  */

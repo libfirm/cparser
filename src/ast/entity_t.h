@@ -13,7 +13,6 @@
 #include "ast/entity.h"
 #include "ast/symbol.h"
 #include "firm/jump_target.h"
-#include "parser/builtins.h"
 #include "position.h"
 
 typedef enum {
@@ -89,6 +88,21 @@ typedef enum elf_visibility_t {
 	ELF_VISIBILITY_PROTECTED,
 	ELF_VISIBILITY_ERROR
 } elf_visibility_t;
+
+typedef enum {
+	BUILTIN_NONE,
+	BUILTIN_ALLOCA,
+	BUILTIN_INF,
+	BUILTIN_NAN,
+	BUILTIN_EXPECT,
+	BUILTIN_VA_END,
+	BUILTIN_OBJECT_SIZE,
+	BUILTIN_ROTL,
+	BUILTIN_ROTR,
+	BUILTIN_LIBC,
+	BUILTIN_LIBC_CHECK,
+	BUILTIN_FIRM,
+} builtin_kind_t;
 
 /**
  * A scope containing entities.
