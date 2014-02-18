@@ -159,6 +159,18 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 		panic("filename too long");
 }
 
+static FILE *open_temp_file(const char *basename, const char *extension,
+                            const char **final_name)
+{
+	char tmpname[512];
+	char uniquenum_extension[32];
+	static unsigned nextnum = 0;
+	snprintf(uniquenum_extension, sizeof(uniquenum_extension), "-%u%s",
+	         nextnum++, extension);
+	get_output_name(tmpname, sizeof(tmpname), basename, uniquenum_extension);
+	return make_temp_file(tmpname, final_name);
+}
+
 static bool close_input(compilation_unit_t *unit)
 {
 	assert(unit->input);
@@ -765,7 +777,6 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
                             lang_standard_t standard, FILE *out)
 {
 	int  result = EXIT_SUCCESS;
-	char tmpname[128];  /* used to change input filename extension */
 
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		const char *const inputname = unit->name ?
@@ -874,8 +885,7 @@ again:
 			if (mode == MODE_COMPILE) {
 				asm_out = out;
 			} else {
-				get_output_name(tmpname, sizeof(tmpname), inputname, ".s");
-				asm_out = make_temp_file(tmpname, &unit->name);
+				asm_out = open_temp_file(inputname, ".s", &unit->name);
 			}
 			ir_timer_t *t_opt_codegen = ir_timer_new();
 			timer_register(t_opt_codegen, "Optimization and Codegeneration");
@@ -902,9 +912,8 @@ again:
 				fclose(out);
 				unit->name = outname;
 			} else {
-				get_output_name(tmpname, sizeof(tmpname), inputname, ".o");
-				FILE *tempf = make_temp_file(tmpname, &unit->name);
-				/* hackish... */
+				FILE *tempf = open_temp_file(inputname, ".o", &unit->name);
+				/* racy/hackish... */
 				fclose(tempf);
 			}
 
