@@ -323,6 +323,8 @@ static void after_inline_opt(ir_graph *irg)
 	timer_stop(config->timer);
 
 	do_irg_opt(irg, "scalar-replace");
+	do_irg_opt(irg, "opt-load-store");
+	do_irg_opt(irg, "fp-vrp");
 	do_irg_opt(irg, "local");
 	do_irg_opt(irg, "control-flow");
 	do_irg_opt(irg, "combo");
