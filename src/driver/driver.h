@@ -56,7 +56,8 @@ typedef enum compilation_unit_type_t {
 	COMPILATION_UNIT_OBJECT,
 	COMPILATION_UNIT_IR,
 	COMPILATION_UNIT_DEPENDENCIES,
-	COMPILATION_UNIT_UNKNOWN
+	COMPILATION_UNIT_UNKNOWN,
+	COMPILATION_UNIT_LAST = COMPILATION_UNIT_UNKNOWN
 } compilation_unit_type_t;
 
 typedef struct compilation_unit_t compilation_unit_t;
@@ -65,11 +66,23 @@ struct compilation_unit_t {
 	FILE                   *input; /**< input (NULL if not opened yet) */
 	input_t                *input_decoder;
 	bool                    input_is_pipe;
+	const char             *original_name;
 	compilation_unit_type_t type;
 	lang_standard_t         standard;
 	translation_unit_t     *ast;
 	compilation_unit_t     *next;
 };
+
+typedef struct compilation_env_t {
+	FILE *out;
+	bool  continue_on_parse_errors;
+} compilation_env_t;
+
+typedef bool (*compilation_unit_handler)(compilation_env_t *,
+                                         compilation_unit_t*);
+
+void set_unit_handler(compilation_unit_type_t type,
+                      compilation_unit_handler handler, bool stop_after);
 
 extern compile_mode_t  mode;
 extern const char     *outname;

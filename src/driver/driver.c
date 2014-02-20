@@ -259,9 +259,97 @@ static void init_external_preprocessor(void)
 	}
 }
 
-static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
-                                      compile_mode_t mode)
+static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 {
+	lang_features_t features = 0;
+	if (!is_cpp) {
+		switch (standard) {
+		case STANDARD_C89:     features = _C89;                       break;
+							   /* TODO determine difference between these two */
+		case STANDARD_C89AMD1: features = _C89;                       break;
+		case STANDARD_C99:     features = _C89 | _C99;                break;
+		case STANDARD_C11:     features = _C89 | _C99 | _C11;         break;
+		case STANDARD_GNU89:   features = _C89 |               _GNUC; break;
+		case STANDARD_GNU11:   features = _C89 | _C99 | _C11 | _GNUC; break;
+
+		case STANDARD_ANSI:
+		case STANDARD_CXX98:
+		case STANDARD_GNUXX98:
+		case STANDARD_DEFAULT:
+			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
+			/* FALLTHROUGH */
+		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
+		default:
+			panic("invalid standard");
+		}
+	} else {
+		switch (standard) {
+		case STANDARD_CXX98: features = _CXX; break;
+
+		case STANDARD_ANSI:
+		case STANDARD_C89:
+		case STANDARD_C89AMD1:
+		case STANDARD_C99:
+		case STANDARD_C11:
+		case STANDARD_GNU89:
+		case STANDARD_GNU99:
+		case STANDARD_GNU11:
+		case STANDARD_DEFAULT:
+			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
+			/* FALLTHROUGH */
+		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
+		default:
+			panic("invalid standard");
+		}
+	}
+
+	features |= features_on;
+	features &= ~features_off;
+	dialect.features = features;
+
+	dialect.c89 = dialect.c99 = dialect.c11
+	    = dialect.gnu = dialect.ms = dialect.cpp = false;
+	if (features & _C11)
+	    dialect.c89 = dialect.c99 = dialect.c11 = true;
+	if (features & _C99)
+	    dialect.c89 = dialect.c99 = true;
+	if (features & _C89)
+	    dialect.c89 = true;
+	if (features & _GNUC)
+	    dialect.gnu = true;
+	if (features & _MS)
+	    dialect.ms = true;
+	if (features & _CXX)
+	    dialect.c89 = dialect.cpp = true;
+
+	init_types_dialect();
+}
+
+static void init_c_dialect_for_unit(const compilation_unit_t *unit)
+{
+	compilation_unit_type_t type = unit->type;
+	bool                    is_cpp;
+	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C
+	 || type == COMPILATION_UNIT_LEXER_TOKENS_C) {
+		is_cpp = false;
+	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
+	        || type == COMPILATION_UNIT_CXX
+	        || type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
+		is_cpp = true;
+	} else if (type == COMPILATION_UNIT_ASSEMBLER
+	        || type == COMPILATION_UNIT_PREPROCESSED_ASSEMBLER
+	        || type == COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER) {
+		return;
+	} else {
+		panic("can't determine c mode from unit type");
+	}
+	init_c_dialect(is_cpp, unit->standard);
+}
+
+static bool run_external_preprocessor(compilation_env_t *env,
+                                      compilation_unit_t *unit)
+{
+	init_c_dialect_for_unit(unit);
 	init_external_preprocessor();
 
 	obstack_1grow(&cppflags_obst, '\0');
@@ -351,11 +439,11 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 	bool res            = true;
 	if (mode == MODE_GENERATE_DEPENDENCIES) {
 		unit->type = COMPILATION_UNIT_DEPENDENCIES;
-		copy_file(out, unit->input);
+		copy_file(env->out, unit->input);
 		res &= close_input(unit);
 	} else {
 		if (mode == MODE_PREPROCESS_ONLY) {
-			copy_file(out, unit->input);
+			copy_file(env->out, unit->input);
 			res &= close_input(unit);
 		}
 		switch (unit->type) {
@@ -377,7 +465,7 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 	return res;
 }
 
-static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
+static bool assemble(compilation_unit_t *unit, const char *o_name)
 {
 	if (asflags == NULL) {
 		obstack_1grow(&asflags_obst, '\0');
@@ -388,7 +476,7 @@ static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
 	if (asflags[0] != '\0')
 		obstack_printf(&asflags_obst, " %s", asflags);
 
-	obstack_printf(&asflags_obst, " %s -o %s", in, out);
+	obstack_printf(&asflags_obst, " %s -o %s", unit->name, o_name);
 	obstack_1grow(&asflags_obst, '\0');
 
 	char *commandline = obstack_finish(&asflags_obst);
@@ -397,12 +485,30 @@ static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "%s: error: assembler reported an error\n", in);
+		fprintf(stderr, "%s: error: assembler reported an error\n", unit->name);
 		return false;
 	}
 	obstack_free(&asflags_obst, commandline);
 	unit->type = COMPILATION_UNIT_OBJECT;
+	unit->name = o_name;
 	return true;
+}
+
+static bool assemble_final(compilation_env_t *env, compilation_unit_t *unit)
+{
+	fclose(env->out);
+	return assemble(unit, outname);
+}
+
+static bool assemble_intermediate(compilation_env_t *env,
+                                  compilation_unit_t *unit)
+{
+	(void)env;
+	const char *o_name;
+	FILE *tempf = open_temp_file(unit->name, ".o", &o_name);
+	/* racy/hackish... */
+	fclose(tempf);
+	return assemble(unit, o_name);
 }
 
 compilation_unit_type_t get_unit_type_from_string(const char *string)
@@ -419,89 +525,6 @@ compilation_unit_type_t get_unit_type_from_string(const char *string)
 		return COMPILATION_UNIT_AUTODETECT;
 
 	return COMPILATION_UNIT_UNKNOWN;
-}
-
-static void init_c_dialect(bool is_cpp, lang_standard_t standard)
-{
-	lang_features_t features = 0;
-	if (!is_cpp) {
-		switch (standard) {
-		case STANDARD_C89:     features = _C89;                       break;
-							   /* TODO determine difference between these two */
-		case STANDARD_C89AMD1: features = _C89;                       break;
-		case STANDARD_C99:     features = _C89 | _C99;                break;
-		case STANDARD_C11:     features = _C89 | _C99 | _C11;         break;
-		case STANDARD_GNU89:   features = _C89 |               _GNUC; break;
-		case STANDARD_GNU11:   features = _C89 | _C99 | _C11 | _GNUC; break;
-
-		case STANDARD_ANSI:
-		case STANDARD_CXX98:
-		case STANDARD_GNUXX98:
-		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
-			/* FALLTHROUGH */
-		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
-		default:
-			panic("invalid standard");
-		}
-	} else {
-		switch (standard) {
-		case STANDARD_CXX98: features = _CXX; break;
-
-		case STANDARD_ANSI:
-		case STANDARD_C89:
-		case STANDARD_C89AMD1:
-		case STANDARD_C99:
-		case STANDARD_C11:
-		case STANDARD_GNU89:
-		case STANDARD_GNU99:
-		case STANDARD_GNU11:
-		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
-			/* FALLTHROUGH */
-		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
-		default:
-			panic("invalid standard");
-		}
-	}
-
-	features |= features_on;
-	features &= ~features_off;
-	dialect.features = features;
-
-	dialect.c89 = dialect.c99 = dialect.c11
-	    = dialect.gnu = dialect.ms = dialect.cpp = false;
-	if (features & _C11)
-	    dialect.c89 = dialect.c99 = dialect.c11 = true;
-	if (features & _C99)
-	    dialect.c89 = dialect.c99 = true;
-	if (features & _C89)
-	    dialect.c89 = true;
-	if (features & _GNUC)
-	    dialect.gnu = true;
-	if (features & _MS)
-	    dialect.ms = true;
-	if (features & _CXX)
-	    dialect.c89 = dialect.cpp = true;
-
-	init_types_dialect();
-}
-
-static void init_c_dialect_for_unit(const compilation_unit_t *unit)
-{
-	compilation_unit_type_t type = unit->type;
-	bool                    is_cpp;
-	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C
-	 || type == COMPILATION_UNIT_LEXER_TOKENS_C) {
-		is_cpp = false;
-	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
-	        || type == COMPILATION_UNIT_CXX
-	        || type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-		is_cpp = true;
-	} else {
-		panic("can't determine c mode from unit type");
-	}
-	init_c_dialect(is_cpp, unit->standard);
 }
 
 static void determine_unit_standard(compilation_unit_t *unit,
@@ -601,12 +624,20 @@ static void append_environment_include_paths(void)
 	                 dialect.cpp ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
 }
 
-static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
-                                compile_mode_t mode)
+static bool start_preprocessing(compilation_env_t *env,
+                                compilation_unit_t *unit)
 {
+	if (mode == MODE_GENERATE_DEPENDENCIES) {
+		position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos,
+		       "builtin preprocessor does not support dependency generation");
+		return false;
+	}
+
 	if (!open_input(unit))
 		return false;
 
+	init_c_dialect_for_unit(unit);
 	if (!driver_no_stdinc)
 		append_standard_include_paths();
 	append_environment_include_paths();
@@ -616,6 +647,7 @@ static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
 
 	add_predefined_macros();
 	if (mode == MODE_PREPROCESS_ONLY) {
+		FILE *out = env->out;
 		set_preprocessor_output(out);
 		/* just here for gcc compatibility */
 		fprintf(out, "# 1 \"%s\"\n", unit->name);
@@ -669,7 +701,8 @@ static void print_error_summary(void)
 	}
 }
 
-static bool print_preprocessing_tokens(compilation_unit_t *unit, FILE *out)
+static bool print_preprocessing_tokens(compilation_env_t *env,
+                                       compilation_unit_t *unit)
 {
 	for (;;) {
 		next_preprocessing_token();
@@ -678,27 +711,20 @@ static bool print_preprocessing_tokens(compilation_unit_t *unit, FILE *out)
 		emit_pp_token();
 	}
 
-	fputc('\n', out);
+	fputc('\n', env->out);
 	check_unclosed_conditionals();
 	bool res = finish_preprocessing(unit);
 	print_error_summary();
-
-	if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-	} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-	} else {
-		assert(unit->type == COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER);
-		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-	}
 	return res;
 }
 
-static bool do_parsing(compilation_unit_t *unit, compile_mode_t mode)
+static bool do_parsing(compilation_env_t *env, compilation_unit_t *unit)
 {
 	ir_timer_t *t_parsing = ir_timer_new();
 	timer_register(t_parsing, "Frontend: Parsing");
 	timer_start(t_parsing);
+
+	init_c_dialect_for_unit(unit);
 
 	start_parsing();
 
@@ -708,13 +734,13 @@ static bool do_parsing(compilation_unit_t *unit, compile_mode_t mode)
 	bool res = finish_preprocessing(unit);
 	print_error_summary();
 
-	unit->type         = COMPILATION_UNIT_AST;
+	unit->type = COMPILATION_UNIT_AST;
 	timer_stop(t_parsing);
 	if (stat_ev_enabled) {
 		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
 	}
 
-	return (res && error_count == 0) || mode == MODE_PRINT_AST;
+	return (res && error_count == 0) || env->continue_on_parse_errors;
 }
 
 static void node_counter(ir_node *node, void *env)
@@ -738,8 +764,9 @@ static unsigned long long count_firm_nodes(void)
 
 static bool already_constructed_firm = false;
 
-static bool build_firm_ir(compilation_unit_t *unit)
+static bool build_firm_ir(compilation_env_t *env, compilation_unit_t *unit)
 {
+	(void)env;
 	ir_timer_t *t_construct = ir_timer_new();
 	timer_register(t_construct, "Frontend: Graph construction");
 	timer_start(t_construct);
@@ -759,8 +786,9 @@ static bool build_firm_ir(compilation_unit_t *unit)
 	return true;
 }
 
-static bool read_ir_file(compilation_unit_t *unit)
+static bool read_ir_file(compilation_env_t *env, compilation_unit_t *unit)
 {
+	(void)env;
 	if (!open_input(unit))
 		return false;
 	if (ir_import_file(unit->input, unit->name)) {
@@ -773,166 +801,182 @@ static bool read_ir_file(compilation_unit_t *unit)
 	return true;
 }
 
-static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
-                            lang_standard_t standard, FILE *out)
+static bool do_print_ast(compilation_env_t *env, compilation_unit_t *unit)
 {
-	int  result = EXIT_SUCCESS;
+	print_to_file(env->out);
+	print_ast(unit->ast);
+	return error_count == 0;
+}
 
-	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
-		const char *const inputname = unit->name ?
-			unit->name : "stdin.c";
+static bool do_nothing(compilation_env_t *env, compilation_unit_t *unit)
+{
+	(void)env;
+	(void)unit;
+	return true;
+}
 
-		determine_unit_standard(unit, standard);
+static bool print_fluffy(compilation_env_t *env, compilation_unit_t *unit)
+{
+	write_fluffy_decls(env->out, unit->ast);
+	return true;
+}
 
-		stat_ev_ctx_push_str("compilation_unit", inputname);
+static bool print_jna(compilation_env_t *env, compilation_unit_t *unit)
+{
+	write_jna_decls(env->out, unit->ast);
+	return true;
+}
 
-again:
-		switch (unit->type) {
-		case COMPILATION_UNIT_IR:
-			if (!read_ir_file(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
+static bool print_compound_size(compilation_env_t *env,
+                                compilation_unit_t *unit)
+{
+	write_compoundsizes(env->out, unit->ast);
+	return true;
+}
 
-		case COMPILATION_UNIT_C:
-		case COMPILATION_UNIT_CXX:
-			init_c_dialect_for_unit(unit);
-			/* FALLTHROUGH */
-		case COMPILATION_UNIT_ASSEMBLER:
-			if (driver_use_integrated_preprocessor == -1) {
-				/* don't use the integrated preprocessor when crosscompiling
-				 * since we probably don't have the correct location of the
-				 * system headers compiled in. */
-				driver_use_integrated_preprocessor = target.triple == NULL;
-			}
-			bool (*preproc)(compilation_unit_t*, FILE*, compile_mode_t)
-				= driver_use_integrated_preprocessor
-				? start_preprocessing : run_external_preprocessor;
-			if (!preproc(unit, out, mode)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
+static bool do_generate_code(FILE *asm_out, compilation_unit_t *unit)
+{
+	ir_timer_t *t_opt_codegen = ir_timer_new();
+	timer_register(t_opt_codegen, "Optimization and Codegeneration");
+	timer_start(t_opt_codegen);
+	generate_code(asm_out, unit->original_name);
+	timer_stop(t_opt_codegen);
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_opt_codegen", ir_timer_elapsed_sec(t_opt_codegen));
+	}
+	unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+	return true;
+}
 
-		case COMPILATION_UNIT_LEXER_TOKENS_C:
-		case COMPILATION_UNIT_LEXER_TOKENS_CXX:
-			init_c_dialect_for_unit(unit);
-			/* FALLTHROUGH */
-		case COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER:
-			if (mode == MODE_PREPROCESS_ONLY) {
-				if (!print_preprocessing_tokens(unit, out)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-			} else if (mode == MODE_GENERATE_DEPENDENCIES) {
-				position_t const pos = { inputname, 0, 0, 0 };
-				errorf(&pos, "builtin preprocessor does not support dependency generation");
-				result = EXIT_FAILURE;
-				break;
-			} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C
-			        || unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
-				if (!do_parsing(unit, mode)) {
-					result = EXIT_FAILURE;
-					break;
-				}
-			}
-			goto again;
+static bool generate_code_final(compilation_env_t *env,
+                                compilation_unit_t *unit)
+{
+	return do_generate_code(env->out, unit);
+}
 
-		case COMPILATION_UNIT_PREPROCESSED_C:
-		case COMPILATION_UNIT_PREPROCESSED_CXX:
-			init_c_dialect_for_unit(unit);
-			if (mode == MODE_PREPROCESS_ONLY)
-				break;
-			if (!start_preprocessing(unit, out, mode)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
+static bool generate_code_intermediate(compilation_env_t *env,
+                                       compilation_unit_t *unit)
+{
+	(void)env;
+	const char *s_name;
+	FILE *asm_out = open_temp_file(unit->name, ".s", &s_name);
+	bool result = do_generate_code(asm_out, unit);
+	unit->name = s_name;
+	fclose(asm_out);
+	return result;
+}
 
-		case COMPILATION_UNIT_AST:
-			if (mode == MODE_PRINT_AST) {
-				print_to_file(out);
-				print_ast(unit->ast);
-				if (error_count > 0)
-					result = EXIT_FAILURE;
-				break;
-			} else if (mode == MODE_BENCHMARK_PARSER) {
-				break;
-			} else if (mode == MODE_PRINT_FLUFFY) {
-				write_fluffy_decls(out, unit->ast);
-				break;
-			} else if (mode == MODE_PRINT_JNA) {
-				write_jna_decls(out, unit->ast);
-				break;
-			} else if (mode == MODE_PRINT_COMPOUND_SIZE) {
-				write_compoundsizes(out, unit->ast);
-				break;
-			}
+static compilation_unit_handler handlers[COMPILATION_UNIT_LAST+1];
+static bool                     stop_after[COMPILATION_UNIT_LAST+1];
 
-			if (!build_firm_ir(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
+void set_unit_handler(compilation_unit_type_t type,
+                      compilation_unit_handler handler, bool stop_after_val)
+{
+	assert(type <= COMPILATION_UNIT_LAST);
+	handlers[type] = handler;
+	stop_after[type] = stop_after_val;
+}
 
-		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
-			if (mode == MODE_PARSE_ONLY || mode == MODE_COMPILE_DUMP
-			 || mode == MODE_COMPILE_EXPORTIR)
-				break;
+static void setup_default_handlers(compilation_env_t *env)
+{
+	if (driver_use_integrated_preprocessor == -1) {
+		/* don't use the integrated preprocessor when crosscompiling
+		 * since we probably don't have the correct location of the
+		 * system headers compiled in. */
+		driver_use_integrated_preprocessor = target.triple == NULL;
+	}
+	compilation_unit_handler preprocessor
+		= driver_use_integrated_preprocessor
+		? start_preprocessing : run_external_preprocessor;
 
-			FILE *asm_out;
-			if (mode == MODE_COMPILE) {
-				asm_out = out;
-			} else {
-				asm_out = open_temp_file(inputname, ".s", &unit->name);
-			}
-			ir_timer_t *t_opt_codegen = ir_timer_new();
-			timer_register(t_opt_codegen, "Optimization and Codegeneration");
-			timer_start(t_opt_codegen);
-			generate_code(asm_out, inputname);
-			timer_stop(t_opt_codegen);
-			if (stat_ev_enabled) {
-				stat_ev_dbl("time_opt_codegen", ir_timer_elapsed_sec(t_opt_codegen));
-			}
-			if (asm_out != out) {
-				fclose(asm_out);
-			}
-			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-			goto again;
+	set_unit_handler(COMPILATION_UNIT_OBJECT,  do_nothing, true);
+	set_unit_handler(COMPILATION_UNIT_UNKNOWN, do_nothing, true);
 
-		case COMPILATION_UNIT_PREPROCESSED_ASSEMBLER:
-			if (mode != MODE_COMPILE_ASSEMBLE
-			 && mode != MODE_COMPILE_ASSEMBLE_LINK)
-				break;
+	set_unit_handler(COMPILATION_UNIT_IR,        read_ir_file, false);
+	set_unit_handler(COMPILATION_UNIT_C,         preprocessor, false);
+	set_unit_handler(COMPILATION_UNIT_CXX,       preprocessor, false);
+	set_unit_handler(COMPILATION_UNIT_ASSEMBLER, preprocessor, false);
 
-			/* assemble */
-			const char *input = unit->name;
-			if (mode == MODE_COMPILE_ASSEMBLE) {
-				fclose(out);
-				unit->name = outname;
-			} else {
-				FILE *tempf = open_temp_file(inputname, ".o", &unit->name);
-				/* racy/hackish... */
-				fclose(tempf);
-			}
+	set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_C,   do_parsing, false);
+	set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_CXX, do_parsing, false);
+	set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
+	                 do_parsing, false);
 
-			if (!assemble(unit, unit->name, input)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			goto again;
+	set_unit_handler(COMPILATION_UNIT_PREPROCESSED_C,
+	                 start_preprocessing, false);
+	set_unit_handler(COMPILATION_UNIT_PREPROCESSED_CXX,
+	                 start_preprocessing, false);
+	set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, false);
+	set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+	                 generate_code_intermediate, false);
+	set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
+	                 assemble_intermediate, false);
 
-		case COMPILATION_UNIT_DEPENDENCIES:
-		case COMPILATION_UNIT_UNKNOWN:
-		case COMPILATION_UNIT_AUTODETECT:
-		case COMPILATION_UNIT_OBJECT:
+	switch (mode) {
+	case MODE_COMPILE_ASSEMBLE_LINK:
+		break;
+	case MODE_PREPROCESS_ONLY:
+		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_C,
+		                 print_preprocessing_tokens, true);
+		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_CXX,
+		                 print_preprocessing_tokens, true);
+		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
+		                 print_preprocessing_tokens, true);
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_C,   do_nothing, true);
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_CXX, do_nothing, true);
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER, do_nothing,
+		                 true);
+		return;
+	case MODE_PRINT_AST:
+		env->continue_on_parse_errors = true;
+		set_unit_handler(COMPILATION_UNIT_AST, do_print_ast, true);
+		return;
+	case MODE_BENCHMARK_PARSER:
+		set_unit_handler(COMPILATION_UNIT_AST, do_nothing, true);
+		return;
+	case MODE_PRINT_FLUFFY:
+		set_unit_handler(COMPILATION_UNIT_AST, print_fluffy, true);
+		return;
+	case MODE_PRINT_JNA:
+		set_unit_handler(COMPILATION_UNIT_AST, print_jna, true);
+		return;
+	case MODE_PRINT_COMPOUND_SIZE:
+		set_unit_handler(COMPILATION_UNIT_AST, print_compound_size, true);
+		return;
+	case MODE_PARSE_ONLY:
+	case MODE_COMPILE_DUMP:
+	case MODE_COMPILE_EXPORTIR:
+		set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, true);
+	    return;
+	case MODE_COMPILE:
+		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+		                  generate_code_final, true);
+		return;
+	case MODE_COMPILE_ASSEMBLE:
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
+		                 assemble_final, true);
+		return;
+	case MODE_GENERATE_DEPENDENCIES:
+		/* TODO */
+		return;
+	}
+}
+
+static bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
+{
+	for(;;) {
+		compilation_unit_handler handler = handlers[unit->type];
+		if (handler == NULL) {
+			errorf(NULL, "Incomplete handler chain on '%s'\n", unit->name);
 			break;
 		}
-
-		stat_ev_ctx_pop("compilation_unit");
+		bool should_stop = stop_after[unit->type];
+		if (!handler(env, unit))
+			return false;
+		if (should_stop)
+			break;
 	}
-	return result;
+	return true;
 }
 
 static int link_program(compilation_unit_t *units)
@@ -941,6 +985,7 @@ static int link_program(compilation_unit_t *units)
 	const char *flags = obstack_finish(&ldflags_obst);
 
 	/* construct commandline */
+	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s ", driver_linker);
 
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
@@ -999,9 +1044,6 @@ static compilation_unit_type_t autodetect_input(const char *filename)
 
 void driver_add_input(const char *filename, compilation_unit_type_t type)
 {
-	if (type == COMPILATION_UNIT_AUTODETECT)
-		type = autodetect_input(filename);
-
 	compilation_unit_t *entry = OALLOCZ(&file_obst, compilation_unit_t);
 	entry->name = filename;
 	entry->type = type;
@@ -1123,7 +1165,32 @@ int action_compile(const char *argv0)
 		}
 	}
 
-	int result = compilation_loop(mode, units, standard, out);
+	/* prepare compilation units: detect filetype where necessart and
+	 * determine language standard used. */
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
+		if (unit->type == COMPILATION_UNIT_AUTODETECT)
+			unit->type = autodetect_input(unit->name);
+
+		determine_unit_standard(unit, standard);
+		unit->original_name = unit->name;
+	}
+
+	compilation_env_t env;
+	memset(&env, 0, sizeof(env));
+	env.out = out;
+	setup_default_handlers(&env);
+
+	/* process compilation units */
+	int result = EXIT_SUCCESS;
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
+		stat_ev_ctx_push_str("compilation_unit", unit->name);
+		bool ok = process_unit(&env, unit);
+		stat_ev_ctx_pop("compilation_unit");
+		if (!ok) {
+			result = EXIT_FAILURE;
+			break;
+		}
+	}
 	if (stat_ev_enabled) {
 		stat_ev_end();
 	}
