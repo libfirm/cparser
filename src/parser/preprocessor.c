@@ -4117,8 +4117,10 @@ static void input_error(unsigned const delta_lines, unsigned const delta_cols, c
 	warningf(WARN_INVALID_BYTE_SEQUENCE, &pos, "%s", message);
 }
 
-void preprocessor_early_init(void)
+void init_preprocessor(void)
 {
+	init_symbol_table();
+	init_tokens();
 	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
 	init_symbols();
@@ -4129,7 +4131,7 @@ void preprocessor_early_init(void)
 	init_dynamic_macros();
 }
 
-void init_preprocessor(void)
+void setup_preprocessor(void)
 {
 	obstack_init(&input_obstack);
 	expansion_stack  = NEW_ARR_F(pp_expansion_state_t, 0);
@@ -4155,4 +4157,6 @@ void exit_preprocessor(void)
 	obstack_free(&input_obstack, NULL);
 	obstack_free(&pp_obstack, NULL);
 	obstack_free(&config_obstack, NULL);
+	exit_tokens();
+	exit_symbol_table();
 }

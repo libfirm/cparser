@@ -27,12 +27,13 @@
 #include "adt/error.h"
 #include "adt/separator_t.h"
 #include "adt/util.h"
-#include "ast/constfold.h"
-#include "ast/printer.h"
-#include "ast/symbol_t.h"
-#include "ast/type_t.h"
-#include "ast/types.h"
+#include "constfold.h"
 #include "driver/lang_features.h"
+#include "printer.h"
+#include "symbol_t.h"
+#include "type_hash.h"
+#include "type_t.h"
+#include "types.h"
 
 struct obstack ast_obstack;
 
@@ -2011,9 +2012,14 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 void init_ast(void)
 {
 	obstack_init(&ast_obstack);
+	init_typehash();
+	init_basic_types();
+	init_constfold();
 }
 
 void exit_ast(void)
 {
+	exit_typehash();
+	exit_types();
 	obstack_free(&ast_obstack, NULL);
 }

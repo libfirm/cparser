@@ -112,10 +112,10 @@ void init_temp_files(void)
 
 	tempsubdir = NULL;
 	temp_files = NEW_ARR_F(char*, 0);
-	atexit(free_temp_files);
+	atexit(exit_temp_files);
 }
 
-void free_temp_files(void)
+void exit_temp_files(void)
 {
 	if (temp_files == NULL)
 		return;

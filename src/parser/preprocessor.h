@@ -12,8 +12,8 @@
 /** initialize just enough so we can use add_define(),add_define_string(),
  * undefine(), append_include_path(), append_env_paths() for commandline
  * parsing */
-void preprocessor_early_init(void);
 void init_preprocessor(void);
+void setup_preprocessor(void);
 
 void exit_preprocessor(void);
 

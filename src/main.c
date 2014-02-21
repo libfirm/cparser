@@ -2,43 +2,25 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "driver/enable_posix.h"
-
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "adt/array.h"
-#include "adt/error.h"
 #include "adt/strutil.h"
-#include "adt/util.h"
-#include "ast/ast_t.h"
-#include "ast/constfold.h"
-#include "ast/constfoldbits.h"
-#include "ast/printer.h"
-#include "ast/symbol_table.h"
-#include "ast/type_hash.h"
-#include "ast/type_t.h"
-#include "ast/types.h"
+#include "ast/ast.h"
 #include "driver/c_driver.h"
 #include "driver/diagnostic.h"
 #include "driver/driver.h"
 #include "driver/driver_t.h"
 #include "driver/help.h"
-#include "driver/lang_features.h"
-#include "driver/machine_triple.h"
 #include "driver/options.h"
-#include "driver/predefs.h"
 #include "driver/target.h"
 #include "driver/tempfile.h"
-#include "driver/version.h"
-#include "driver/warning.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
 #include "firm/firm_timing.h"
-#include "firm/mangle.h"
 #include "parser/parser.h"
 #include "parser/preprocessor.h"
 #include "wrappergen/write_compoundsizes.h"
@@ -238,14 +220,10 @@ int action_compile(const char *argv0)
 int main(int argc, char **argv)
 {
 	init_temp_files();
-	init_symbol_table();
-	init_tokens();
 	init_driver();
 	init_default_driver();
-	preprocessor_early_init();
-
-	/* initialize this early because it has to parse options */
-	gen_firm_init();
+	init_preprocessor();
+	init_gen_firm(); /* initialize early because we need to parse options */
 
 	options_state_t state;
 	memset(&state, 0, sizeof(state));
@@ -280,30 +258,19 @@ int main(int argc, char **argv)
 
 	if (!target_setup())
 		return EXIT_FAILURE;
-	init_typehash();
-	init_basic_types();
 	init_ast();
-	init_constfold();
 	init_parser();
-	init_ast2firm();
-	init_mangle();
 
 	assert(state.action != NULL);
 	int ret = state.action(argv[0]);
 
-	free_temp_files();
-
-	gen_firm_finish();
-	exit_mangle();
+	exit_gen_firm();
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();
 	exit_preprocessor();
-	exit_typehash();
-	exit_types();
-	exit_tokens();
-	exit_symbol_table();
 	exit_driver();
 	exit_default_driver();
+	exit_temp_files();
 	return ret;
 }

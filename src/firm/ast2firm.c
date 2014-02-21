@@ -5261,8 +5261,13 @@ static void scope_to_firm(scope_t *scope)
 	}
 }
 
-void init_ast2firm(void)
+static bool ast2firm_initialized = false;
+
+static void init_ast2firm(void)
 {
+	if (ast2firm_initialized)
+		return;
+	ast2firm_initialized = true;
 	obstack_init(&asm_obst);
 
 	ir_set_debug_retrieve(dbg_retrieve);
@@ -5274,10 +5279,14 @@ void init_ast2firm(void)
 	}
 
 	entitymap_init(&entitymap);
+	init_mangle();
 }
 
 void exit_ast2firm(void)
 {
+	if (!ast2firm_initialized)
+		return;
+	exit_mangle();
 	entitymap_destroy(&entitymap);
 	obstack_free(&asm_obst, NULL);
 }
@@ -5305,6 +5314,7 @@ static const char *get_cwd(void)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	init_ast2firm();
 	if (dialect.cpp) {
 		be_dwarf_set_source_language(DW_LANG_C_plus_plus);
 	} else if (dialect.c99) {

@@ -98,10 +98,10 @@ enum rts_names {
 extern ir_entity *rts_entities[rts_max];
 
 /** Initialize for the Firm-generating back end. */
-void gen_firm_init(void);
+void init_gen_firm(void);
 
 /** free resources hold by firm-generating back end */
-void gen_firm_finish(void);
+void exit_gen_firm(void);
 
 /**
  * Transform, optimize and generate code

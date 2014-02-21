@@ -66,12 +66,13 @@ typedef union  statement_t                           statement_t;
 typedef struct translation_unit_t                    translation_unit_t;
 
 /**
- * Initialize the AST construction.
+ * Initializes datastructures supporting the AST. You have to call this after
+ * setting up target information.
  */
 void init_ast(void);
 
 /**
- * Free the AST.
+ * Frees datastructures supporting the AST.
  */
 void exit_ast(void);
 

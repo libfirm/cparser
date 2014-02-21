@@ -12,7 +12,6 @@
 
 void translation_unit_to_firm(translation_unit_t *unit);
 
-void init_ast2firm(void);
 void exit_ast2firm(void);
 
 typedef ident* (*create_ld_ident_func)(entity_t *entity);

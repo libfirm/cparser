@@ -515,7 +515,7 @@ static bool start_preprocessing(compilation_env_t *env,
 	if (!driver_no_stdinc)
 		append_standard_include_paths();
 	append_environment_include_paths();
-	init_preprocessor();
+	setup_preprocessor();
 	if (driver_verbose)
 		print_include_paths();
 

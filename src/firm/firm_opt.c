@@ -720,10 +720,7 @@ static void do_firm_lowering(const char *input_filename)
 	}
 }
 
-/**
- * Initialize for the Firm-generating back end.
- */
-void gen_firm_init(void)
+void init_gen_firm(void)
 {
 	ir_init();
 	enable_safe_defaults();
@@ -801,7 +798,7 @@ void generate_code(FILE *out, const char *input_filename)
 		stat_dump_snapshot(input_filename, "final");
 }
 
-void gen_firm_finish(void)
+void exit_gen_firm(void)
 {
 	ir_finish();
 }
