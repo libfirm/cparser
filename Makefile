@@ -11,6 +11,8 @@ variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverag
 srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
 
+AR ?= ar
+
 CPPFLAGS  = -I$(top_srcdir)/src -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
@@ -25,7 +27,7 @@ LINKFLAGS_profile  = -pg
 LINKFLAGS_coverage = --coverage
 LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
-cparser_SOURCES = \
+libcparser_SOURCES = \
 	adt/pset_new.c \
 	adt/strset.c \
 	adt/strutil.c \
@@ -57,7 +59,6 @@ cparser_SOURCES = \
 	firm/firm_timing.c \
 	firm/jump_target.c \
 	firm/mangle.c \
-	main.c \
 	parser/builtins.c \
 	parser/format_check.c \
 	parser/input.c \
@@ -67,32 +68,35 @@ cparser_SOURCES = \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c \
 	wrappergen/write_compoundsizes.c
+libcparser_OBJECTS = $(libcparser_SOURCES:%.c=$(builddir)/%.o)
+libcparser_DEPS    = $(libcparser_OBJECTS:%.o=%.d)
+libcparser_A       = $(builddir)/libcparser.a
+
+cparser_SOURCES = main.c
 cparser_OBJECTS = $(cparser_SOURCES:%.c=$(builddir)/%.o)
 cparser_DEPS    = $(cparser_OBJECTS:%.o=%.d)
+cparser_EXE     = $(builddir)/cparser
 
-SPLINTS = $(addsuffix .splint, $(cparser_SOURCES))
-CPARSERS = $(addsuffix .cparser, $(cparser_SOURCES))
-CPARSEROS = $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
-CPARSEROS_E = $(cparser_SOURCES:%.c=$(builddir)/cpbe/%.o)
-CPARSEROS2 = $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
+CPARSERS = $(addsuffix .check, $(cparser_SOURCES) $(libcparser_SOURCES))
+CPARSEROS = $(libcparser_SOURCES:%.c=$(builddir)/cpb/%.o) $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
+CPARSEROS2 = $(libcparser_SOURCES:%.c=$(builddir)/cpb2/%.o) $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
 
 # This hides the noisy commandline outputs. Show them with "make V=1"
 ifneq ($(V),1)
 Q ?= @
 endif
 
-GOAL = $(builddir)/cparser
-all: $(GOAL)
+all: $(cparser_EXE)
 
 # disable make builtin suffix rules
 .SUFFIXES:
 
 -include $(cparser_DEPS)
 
-.PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint libfirm_subdir
+.PHONY: all bootstrap bootstrap2 clean check libfirm_subdir
 
-DIRS   := $(sort $(dir $(cparser_OBJECTS)))
-UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
+DIRS   := $(sort $(dir $(cparser_OBJECTS) $(libcparser_OBJECTS)))
+UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%))
 
 REVISIONH = $(builddir)/revision.h
 REVISION ?= $(shell git --git-dir $(top_srcdir)/.git describe --abbrev=40 --always --dirty --match '')
@@ -107,9 +111,13 @@ QUICKCHECK_DEFAULT := $(shell which cparser-beta || echo true) -fsyntax-only
 QUICKCHECK ?= $(QUICKCHECK_DEFAULT)
 QUICKCHECK_FLAGS ?= -Wno-shadow
 
-$(GOAL): $(LIBFIRM_FILE) $(cparser_OBJECTS)
-	@echo "===> LD $@"
-	$(Q)$(CC) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LINKFLAGS)
+$(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS) $(libcparser_A)
+	@echo 'LD $@'
+	$(Q)$(CC) $(cparser_OBJECTS) $(libcparser_A) $(LIBFIRM_FILE) -o $@ $(LINKFLAGS)
+
+$(libcparser_A): $(libcparser_OBJECTS)
+	@echo 'AR $@'
+	$(Q)$(AR) -crsu $@ $^
 
 ifneq ("$(LIBFIRM_FILE)", "")
 ifneq ("$(MAKECMDGOALS)", "clean")
@@ -122,53 +130,37 @@ libfirm_subdir:
 endif
 endif
 
-splint: $(SPLINTS)
-
-selfcheck: $(CPARSERS)
+check: $(CPARSERS)
 
 bootstrap: cparser.bootstrap
 
-bootstrape: cparser.bootstrape
-
 bootstrap2: cparser.bootstrap2
 
-%.c.splint: %.c
-	@echo '===> SPLINT $<'
-	$(Q)splint $(CPPFLAGS) $<
+%.c.check: %.c $(cparser_EXE)
+	@echo 'CHECK $<'
+	$(Q)$(cparser_EXE) $(CPPFLAGS) -Wall -Wno-shadow -fsyntax-only $<
 
-%.c.cparser: %.c $(GOAL)
-	@echo '===> CPARSER $<'
-	$(Q)$(GOAL) $(CPPFLAGS) -fsyntax-only $<
-
-$(builddir)/cpb/%.o: %.c $(builddir)/cparser
-	@echo '===> CPARSER $<'
-	$(Q)./$(builddir)/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
-
-$(builddir)/cpbe/%.o: %.c
-	@echo '===> ECCP $@'
-	$(Q)eccp $(CPPFLAGS) -std=c99 -Wall -c $< -o $@
+$(builddir)/cpb/%.o: %.c $(cparser_EXE)
+	@echo 'CPARSER $<'
+	$(Q)$(cparser_EXE) -m32 $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
 
 $(builddir)/cpb2/%.o: %.c cparser.bootstrap
-	@echo '===> CPARSER.BOOTSTRAP $<'
-	$(Q)./cparser.bootstrap $(CPPFLAGS) -Wall -g -c $< -o $@
+	@echo 'CPARSER.BOOTSTRAP $<'
+	$(Q)./cparser.bootstrap -m32 $(CPPFLAGS) -Wall -g -c $< -o $@
 
 cparser.bootstrap: $(CPARSEROS)
-	@echo "===> LD $@"
-	$(Q)./$(builddir)/cparser $(CPARSEROS) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
-
-cparser.bootstrape: $(CPARSEROS_E)
-	@echo "===> LD $@"
-	$(Q)gcc $(CPARSEROS_E) $(LINKFLAGS) -o $@
+	@echo 'LD $@'
+	$(Q)$(cparser_EXE) -m32 $(CPARSEROS) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
 
 cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
-	@echo "===> LD $@"
-	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
+	@echo 'LD $@'
+	$(Q)./cparser.bootstrap -m32 $(CPARSEROS2) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
 
 $(builddir)/%.o: %.c
-	@echo '===> CC $@'
+	@echo 'CC $@'
 	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(QUICKCHECK_FLAGS) $<
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
 
 clean:
-	@echo '===> CLEAN'
+	@echo 'CLEAN'
 	$(Q)rm -rf $(builddir)
