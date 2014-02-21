@@ -28,15 +28,17 @@
 #include "wrappergen/write_jna.h"
 
 typedef enum compile_mode_t {
-	MODE_BENCHMARK_PARSER,
-	MODE_PREPROCESS_ONLY,
+	/* note the following is ordered according to gcc option precedence */
 	MODE_GENERATE_DEPENDENCIES,
+	MODE_PREPROCESS_ONLY,
 	MODE_PARSE_ONLY,
 	MODE_COMPILE,
+	MODE_COMPILE_ASSEMBLE,
+
+	MODE_COMPILE_ASSEMBLE_LINK,
 	MODE_COMPILE_DUMP,
 	MODE_COMPILE_EXPORTIR,
-	MODE_COMPILE_ASSEMBLE,
-	MODE_COMPILE_ASSEMBLE_LINK,
+	MODE_BENCHMARK_PARSER,
 	MODE_PRINT_AST,
 	MODE_PRINT_FLUFFY,
 	MODE_PRINT_JNA,
@@ -68,6 +70,17 @@ static bool parse_ignore_errors(compilation_env_t *env,
 {
 	do_parsing(env, unit); /* ignore return value */
 	return true;
+}
+
+static void set_mode_gcc_prec(compile_mode_t new_mode, const char *arg)
+{
+	/* in gcc the compilation modes appear to have a precedence */
+	if (new_mode < mode) {
+		mode = new_mode;
+	} else {
+		warningf(WARN_COMPAT_OPTION, NULL,
+		         "ignoring option '%s' because of gcc precedence", arg);
+	}
 }
 
 /** modify compilation sequence based on choosen compilation mode */
@@ -146,14 +159,14 @@ static bool parse_compile_mode_options(options_state_t *s)
 
 	const char *arg;
 	if (streq(option, "M") || streq(option, "MM")) {
-		mode = MODE_GENERATE_DEPENDENCIES;
+		set_mode_gcc_prec(MODE_GENERATE_DEPENDENCIES, full_option);
 		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if (streq(option, "c")) {
-		mode = MODE_COMPILE_ASSEMBLE;
+		set_mode_gcc_prec(MODE_COMPILE_ASSEMBLE, full_option);
 	} else if (streq(option, "E")) {
-		mode = MODE_PREPROCESS_ONLY;
+		set_mode_gcc_prec(MODE_PREPROCESS_ONLY, full_option);
 	} else if (streq(option, "S")) {
-		mode = MODE_COMPILE;
+		set_mode_gcc_prec(MODE_COMPILE, full_option);
 	} else if (streq(option, "-benchmark")) {
 		mode = MODE_BENCHMARK_PARSER;
 	} else if (streq(option, "-print-ast")) {
@@ -170,7 +183,7 @@ static bool parse_compile_mode_options(options_state_t *s)
 	} else if (streq(option, "-export-ir")) {
 		mode = MODE_COMPILE_EXPORTIR;
 	} else if (streq(option, "fsyntax-only")) {
-		mode = MODE_PARSE_ONLY;
+		set_mode_gcc_prec(MODE_PARSE_ONLY, full_option);
 	} else if (streq(option, "fno-syntax-only")) {
 	} else {
 		return false;
