@@ -5573,10 +5573,10 @@ static void parse_external_declaration(void)
 
 	if (is_main(entity)) {
 		/* Force main to C linkage. */
-		type_t *const type = entity->declaration.type;
-		assert(is_type_function(type));
-		if (type->function.linkage != LINKAGE_C) {
-			type_t *new_type           = duplicate_type(type);
+		type_t *const main_type = entity->declaration.type;
+		assert(is_type_function(main_type));
+		if (main_type->function.linkage != LINKAGE_C) {
+			type_t *new_type           = duplicate_type(main_type);
 			new_type->function.linkage = LINKAGE_C;
 			entity->declaration.type   = identify_new_type(new_type);
 		}
@@ -7364,9 +7364,9 @@ static function_type_t *handle_builtin_overload(call_expression_t *const call,
 			                          argument->expression->base.type);
 		if (new_type == NULL)
 			return NULL;
-		function_parameter_t *parameter = allocate_parameter(new_type);
-		*anchor = parameter;
-		anchor  = &parameter->next;
+		function_parameter_t *new_parameter = allocate_parameter(new_type);
+		*anchor = new_parameter;
+		anchor  = &new_parameter->next;
 	}
 	new_function_type->function.return_type
 		= check_generic_parameter(&template_replacement,

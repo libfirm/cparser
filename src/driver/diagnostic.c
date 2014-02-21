@@ -84,7 +84,7 @@ static void diagnosticvf(position_t const *const pos,
 	if (pos) {
 		if (pos->colno != 0 && show_column) {
 			fprintf(out, "%s%s:%u:%u: ", colors.highlight, pos->input_name, pos->lineno,
-			        pos->colno);
+			        (unsigned)pos->colno);
 		} else if (pos->lineno != 0) {
 			fprintf(out, "%s%s:%u: ", colors.highlight, pos->input_name, pos->lineno);
 		} else {

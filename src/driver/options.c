@@ -403,11 +403,11 @@ bool options_parse_codegen(options_state_t *s)
 		obstack_blank(&codegenflags_obst, sizeof(codegen_option_t));
 		size_t len = strlen(arg);
 		obstack_grow0(&codegenflags_obst, arg, len);
-		codegen_option_t *option = obstack_finish(&codegenflags_obst);
-		option->next             = NULL;
+		codegen_option_t *cg_option = obstack_finish(&codegenflags_obst);
+		cg_option->next             = NULL;
 
-		*codegen_options_anchor = option;
-		codegen_options_anchor  = &option->next;
+		*codegen_options_anchor = cg_option;
+		codegen_options_anchor  = &cg_option->next;
 	} else {
 		bool truth_value;
 		const char *fopt;
@@ -481,6 +481,7 @@ bool options_parse_diagnostics(options_state_t *s)
 		const char *arg;
 
 		if ((arg = equals_arg("message-length=", s)) != NULL) {
+			(void)arg;
 			/* not supported yet */
 		} else {
 			bool truth_value;

@@ -1551,10 +1551,10 @@ type_t *make_function_type(type_t *return_type, int n_types,
 	bool                  typegeneric = is_generic_type(return_type);
 	function_parameter_t **anchor     = &type->function.parameters;
 	for (int i = 0; i < n_types; ++i) {
-		type_t *type = argument_types[i];
-		typegeneric = typegeneric || is_generic_type(type);
+		type_t *argtype = argument_types[i];
+		typegeneric = typegeneric || is_generic_type(argtype);
 
-		function_parameter_t *parameter = allocate_parameter(type);
+		function_parameter_t *parameter = allocate_parameter(argtype);
 		*anchor = parameter;
 		anchor  = &parameter->next;
 	}
