@@ -13,6 +13,7 @@
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast/ast_t.h"
+#include "c_driver.h"
 #include "diagnostic.h"
 #include "driver.h"
 #include "firm/ast2firm.h"
@@ -62,8 +63,8 @@ static const char *prefix_arg(const char *prefix, options_state_t *s)
 	return def;
 }
 
-static const char *spaced_arg(const char *arg, options_state_t *s,
-                              bool arg_may_be_option)
+const char *spaced_arg(const char *arg, options_state_t *s,
+                       bool arg_may_be_option)
 {
 	const char *option = &s->argv[s->i][1];
 	if (!streq(option, arg))
@@ -139,9 +140,6 @@ bool options_parse_preprocessor(options_state_t *s)
 	} else if ((arg = prefix_arg("U", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-U%s", arg);
 		undefine(arg);
-	} else if (streq(option, "M") || streq(option, "MM")) {
-		mode = MODE_GENERATE_DEPENDENCIES;
-		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if (streq(option, "MMD") || streq(option, "MD")) {
 		construct_dep_target = true;
 		driver_add_flag(&cppflags_obst, "-%s", option);
@@ -197,6 +195,22 @@ bool options_parse_preprocessor(options_state_t *s)
 	return true;
 }
 
+static compilation_unit_type_t get_unit_type_from_string(const char *string)
+{
+	if (streq(string, "c") || streq(string, "c-header"))
+		return COMPILATION_UNIT_C;
+	if (streq(string, "c++") || streq(string, "c++-header"))
+		return COMPILATION_UNIT_CXX;
+	if (streq(string, "assembler"))
+		return COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+	if (streq(string, "assembler-with-cpp"))
+		return COMPILATION_UNIT_ASSEMBLER;
+	if (streq(string, "none"))
+		return COMPILATION_UNIT_AUTODETECT;
+
+	return COMPILATION_UNIT_UNKNOWN;
+}
+
 bool options_parse_driver(options_state_t *s)
 {
 	const char *option = s->argv[s->i];
@@ -214,14 +228,10 @@ bool options_parse_driver(options_state_t *s)
 	++option;
 
 	const char *arg;
-	if ((arg = prefix_arg("o", s)) != NULL) {
+	if (option[0] == 'O') {
+		/* -O flags have already been handled in early option parsing */
+	} else if ((arg = prefix_arg("o", s)) != NULL) {
 		outname = arg;
-	} else if (streq(option, "c")) {
-		mode = MODE_COMPILE_ASSEMBLE;
-	} else if (streq(option, "E")) {
-		mode = MODE_PREPROCESS_ONLY;
-	} else if (streq(option, "S")) {
-		mode = MODE_COMPILE;
 	} else if ((arg = prefix_arg("x", s)) != NULL) {
 		forced_unittype = get_unit_type_from_string(arg);
 		if (forced_unittype == COMPILATION_UNIT_UNKNOWN) {
@@ -268,32 +278,14 @@ bool options_parse_driver(options_state_t *s)
 	} else if (streq(option, "-no-ms")) {
 		features_on  &= ~_MS;
 		features_off |=  _MS;
-	} else if (streq(option, "-benchmark")) {
-		mode = MODE_BENCHMARK_PARSER;
-	} else if (streq(option, "-print-ast")) {
-		mode = MODE_PRINT_AST;
 	} else if (streq(option, "-print-implicit-cast")) {
 		print_implicit_casts = true;
 	} else if (streq(option, "-print-parenthesis")) {
 		print_parenthesis = true;
-	} else if (streq(option, "-print-fluffy")) {
-		mode = MODE_PRINT_FLUFFY;
-	} else if (streq(option, "-print-compound-sizes")) {
-		mode = MODE_PRINT_COMPOUND_SIZE;
-	} else if (streq(option, "-print-jna")) {
-		mode = MODE_PRINT_JNA;
 	} else if ((arg = spaced_arg("-jna-limit", s, false)) != NULL) {
 		jna_limit_output(arg);
 	} else if ((arg = spaced_arg("-jna-libname", s, false)) != NULL) {
 		jna_set_libname(arg);
-	} else if ((arg = spaced_arg("-dump-function", s, false)) != NULL) {
-		dumpfunction = arg;
-		mode         = MODE_COMPILE_DUMP;
-	} else if (streq(option, "-export-ir")) {
-		mode = MODE_COMPILE_EXPORTIR;
-	} else if (streq(option, "fsyntax-only")) {
-		mode = MODE_PARSE_ONLY;
-	} else if (streq(option, "fno-syntax-only")) {
 	} else if (streq(option, "v")) {
 		driver_verbose = true;
 	} else if (streq(option, "-time")) {
@@ -311,6 +303,12 @@ bool options_parse_driver(options_state_t *s)
 		s->action = action_version;
 	} else if (streq(option, "dumpversion")) {
 		s->action = action_version_short;
+	} else if (option[0] == 'd') {
+		/* scan debug flags */
+		for (const char *flag = &option[1]; *flag != '\0'; ++flag) {
+			if (*flag == 'M')
+				dump_defines = true;
+		}
 	} else {
 		return false;
 	}
@@ -628,4 +626,31 @@ bool options_parse_meta(options_state_t *s)
 		}
 	}
 	return true;
+}
+
+void options_parse_early(options_state_t *state)
+{
+	unsigned opt_level = 1;
+	for (int i = 1; i < state->argc; ++i) {
+		const char *arg = state->argv[i];
+		if (arg[0] != '-')
+			continue;
+
+		const char *option = &arg[1];
+		if (option[0] == 'O') {
+			if (option[2] != '\0')
+				goto invalid_o_option;
+			char opt = option[1];
+			if (opt == 's') {
+				opt_level = 2; /* for now until we have a real -Os */
+			} else if (opt >= '0' && opt <= '9') {
+				opt_level = opt - '0';
+			} else {
+invalid_o_option:
+				errorf(NULL, "invalid optimization option '%s'", arg);
+				state->argument_errors = true;
+			}
+		}
+	}
+	choose_optimization_pack(opt_level);
 }

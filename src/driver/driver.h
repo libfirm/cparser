@@ -10,36 +10,6 @@
 #include "parser/input.h"
 #include "tempfile.h"
 
-typedef enum compile_mode_t {
-	MODE_BENCHMARK_PARSER,
-	MODE_PREPROCESS_ONLY,
-	MODE_GENERATE_DEPENDENCIES,
-	MODE_PARSE_ONLY,
-	MODE_COMPILE,
-	MODE_COMPILE_DUMP,
-	MODE_COMPILE_EXPORTIR,
-	MODE_COMPILE_ASSEMBLE,
-	MODE_COMPILE_ASSEMBLE_LINK,
-	MODE_PRINT_AST,
-	MODE_PRINT_FLUFFY,
-	MODE_PRINT_JNA,
-	MODE_PRINT_COMPOUND_SIZE,
-} compile_mode_t;
-
-typedef enum lang_standard_t {
-	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
-	STANDARD_ANSI,    /* ISO C90 (for C) or ISO C++ 1998 (for C++) */
-	STANDARD_C89,     /* ISO C90 (sic) */
-	STANDARD_C89AMD1, /* ISO C90 as modified in amendment 1 */
-	STANDARD_C99,     /* ISO C99 */
-	STANDARD_C11,     /* ISO C11 */
-	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
-	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
-	STANDARD_GNU11,   /* ISO C11 plus GNU extensions */
-	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
-	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
-} lang_standard_t;
-
 typedef enum compilation_unit_type_t {
 	COMPILATION_UNIT_AUTODETECT,
 	COMPILATION_UNIT_C,
@@ -61,22 +31,7 @@ typedef enum compilation_unit_type_t {
 } compilation_unit_type_t;
 
 typedef struct compilation_unit_t compilation_unit_t;
-struct compilation_unit_t {
-	const char             *name;  /**< filename or "-" for stdin */
-	FILE                   *input; /**< input (NULL if not opened yet) */
-	input_t                *input_decoder;
-	bool                    input_is_pipe;
-	const char             *original_name;
-	compilation_unit_type_t type;
-	lang_standard_t         standard;
-	translation_unit_t     *ast;
-	compilation_unit_t     *next;
-};
-
-typedef struct compilation_env_t {
-	FILE *out;
-	bool  continue_on_parse_errors;
-} compilation_env_t;
+typedef struct compilation_env_t  compilation_env_t;
 
 typedef bool (*compilation_unit_handler)(compilation_env_t *,
                                          compilation_unit_t*);
@@ -84,40 +39,42 @@ typedef bool (*compilation_unit_handler)(compilation_env_t *,
 void set_unit_handler(compilation_unit_type_t type,
                       compilation_unit_handler handler, bool stop_after);
 
-extern compile_mode_t  mode;
-extern const char     *outname;
-extern struct obstack  cppflags_obst;
-extern struct obstack  ldflags_obst;
-extern struct obstack  asflags_obst;
-extern struct obstack  codegenflags_obst;
-extern struct obstack  c_cpp_cppflags_obst;
-extern unsigned        features_on;
-extern unsigned        features_off;
-extern bool            construct_dep_target;
-extern bool            dump_defines;
-extern bool            produce_statev;
-extern lang_standard_t standard;
-extern int             colorterm;
-extern const char     *filtev;
-extern const char     *dumpfunction;
-extern const char     *driver_linker;
-extern const char     *driver_preprocessor;
-extern const char     *driver_assembler;
-extern const char     *driver_default_exe_output;
-/** -1: auto (use if not crosscompiling), 0 - no, 1 - yes */
-extern int             driver_use_integrated_preprocessor;
-extern bool            driver_verbose;
-extern bool            driver_no_stdinc;
-extern bool            do_timing;
-extern bool            print_timing;
+bool process_unit(compilation_env_t *env, compilation_unit_t *unit);
+bool process_all_units(compilation_env_t *env);
 
-compilation_unit_type_t get_unit_type_from_string(const char *string);
+compilation_unit_type_t autodetect_input(const char *filename);
+
+extern const char         *outname;
+extern bool                produce_statev;
+extern const char         *filtev;
+extern int                 colorterm;
+extern bool                do_timing;
+extern bool                print_timing;
+extern struct obstack      file_obst;
+extern compilation_unit_t *units;
 
 void driver_add_input(const char *filename, compilation_unit_type_t type);
 void driver_add_flag(struct obstack *obst, const char *format, ...);
 
-void driver_print_file_name(const char *name);
+FILE *open_temp_file(const char *basename, const char *extension,
+                     const char **final_name);
+const char *get_output_name(const char *inputname, const char *newext);
 
+bool open_input(compilation_unit_t *unit);
+bool close_input(compilation_unit_t *unit);
+
+bool open_output_for_unit(compilation_env_t *env, compilation_unit_t *unit,
+                          const char *default_extension);
+bool open_output(compilation_env_t *env);
+void close_output(compilation_env_t *env);
+
+void copy_file(FILE *dest, FILE *input);
+bool do_copy_file(compilation_env_t *env, compilation_unit_t *unit);
+
+void begin_statistics(void);
+void end_statistics(void);
+
+int action_print_file_name(const char *argv0);
 int action_compile(const char *argv0);
 
 void init_driver(void);

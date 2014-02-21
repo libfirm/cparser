@@ -12,8 +12,6 @@
 #include "version.h"
 #include <revision.h>
 
-const char *print_file_name_file;
-
 int action_version(const char *argv0)
 {
 	(void)argv0;
@@ -39,30 +37,4 @@ int action_version_short(const char *argv0)
 	printf("%s.%s.%s\n",
 	       CPARSER_MAJOR, CPARSER_MINOR, CPARSER_PATCHLEVEL);
 	return EXIT_SUCCESS;
-}
-
-int action_print_file_name(const char *argv0)
-{
-	(void)argv0;
-	driver_add_flag(&ldflags_obst, "-print-file-name=%s", print_file_name_file);
-
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
-
-	/* construct commandline */
-	obstack_printf(&ldflags_obst, "%s ", driver_linker);
-	obstack_printf(&ldflags_obst, "%s", flags);
-	obstack_1grow(&ldflags_obst, '\0');
-
-	char *commandline = obstack_finish(&ldflags_obst);
-	if (driver_verbose) {
-		puts(commandline);
-	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "%s: error: linker reported an error\n",
-		        print_file_name_file);
-	}
-	obstack_free(&ldflags_obst, commandline);
-	return err;
 }

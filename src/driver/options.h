@@ -18,6 +18,12 @@ typedef struct options_state_t {
 	action_func action;
 } options_state_t;
 
+/**
+ * early option parsing (find out optimization level which can be tuned
+ * with -fXXX flags in the normal phase)
+ */
+void options_parse_early(options_state_t *state);
+
 bool options_parse_assembler(options_state_t *state);
 bool options_parse_c_dialect(options_state_t *state);
 bool options_parse_codegen(options_state_t *state);
@@ -30,5 +36,8 @@ bool options_parse_preprocessor(options_state_t *state);
 
 bool action_print_help(const char *argv0);
 void setup_target_machine(void);
+
+const char *spaced_arg(const char *arg, options_state_t *s,
+                       bool arg_may_be_option);
 
 #endif

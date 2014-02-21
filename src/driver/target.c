@@ -10,8 +10,8 @@
 #include "adt/util.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
+#include "c_driver.h"
 #include "diagnostic.h"
-#include "driver.h"
 #include "firm/ast2firm.h"
 #include "firm/mangle.h"
 #include "lang_features.h"
@@ -20,6 +20,7 @@
 
 target_t    target;
 const char *multilib_directory_target_triple;
+static const char *experimental_backend;
 
 /**
  * initialize cparser type properties based on a firm type
@@ -223,16 +224,22 @@ static void setup_isa(const char *isa)
 
 static void setup_x86_64(void)
 {
-	warningf(WARN_EXPERIMENTAL, NULL,
-			 "the x86_64 backend is highly experimental and unfinished (consider the -m32 switch)");
+	experimental_backend
+		= "the x86_64 backend is highly experimental and unfinished (consider the -m32 switch)";
 	setup_isa("amd64");
 }
 
 static void setup_arm(void)
 {
-	warningf(WARN_EXPERIMENTAL, NULL,
-			 "the arm backend is highly experimental and unfinished");
+	experimental_backend
+		= "the arm backend is highly experimental and unfinished";
 	setup_isa("arm");
+}
+
+void warn_experimental_target(void)
+{
+	if (experimental_backend != NULL)
+		warningf(WARN_EXPERIMENTAL, NULL, experimental_backend);
 }
 
 static void setup_ia32(const char *firm_arch)
@@ -245,11 +252,11 @@ static void setup_ia32(const char *firm_arch)
 	strcpy(firm_isa, "ia32");
 }
 
-static void setup_firm_isa(void)
+static bool setup_firm_isa(void)
 {
 	if (firm_isa[0] != '\0') {
 		setup_isa(firm_isa);
-		return;
+		return true;
 	}
 
 	const char *cpu = target.machine->cpu_type;
@@ -279,12 +286,14 @@ static void setup_firm_isa(void)
 		setup_arm();
 	} else {
 		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
-		exit(EXIT_FAILURE);
+		return false;
 	}
+	return true;
 }
 
-static void pass_options_to_firm_be(options_state_t *s)
+static bool pass_options_to_firm_be(void)
 {
+	bool res = true;
 	/* pass options to firm backend (this happens delayed because we first
 	 * had to decide which backend is actually used) */
 	for (codegen_option_t *option = codegen_options; option != NULL;
@@ -296,7 +305,7 @@ static void pass_options_to_firm_be(options_state_t *s)
 			snprintf(buf, sizeof(buf), "%s-%s", firm_isa, opt);
 			if (be_parse_arg(buf) == 0) {
 				errorf(NULL, "Unknown codegen option '-m%s'", opt);
-				s->argument_errors = true;
+				res = false;
 				continue;
 			}
 		}
@@ -324,16 +333,17 @@ static void pass_options_to_firm_be(options_state_t *s)
 	if (profile_use) {
 		set_be_option("profileuse");
 	}
+	return res;
 }
 
-void target_setup(options_state_t *options_state)
+bool target_setup(void)
 {
 	if (target.machine == NULL)
 		target.machine = firm_get_host_machine();
 
-	setup_firm_isa();
+	bool res = setup_firm_isa();
 	init_os_support();
-	pass_options_to_firm_be(options_state);
+	res &= pass_options_to_firm_be();
 	setup_types();
 
 	multilib_directory_target_triple = NULL;
@@ -348,4 +358,5 @@ void target_setup(options_state_t *options_state)
 			multilib_directory_target_triple = MULTILIB_M64_TRIPLE;
 #endif
 	}
+	return res;
 }

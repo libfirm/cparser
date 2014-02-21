@@ -176,7 +176,6 @@ static whitespace_info_t info;
 
 static inline void next_char(void);
 static void next_input_token(void);
-static void print_line_directive(const position_t *pos, const char *add);
 
 static symbol_t *symbol_colongreater;
 static symbol_t *symbol_lesscolon;
@@ -198,6 +197,8 @@ static void init_symbols(void)
 
 	symbol___VA_ARGS__ = symbol_table_insert("__VA_ARGS__");
 }
+
+static void print_line_directive(const position_t *pos, const char *add);
 
 void switch_pp_input(input_t *const decoder, char const *const input_name,
                      searchpath_entry_t *const path,
@@ -250,6 +251,18 @@ static void close_pp_input_file(void)
 	close_pp_input();
 	fclose(input.file);
 	input_free(input.input);
+}
+
+void print_pp_header(void)
+{
+	/* this is just here to make our output look similar to the gcc one */
+	position_t first_pos = input.pos;
+	first_pos.lineno = 1;
+	print_line_directive(&first_pos, NULL);
+	fputc('\n', out);
+	fprintf(out, "# 1 \"<built-in>\"\n");
+	fprintf(out, "# 1 \"<command-line>\"\n");
+	print_line_directive(&first_pos, NULL);
 }
 
 static void push_input(void)
@@ -4129,6 +4142,7 @@ void init_preprocessor(void)
 
 	pp_null = get_mode_null(mode_Ls);
 	pp_one  = get_mode_one(mode_Ls);
+	set_preprocessor_output(NULL);
 }
 
 void exit_preprocessor(void)

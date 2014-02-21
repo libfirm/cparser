@@ -41,6 +41,7 @@ cparser_SOURCES = \
 	ast/types.c \
 	ast/walk.c \
 	driver/actions.c \
+	driver/c_driver.c \
 	driver/diagnostic.c \
 	driver/driver.c \
 	driver/help.c \

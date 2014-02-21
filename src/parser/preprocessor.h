@@ -7,6 +7,7 @@
 
 #include "input.h"
 #include "token_t.h"
+#include "ast/position.h"
 
 /** initialize just enough so we can use add_define(),add_define_string(),
  * undefine(), append_include_path(), append_env_paths() for commandline
@@ -21,8 +22,10 @@ typedef struct searchpath_entry_t searchpath_entry_t;
 /** Switch input to another file. The current token is not changed. */
 void switch_pp_input(input_t *decoder, char const *input_name,
                      searchpath_entry_t *entry, bool is_system_header);
-
 void close_pp_input(void);
+
+/** print the header displayed by gcc when writing preprocessing tokens */
+void print_pp_header(void);
 
 void next_preprocessing_token(void);
 

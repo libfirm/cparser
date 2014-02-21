@@ -10,7 +10,8 @@
 #include "machine_triple.h"
 #include "options.h"
 
-void target_setup(options_state_t *state);
+bool target_setup(void);
+void warn_experimental_target(void);
 
 typedef struct codegen_option_t codegen_option_t;
 
