@@ -16,9 +16,9 @@
 #include <libfirm/firm.h>
 
 #include "firm_opt.h"
-#include "firm_timing.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
+#include "driver/timing.h"
 
 /* optimization settings */
 struct a_firm_opt {

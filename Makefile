@@ -52,11 +52,11 @@ libcparser_SOURCES = \
 	driver/predefs.c \
 	driver/target.c \
 	driver/tempfile.c \
+	driver/timing.c \
 	driver/warning.c \
 	firm/ast2firm.c \
 	firm/entitymap.c \
 	firm/firm_opt.c \
-	firm/firm_timing.c \
 	firm/jump_target.c \
 	firm/mangle.c \
 	parser/builtins.c \

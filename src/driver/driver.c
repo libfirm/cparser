@@ -17,8 +17,8 @@
 #include "adt/util.h"
 #include "c_driver.h"
 #include "diagnostic.h"
-#include "firm/firm_timing.h"
 #include "lang_features.h"
+#include "timing.h"
 
 const char         *outname;
 bool                produce_statev;

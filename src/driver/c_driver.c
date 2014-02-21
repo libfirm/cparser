@@ -22,12 +22,12 @@
 #include "driver_t.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
-#include "firm/firm_timing.h"
 #include "lang_features.h"
 #include "parser/parser.h"
 #include "parser/preprocessor.h"
 #include "predefs.h"
 #include "target.h"
+#include "timing.h"
 #include "version.h"
 
 #ifndef PREPROCESSOR

@@ -7,7 +7,7 @@
  * @file
  * @brief timing for the Firm compiler
  */
-#include "firm_timing.h"
+#include "timing.h"
 
 #include <libfirm/adt/xmalloc.h>
 

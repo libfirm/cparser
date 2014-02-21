@@ -7,8 +7,8 @@
  * @file
  * @brief timing for the Firm compiler
  */
-#ifndef __FIRM_TIMING_H__
-#define __FIRM_TIMING_H__
+#ifndef TIMING_H
+#define TIMING_H
 
 #include <stdio.h>
 #include <libfirm/timing.h>
