@@ -72,7 +72,7 @@ libcparser_OBJECTS = $(libcparser_SOURCES:%.c=$(builddir)/%.o)
 libcparser_DEPS    = $(libcparser_OBJECTS:%.o=%.d)
 libcparser_A       = $(builddir)/libcparser.a
 
-cparser_SOURCES = main.c
+cparser_SOURCES = main.c $(libcparser_SOURCES)
 cparser_OBJECTS = $(cparser_SOURCES:%.c=$(builddir)/%.o)
 cparser_DEPS    = $(cparser_OBJECTS:%.o=%.d)
 cparser_EXE     = $(builddir)/cparser
@@ -111,9 +111,9 @@ QUICKCHECK_DEFAULT := $(shell which cparser-beta || echo true) -fsyntax-only
 QUICKCHECK ?= $(QUICKCHECK_DEFAULT)
 QUICKCHECK_FLAGS ?= -Wno-shadow
 
-$(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS) $(libcparser_A)
+$(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo 'LD $@'
-	$(Q)$(CC) $(cparser_OBJECTS) $(libcparser_A) $(LIBFIRM_FILE) -o $@ $(LINKFLAGS)
+	$(Q)$(CC) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $@ $(LINKFLAGS)
 
 $(libcparser_A): $(libcparser_OBJECTS)
 	@echo 'AR $@'
