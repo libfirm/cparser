@@ -919,6 +919,12 @@ static void set_option(const char *arg)
 	assert(res);
 }
 
+bool firm_is_inling_enabled(void)
+{
+	opt_config_t *const config = get_opt("inline");
+	return config->flags & OPT_FLAG_ENABLED;
+}
+
 void choose_optimization_pack(int level)
 {
 	/* apply optimization level */

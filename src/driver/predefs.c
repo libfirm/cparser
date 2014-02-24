@@ -13,6 +13,7 @@
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "firm/ast2firm.h"
+#include "firm/firm_opt.h"
 #include "lang_features.h"
 #include "machine_triple.h"
 #include "parser/preprocessor.h"
@@ -249,8 +250,8 @@ void add_predefined_macros(void)
 	if (dialect.cpp)
 		add_define("__GNUG__", "4", false);
 
-	/* TODO */
-	//add_define("__NO_INLINE__", "1");
+	if (!firm_is_inling_enabled())
+		add_define("__NO_INLINE__", "1", false);
 	if (dialect.c99) {
 		add_define("__GNUC_STDC_INLINE__", "1", false);
 	} else {

@@ -6,6 +6,7 @@
 #define FIRM_OPT_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <libfirm/firm_types.h>
 #include <libfirm/dbginfo.h>
 
@@ -113,6 +114,8 @@ void generate_code(FILE *out, const char *input_filename);
 
 /** process optimization commandline option */
 int firm_option(const char *opt);
+
+bool firm_is_inling_enabled(void);
 
 typedef void (*print_option_help_func)(const char *name, const char *description);
 
