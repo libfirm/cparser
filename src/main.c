@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "adt/error.h"
 #include "adt/strutil.h"
 #include "ast/ast.h"
 #include "driver/c_driver.h"
@@ -78,8 +79,53 @@ static void set_mode_gcc_prec(compile_mode_t new_mode, const char *arg)
 	if (new_mode < mode) {
 		mode = new_mode;
 	} else {
-		warningf(WARN_COMPAT_OPTION, NULL,
+		warningf(WARN_UNUSED_OPTION, NULL,
 		         "ignoring option '%s' because of gcc precedence", arg);
+	}
+}
+
+static bool warn_unused_input(compilation_env_t *env, compilation_unit_t *unit)
+{
+	(void)env;
+	warningf(WARN_UNUSED_OPTION, NULL,
+	         "ignoring input '%s' in current compilation mode", unit->name);
+	unit->name = NULL; /* avoid subsequence warnings */
+	return true;
+}
+
+static bool warn_no_linking(compilation_env_t *env, compilation_unit_t *units)
+{
+	(void)env;
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
+		/* if file was processed somehow don't warn */
+		if (unit->original_name != unit->name)
+			continue;
+		warningf(WARN_UNUSED_OPTION, NULL,
+		         "ignoring input '%s' because no linking is performed",
+		         unit->name);
+	}
+	return true;
+}
+
+static void set_unused_after(compile_mode_t mode)
+{
+	switch (mode) {
+	case MODE_PREPROCESS_ONLY:
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_C,   warn_unused_input,
+		                 true);
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_CXX, warn_unused_input,
+		                 true);
+		/* FALLTHROUGH */
+	case MODE_PARSE_ONLY:
+		set_unit_handler(COMPILATION_UNIT_IR, warn_unused_input, true);
+		/* FALLTHROUGH */
+	case MODE_COMPILE:
+		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
+		                 warn_unused_input, true);
+		set_unit_handler(COMPILATION_UNIT_OBJECT, warn_unused_input, true);
+		break;
+	default:
+		panic("invalid argument to set_unused_after");
 	}
 }
 
@@ -97,10 +143,7 @@ static void set_handlers(compile_mode_t mode)
 		                 print_preprocessing_tokens, true);
 		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
 		                 print_preprocessing_tokens, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_C,   do_copy_file, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_CXX, do_copy_file, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER, do_copy_file,
-		                 true);
+		set_unused_after(MODE_PREPROCESS_ONLY);
 		return;
 	case MODE_PRINT_AST:
 		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_C,
@@ -108,27 +151,34 @@ static void set_handlers(compile_mode_t mode)
 		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_CXX,
 		                 parse_ignore_errors, false);
 		set_unit_handler(COMPILATION_UNIT_AST, do_print_ast, true);
+		set_unused_after(MODE_PARSE_ONLY);
 		return;
 	case MODE_BENCHMARK_PARSER:
 		set_unit_handler(COMPILATION_UNIT_AST, do_nothing, true);
+		set_unused_after(MODE_PARSE_ONLY);
 		return;
 	case MODE_PRINT_FLUFFY:
 		set_unit_handler(COMPILATION_UNIT_AST, print_fluffy, true);
+		set_unused_after(MODE_PARSE_ONLY);
 		return;
 	case MODE_PRINT_JNA:
 		set_unit_handler(COMPILATION_UNIT_AST, print_jna, true);
+		set_unused_after(MODE_PARSE_ONLY);
 		return;
 	case MODE_PRINT_COMPOUND_SIZE:
 		set_unit_handler(COMPILATION_UNIT_AST, print_compound_size, true);
+		set_unused_after(MODE_PARSE_ONLY);
 		return;
 	case MODE_PARSE_ONLY:
 	case MODE_COMPILE_DUMP:
 	case MODE_COMPILE_EXPORTIR:
 		set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, true);
+		set_unused_after(MODE_COMPILE);
 	    return;
 	case MODE_COMPILE:
 		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
 		                 generate_code_final, true);
+		set_unused_after(MODE_COMPILE);
 		return;
 	case MODE_COMPILE_ASSEMBLE:
 		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
@@ -141,10 +191,7 @@ static void set_handlers(compile_mode_t mode)
 		                 generate_dependencies, true);
 		set_unit_handler(COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
 		                 generate_dependencies, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_C,   do_copy_file, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_CXX, do_copy_file, true);
-		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER, do_copy_file,
-		                 true);
+		set_unused_after(MODE_PREPROCESS_ONLY);
 		return;
 	}
 }
@@ -161,6 +208,7 @@ static bool parse_compile_mode_options(options_state_t *s)
 	if (streq(option, "M") || streq(option, "MM")) {
 		set_mode_gcc_prec(MODE_GENERATE_DEPENDENCIES, full_option);
 		driver_add_flag(&cppflags_obst, "-%s", option);
+		dump_dependencies_instead_of_preprocessing = true;
 	} else if (streq(option, "c")) {
 		set_mode_gcc_prec(MODE_COMPILE_ASSEMBLE, full_option);
 	} else if (streq(option, "E")) {
@@ -215,12 +263,10 @@ int action_compile(const char *argv0)
 			= mode == MODE_COMPILE_ASSEMBLE_LINK ? link_program
 			: mode == MODE_COMPILE_DUMP          ? dump_irg
 			: mode == MODE_COMPILE_EXPORTIR      ? write_ir_file
-			: NULL;
-		if (final_step != NULL) {
-			bool res = final_step(&env, units);
-			if (!res) {
-				result = EXIT_FAILURE;
-			}
+			: warn_no_linking;
+		bool res = final_step(&env, units);
+		if (!res) {
+			result = EXIT_FAILURE;
 		}
 	}
 

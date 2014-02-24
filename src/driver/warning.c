@@ -73,6 +73,7 @@ static warning_switch_t warning[] = {
 	[WARN_UNREACHABLE_CODE]              = { WARN_STATE_NONE, "unreachable-code"              },
 	[WARN_UNUSED_FUNCTION]               = { WARN_STATE_NONE, "unused-function"               },
 	[WARN_UNUSED_LABEL]                  = { WARN_STATE_NONE, "unused-label"                  },
+	[WARN_UNUSED_OPTION]                 = { WARN_STATE_ON,   "unused-option"                 },
 	[WARN_UNUSED_PARAMETER]              = { WARN_STATE_NONE, "unused-parameter"              },
 	[WARN_UNUSED_VALUE]                  = { WARN_STATE_ON,   "unused-value"                  },
 	[WARN_UNUSED_VARIABLE]               = { WARN_STATE_NONE, "unused-variable"               },

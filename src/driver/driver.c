@@ -199,6 +199,8 @@ void copy_file(FILE *dest, FILE *input)
 
 bool do_copy_file(compilation_env_t *env, compilation_unit_t *unit)
 {
+	if (!open_input(unit))
+		return false;
 	if (!open_output(env))
 		return false;
 	copy_file(env->out, unit->input);

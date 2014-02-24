@@ -31,6 +31,7 @@ extern unsigned        features_on;
 extern unsigned        features_off;
 extern bool            construct_dep_target;
 extern bool            dump_defines;
+extern bool            dump_dependencies_instead_of_preprocessing;
 extern const char     *dumpfunction;
 /** -1: auto (use if not crosscompiling), 0 - no, 1 - yes */
 extern int             driver_use_integrated_preprocessor;

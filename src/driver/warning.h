@@ -73,6 +73,7 @@ typedef enum warning_t {
 	WARN_UNREACHABLE_CODE,              /**< Warn if the compiler detects that code will never be executed */
 	WARN_UNUSED_FUNCTION,               /**< Warn whenever a static function is declared but not defined or a non-inline static function is unused */
 	WARN_UNUSED_LABEL,                  /**< Warn whenever a label is declared but not used */
+	WARN_UNUSED_OPTION,                 /**< Warn whenever a commandline option was not used */
 	WARN_UNUSED_PARAMETER,              /**< Warn whenever a function parameter is unused aside from its declaration */
 	WARN_UNUSED_VALUE,                  /**< Warn whenever a statement computes a result that is explicitly not used */
 	WARN_UNUSED_VARIABLE,               /**< Warn whenever a local variable or non-constant static variable is unused aside from its declaration */

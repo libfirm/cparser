@@ -76,6 +76,7 @@ int             driver_use_integrated_preprocessor = -1;
 bool            driver_no_stdinc;
 bool            driver_verbose;
 bool            dump_defines;
+bool            dump_dependencies_instead_of_preprocessing;
 unsigned        features_on;
 unsigned        features_off;
 lang_standard_t standard;
@@ -384,19 +385,23 @@ static bool run_external_preprocessor(compilation_env_t *env,
 
 	unit->input         = f;
 	unit->input_is_pipe = true;
-	switch (unit->type) {
-	case COMPILATION_UNIT_ASSEMBLER:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-		break;
-	case COMPILATION_UNIT_C:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-		break;
-	case COMPILATION_UNIT_CXX:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-		break;
-	default:
-		unit->type = COMPILATION_UNIT_UNKNOWN;
-		break;
+	if (dump_dependencies_instead_of_preprocessing) {
+		unit->type = COMPILATION_UNIT_DEPENDENCIES;
+	} else {
+		switch (unit->type) {
+		case COMPILATION_UNIT_ASSEMBLER:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+			break;
+		case COMPILATION_UNIT_C:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_C;
+			break;
+		case COMPILATION_UNIT_CXX:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
+			break;
+		default:
+			unit->type = COMPILATION_UNIT_UNKNOWN;
+			break;
+		}
 	}
 	return true;
 }
@@ -933,6 +938,7 @@ void set_default_handlers(void)
 	                 generate_code_intermediate, false);
 	set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
 	                 assemble_intermediate, false);
+	set_unit_handler(COMPILATION_UNIT_DEPENDENCIES, do_copy_file, true);
 }
 
 void init_default_driver(void)
