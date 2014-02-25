@@ -227,7 +227,8 @@ void switch_pp_input(input_t *const decoder, char const *const input_name,
 	}
 	print_line_directive(&input.pos, line_flag);
 
-	/* place a virtual '\n' so we realize we're at line begin */
+	/* place a virtual '\n' so we realize we're at line begin
+	 * (remember this special case in input_error) */
 	input.pos.lineno = 0;
 	input.c          = '\n';
 }
@@ -4107,7 +4108,10 @@ void print_defines(void)
 
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
 {
-	position_t pos = pp_token.base.pos;
+	position_t pos = input.pos;
+	/* see hack at end for switch_pp_input() */
+	if (pos.lineno == 0)
+		pos.lineno = 1;
 	if (delta_lines > 0) {
 		pos.lineno += delta_lines;
 		pos.colno = delta_cols;
