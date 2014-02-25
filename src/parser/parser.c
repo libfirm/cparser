@@ -923,7 +923,8 @@ static void warn_enum_conversion(type_t *dest_type, expression_t *expression)
 
 	type_t       *const exact         = get_more_exact_type(expression);
 	const type_t *const exact_skipped = skip_typeref(exact);
-	if (is_type_enum(exact_skipped) && exact_skipped != skipped_dest) {
+	if (is_type_enum(exact_skipped)
+	    && exact_skipped->enumt.enume != skipped_dest->enumt.enume) {
 		warningf(WARN_ENUM_CONVERSION, &expression->base.pos,
 				 "implicit conversion from enumeration type '%T' to different enumeration type '%T'",
 				 exact, dest_type);
