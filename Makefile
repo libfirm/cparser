@@ -27,47 +27,7 @@ LINKFLAGS_profile  = -pg
 LINKFLAGS_coverage = --coverage
 LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
-libcparser_SOURCES = \
-	adt/pset_new.c \
-	adt/strset.c \
-	adt/strutil.c \
-	ast/ast.c \
-	ast/attribute.c \
-	ast/constfold.c \
-	ast/entity.c \
-	ast/printer.c \
-	ast/string_rep.c \
-	ast/symbol_table.c \
-	ast/type.c \
-	ast/type_hash.c \
-	ast/types.c \
-	ast/walk.c \
-	driver/actions.c \
-	driver/c_driver.c \
-	driver/diagnostic.c \
-	driver/driver.c \
-	driver/help.c \
-	driver/machine_triple.c \
-	driver/options.c \
-	driver/predefs.c \
-	driver/target.c \
-	driver/tempfile.c \
-	driver/timing.c \
-	driver/warning.c \
-	firm/ast2firm.c \
-	firm/entitymap.c \
-	firm/firm_opt.c \
-	firm/jump_target.c \
-	firm/mangle.c \
-	parser/builtins.c \
-	parser/format_check.c \
-	parser/input.c \
-	parser/parser.c \
-	parser/preprocessor.c \
-	parser/token.c \
-	wrappergen/write_fluffy.c \
-	wrappergen/write_jna.c \
-	wrappergen/write_compoundsizes.c
+libcparser_SOURCES := $(wildcard $(top_srcdir)/src/*/*.c)
 libcparser_OBJECTS = $(libcparser_SOURCES:%.c=$(builddir)/%.o)
 libcparser_DEPS    = $(libcparser_OBJECTS:%.o=%.d)
 libcparser_A       = $(builddir)/libcparser.a
