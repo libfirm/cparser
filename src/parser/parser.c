@@ -897,6 +897,40 @@ static bool is_null_pointer_constant(const expression_t *expression)
 }
 
 /**
+ * Attempts to get a more exact type for an expression, for example
+ * get the enum type instead of "int".
+ */
+static type_t *get_more_exact_type(expression_t *expression)
+{
+	if (expression->kind == EXPR_ENUM_CONSTANT) {
+		const entity_t *enume = expression->reference.entity;
+		type_t         *enumt = enume->enum_value.enum_type;
+		return enumt;
+	} else if (expression->kind == EXPR_SELECT) {
+		const entity_t *member = expression->select.compound_entry;
+		assert(member->kind == ENTITY_COMPOUND_MEMBER);
+		/* in case of bitfields, this will get us the base type */
+		return member->declaration.type;
+	} else {
+		return expression->base.type;
+	}
+}
+
+static void warn_enum_conversion(type_t *dest_type, expression_t *expression)
+{
+	const type_t *skipped_dest = skip_typeref(dest_type);
+	assert(is_type_enum(skipped_dest));
+
+	type_t       *const exact         = get_more_exact_type(expression);
+	const type_t *const exact_skipped = skip_typeref(exact);
+	if (is_type_enum(exact_skipped) && exact_skipped != skipped_dest) {
+		warningf(WARN_ENUM_CONVERSION, &expression->base.pos,
+				 "implicit conversion from enumeration type '%T' to different enumeration type '%T'",
+				 exact, dest_type);
+	}
+}
+
+/**
  * Create an implicit cast expression.
  *
  * @param expression  the expression to cast
@@ -905,9 +939,14 @@ static bool is_null_pointer_constant(const expression_t *expression)
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
-	type_t *const source_type = skip_typeref(expression->base.type);
-	if (source_type == skip_typeref(dest_type))
+	const type_t *const source_type = skip_typeref(expression->base.type);
+	const type_t *const skipped_dest = skip_typeref(dest_type);
+	if (source_type == skipped_dest)
 		return expression;
+
+	if (is_type_enum(skipped_dest)) {
+		warn_enum_conversion(dest_type, expression);
+	}
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->unary.value   = expression;
@@ -5648,7 +5687,7 @@ static expression_t *create_select(const position_t *pos, expression_t *addr,
 	type_t *entry_type = entry->declaration.type;
 	type_t *res_type   = get_qualified_type(entry_type, qualifiers);
 
-	/* bitfields need special treatment */
+	/* handle bitfield integer promotion here */
 	if (entry->compound_member.bitfield) {
 		unsigned bit_size = entry->compound_member.bit_size;
 		/* if fewer bits than an int, convert to int (see §6.3.1.1) */
@@ -8787,6 +8826,15 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	assign_error_t error = semantic_assign(orig_type_left, expression->right);
 	report_assign_error(error, orig_type_left, expression->right,
 	                    "assignment", &left->base.pos);
+	if (is_bitfield(left)) {
+		assert(left->kind == EXPR_SELECT);
+		const entity_t *member      = left->select.compound_entry;
+		type_t         *lhs_type    = member->declaration.type;
+		const type_t   *lhs_skipped = skip_typeref(lhs_type);
+		if (is_type_enum(lhs_skipped)) {
+			warn_enum_conversion(lhs_type, expression->right);
+		}
+	}
 	expression->right = create_implicit_cast(expression->right, orig_type_left);
 	expression->base.type = orig_type_left;
 }

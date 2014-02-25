@@ -29,6 +29,7 @@ typedef enum warning_t {
 	WARN_EMPTY_BODY,                    /**< Warn about an empty body of an if or else statement */
 	WARN_EMPTY_STATEMENT,               /**< Warn about empty statements, i.e. lone ';'  */
 	WARN_ENDIF_LABELS,                  /**< Warn whenever an '#else' or an '#endif' are followed by text */
+	WARN_ENUM_CONVERSION,               /**< warn about implicit conversion between different enum types */
 	WARN_ERROR,                         /**< Treat warnings as errors */
 	WARN_EXPERIMENTAL,                  /**< warn if experimental/unstable compiler features are used */
 	WARN_FATAL_ERRORS,                  /**< First error stops the compilation */

@@ -29,6 +29,7 @@ static warning_switch_t warning[] = {
 	[WARN_EMPTY_BODY]                    = { WARN_STATE_NONE, "empty-body"                    },
 	[WARN_EMPTY_STATEMENT]               = { WARN_STATE_NONE, "empty-statement"               },
 	[WARN_ENDIF_LABELS]                  = { WARN_STATE_ON,   "endif-labels"                  },
+	[WARN_ENUM_CONVERSION]               = { WARN_STATE_ON,   "enum-conversion"               },
 	[WARN_ERROR]                         = { WARN_STATE_NONE, "error"                         },
 	[WARN_EXPERIMENTAL]                  = { WARN_STATE_ON,   "experimental"                  },
 	[WARN_FATAL_ERRORS]                  = { WARN_STATE_NONE, "fatal-errors"                  },
