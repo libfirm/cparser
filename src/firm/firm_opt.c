@@ -919,7 +919,7 @@ static void set_option(const char *arg)
 	assert(res);
 }
 
-bool firm_is_inling_enabled(void)
+bool firm_is_inlining_enabled(void)
 {
 	opt_config_t *const config = get_opt("inline");
 	return config->flags & OPT_FLAG_ENABLED;

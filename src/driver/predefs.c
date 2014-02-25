@@ -250,7 +250,7 @@ void add_predefined_macros(void)
 	if (dialect.cpp)
 		add_define("__GNUG__", "4", false);
 
-	if (!firm_is_inling_enabled())
+	if (!firm_is_inlining_enabled())
 		add_define("__NO_INLINE__", "1", false);
 	if (dialect.c99) {
 		add_define("__GNUC_STDC_INLINE__", "1", false);
