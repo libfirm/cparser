@@ -355,8 +355,8 @@ static void do_gcse(ir_graph *irg)
 }
 
 static opt_config_t opts[] = {
-#define IRG(a, b, c, d) { OPT_TARGET_IRG, a, .u.transform_irg = (transform_irg_func)b, c, d }
-#define IRP(a, b, c, d) { OPT_TARGET_IRP, a, .u.transform_irp = b,                     c, d }
+#define IRG(a, b, c, d) { OPT_TARGET_IRG, a, .u.transform_irg = b, c, d }
+#define IRP(a, b, c, d) { OPT_TARGET_IRP, a, .u.transform_irp = b, c, d }
 	IRG("bool",              opt_bool,                 "bool simplification",                                   OPT_FLAG_NONE),
 	IRG("combo",             combo,                    "combined CCE, UCE and GVN",                             OPT_FLAG_NONE),
 	IRG("confirm",           construct_confirms,       "confirm optimization",                                  OPT_FLAG_HIDE_OPTIONS),
