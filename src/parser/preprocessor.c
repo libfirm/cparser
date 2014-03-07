@@ -3818,6 +3818,12 @@ string:;
 
 static void parse_preprocessing_directive(void)
 {
+	if (current_call.macro != NULL) {
+		warningf(WARN_OTHER, &pp_token.base.pos,
+		         "preprocessing directive in macro argument");
+		push_macro_call();
+	}
+
 	assert(stop_at_newline == false);
 	stop_at_newline = true;
 	eat_token('#');
@@ -3851,6 +3857,8 @@ skip:
 		}
 		eat_pp_directive();
 	}
+
+	pop_macro_call();
 
 	stop_at_newline = false;
 	eat_token(T_NEWLINE);
