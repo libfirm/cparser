@@ -993,8 +993,7 @@ static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
 		ARR_APP1(trampoline_region, current_trampolines, reg);
 		region = reg.region;
 	}
-	return new_d_simpleSel(dbgi, get_irg_no_mem(irg), get_irg_frame(irg),
-	                       region);
+	return new_d_simpleSel(dbgi, get_irg_frame(irg), region);
 }
 
 /**
@@ -1115,7 +1114,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_PARAMETER_ENTITY: {
 		ir_entity *irentity = entity->variable.v.entity;
 		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
+		ir_node   *sel      = new_d_simpleSel(dbgi, frame, irentity);
 		return sel;
 	}
 
@@ -2179,7 +2178,7 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 
 		/* create a sel for the compound literal address */
 		ir_node *frame = get_irg_frame(current_ir_graph);
-		ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+		ir_node *sel   = new_d_simpleSel(dbgi, frame, entity);
 		return sel;
 	}
 }
@@ -2296,7 +2295,7 @@ static ir_node *select_addr(const select_expression_t *expression)
 
 	ir_entity *irentity = entry->compound_member.entity;
 	assert(irentity != NULL);
-	return new_d_simpleSel(dbgi, new_NoMem(), compound_addr, irentity);
+	return new_d_simpleSel(dbgi, compound_addr, irentity);
 }
 
 static ir_node *select_to_firm(const select_expression_t *expression)
@@ -2366,8 +2365,7 @@ static ir_node *va_start_expression_to_firm(
 
 	ir_node  *const frame   = get_irg_frame(current_ir_graph);
 	dbg_info *const dbgi    = get_dbg_info(&expr->base.pos);
-	ir_node  *const no_mem  = new_NoMem();
-	ir_node  *const arg_sel = new_d_simpleSel(dbgi, no_mem, frame, param_ent);
+	ir_node  *const arg_sel = new_d_simpleSel(dbgi, frame, param_ent);
 
 	set_value_for_expression_addr(expr->ap, arg_sel, NULL);
 
@@ -2704,10 +2702,8 @@ static void store_complex(dbg_info *dbgi, ir_node *addr, type_t *type,
                           complex_value value)
 {
 	value = complex_conv_to_storage(dbgi, value, type);
-	ir_graph  *const irg    = current_ir_graph;
 	ir_type   *const irtype = get_ir_type(type);
 	ir_node   *const mem    = get_store();
-	ir_node   *const nomem  = get_irg_no_mem(irg);
 	ir_mode   *const mode   = get_complex_mode_storage(type);
 	ir_node   *const real   = create_conv(dbgi, value.real, mode);
 	ir_node   *const imag   = create_conv(dbgi, value.imag, mode);
@@ -2717,7 +2713,7 @@ static void store_complex(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_node   *const one    = new_Const(get_mode_one(muint));
 	ir_node   *const in[1]  = { one };
 	ir_entity *const arrent = get_array_element_entity(irtype);
-	ir_node   *const addri  = new_d_Sel(dbgi, nomem, addr, 1, in, arrent);
+	ir_node   *const addri  = new_d_Sel(dbgi, addr, 1, in, arrent);
 	ir_node   *const storei = new_d_Store(dbgi, memr, addri, imag, cons_floats);
 	ir_node   *const memi   = new_Proj(storei, mode_M, pn_Store_M);
 	set_store(memi);
@@ -2732,8 +2728,7 @@ static ir_node *complex_to_memory(dbg_info *dbgi, type_t *type,
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_entity *const tmp_storage = new_entity(frame_type, id, irtype);
 	ir_node   *const frame       = get_irg_frame(irg);
-	ir_node   *const nomem       = get_irg_no_mem(irg);
-	ir_node   *const addr        = new_simpleSel(nomem, frame, tmp_storage);
+	ir_node   *const addr        = new_simpleSel(frame, tmp_storage);
 	set_entity_compiler_generated(tmp_storage, 1);
 	store_complex(dbgi, addr, type, value);
 	return addr;
@@ -2773,8 +2768,7 @@ static complex_value complex_deref_address(dbg_info *const dbgi,
 	ir_mode   *const mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 	ir_node   *const in[1]     = { new_Const(get_mode_one(mode_uint)) };
 	ir_entity *const entity    = get_array_element_entity(irtype);
-	ir_node   *const nomem     = get_irg_no_mem(current_ir_graph);
-	ir_node   *const addr2     = new_Sel(nomem, addr, 1, in, entity);
+	ir_node   *const addr2     = new_Sel(addr, 1, in, entity);
 	ir_node   *const load2     = new_d_Load(dbgi, load_mem, addr2, mode, flags);
 	ir_node   *const load_mem2 = new_Proj(load2, mode_M, pn_Load_M);
 	ir_node   *const load_res2 = new_Proj(load2, mode, pn_Load_res);
@@ -3799,8 +3793,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 		unsigned n_members = get_compound_n_members(ent_type);
 		for (unsigned n = 0; n < n_members; ++n) {
 			ir_entity *member = get_compound_member(ent_type, n);
-			ir_node   *addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr,
-				                                member);
+			ir_node   *addr   = new_d_simpleSel(dbgi, base_addr, member);
 			create_dynamic_null_initializer(member, dbgi, addr);
 		}
 		return;
@@ -3814,8 +3807,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 			ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 			ir_node   *in[1]    = { cnst };
 			ir_entity *arrent   = get_array_element_entity(ent_type);
-			ir_node   *addr     = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in,
-			                                arrent);
+			ir_node   *addr     = new_d_Sel(dbgi, base_addr, 1, in, arrent);
 			create_dynamic_null_initializer(arrent, dbgi, addr);
 		}
 		return;
@@ -3910,13 +3902,11 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 				ir_node   *in[1]    = { cnst };
 				irtype     = get_array_element_type(type);
 				sub_entity = get_array_element_entity(type);
-				addr       = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in,
-				                       sub_entity);
+				addr       = new_d_Sel(dbgi, base_addr, 1, in, sub_entity);
 			} else {
 				sub_entity = get_compound_member(type, i);
 				irtype     = get_entity_type(sub_entity);
-				addr       = new_d_simpleSel(dbgi, new_NoMem(), base_addr,
-				                             sub_entity);
+				addr       = new_d_simpleSel(dbgi, base_addr, sub_entity);
 			}
 
 			ir_initializer_t *sub_init
@@ -3936,7 +3926,7 @@ static void create_dynamic_initializer(ir_initializer_t *initializer,
 		dbg_info *dbgi, ir_entity *entity)
 {
 	ir_node *frame     = get_irg_frame(current_ir_graph);
-	ir_node *base_addr = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+	ir_node *base_addr = new_d_simpleSel(dbgi, frame, entity);
 	ir_type *type      = get_entity_type(entity);
 
 	create_dynamic_initializer_sub(initializer, entity, type, dbgi, base_addr);
@@ -3946,9 +3936,8 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
                                      ir_entity *entity, type_t *type)
 {
 	ir_node *memory = get_store();
-	ir_node *nomem  = new_NoMem();
 	ir_node *frame  = get_irg_frame(current_ir_graph);
-	ir_node *addr   = new_d_simpleSel(dbgi, nomem, frame, entity);
+	ir_node *addr   = new_d_simpleSel(dbgi, frame, entity);
 
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
@@ -4994,9 +4983,8 @@ static void initialize_function_parameters(entity_t *entity)
 			ir_entity *param
 				= new_parameter_entity(frame_type, n, param_irtype);
 			set_entity_dbg_info(param, dbgi);
-			ir_node   *nomem = get_irg_no_mem(irg);
 			ir_node   *frame = get_irg_frame(irg);
-			ir_node   *addr  = new_simpleSel(nomem, frame, param);
+			ir_node   *addr  = new_simpleSel(frame, param);
 			complex_value value = complex_deref_address(NULL, type, addr, cons_floats);
 
 			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
