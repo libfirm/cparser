@@ -220,7 +220,7 @@ static ir_type *create_complex_type(type_t const *const type)
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	type_t        *const etype   = make_atomic_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
 	ir_type       *const iretype = get_ir_type(etype);
-	ir_type       *const irtype  = new_type_array(1, iretype);
+	ir_type       *const irtype  = new_type_array(iretype);
 	set_type_dbg_info(irtype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
@@ -229,7 +229,7 @@ static ir_type *create_complex_type(type_t const *const type)
 	unsigned const size = get_type_size(type);
 	set_type_size_bytes(irtype, size);
 
-	set_array_bounds_int(irtype, 0, 0, 2);
+	set_array_size_int(irtype, 2);
 	set_type_state(irtype, layout_fixed);
 
 	return irtype;
@@ -352,19 +352,17 @@ static ir_type *create_array_type(type_t const *const type)
 {
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	ir_type       *const iretype = get_ir_type(type->array.element_type);
-	ir_type       *const irtype  = new_type_array(1, iretype);
+	ir_type       *const irtype  = new_type_array(iretype);
 	set_type_dbg_info(irtype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
 
 	if (type->array.size_constant) {
-		set_array_bounds_int(irtype, 0, 0, type->array.size);
+		set_array_size_int(irtype, type->array.size);
 
 		unsigned const size = get_type_size(type);
 		set_type_size_bytes(irtype, size);
-	} else {
-		set_array_lower_bound_int(irtype, 0, 0);
 	}
 	set_type_state(irtype, layout_fixed);
 
@@ -862,8 +860,8 @@ init_wide:;
 	panic("invalid string encoding");
 
 finish:;
-	ir_type *const type = new_type_array(1, elem_type);
-	set_array_bounds_int(type, 0, 0, slen);
+	ir_type *const type = new_type_array(elem_type);
+	set_array_size_int(type, slen);
 	set_type_size_bytes( type, slen * get_type_size_bytes(elem_type));
 	set_type_state(      type, layout_fixed);
 
@@ -946,8 +944,8 @@ static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned align
 	char buf[32];
 
 	ir_type *ir_type_char = get_ir_type(type_char);
-	ir_type *tp           = new_type_array(1, ir_type_char);
-	set_array_bounds_int(tp, 0, 0, size);
+	ir_type *tp           = new_type_array(ir_type_char);
+	set_array_size_int(tp, size);
 	set_type_alignment_bytes(tp, alignment);
 
 	snprintf(buf, sizeof(buf), "trampolin%u", area_cnt++);
@@ -3808,8 +3806,8 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 		return;
 	}
 	if (is_Array_type(ent_type)) {
-		assert(has_array_upper_bound(ent_type, 0));
-		long n = get_array_upper_bound_int(ent_type, 0);
+		assert(has_array_size(ent_type));
+		long n = get_array_size_int(ent_type);
 		for (long i = 0; i < n; ++i) {
 			ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 			ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
@@ -3891,8 +3889,8 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		assert(is_compound_type(type) || is_Array_type(type));
 		int n_members;
 		if (is_Array_type(type)) {
-			assert(has_array_upper_bound(type, 0));
-			n_members = get_array_upper_bound_int(type, 0);
+			assert(has_array_size(type));
+			n_members = get_array_size_int(type);
 		} else {
 			n_members = get_compound_n_members(type);
 		}
