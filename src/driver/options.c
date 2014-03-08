@@ -388,8 +388,8 @@ bool options_parse_codegen(options_state_t *s)
 		if ((arg = equals_arg("bisa=", s)) != NULL) {
 			snprintf(firm_isa, sizeof(firm_isa), "%s", arg);
 		}
-		if (be_parse_arg(&option[1]))
-			return true;
+		if (!be_parse_arg(&option[1]))
+			return false;
 	} else if (streq(option, "-unroll-loops")) {
 		/* ignore (gcc compatibility) */
 	} else if (streq(option, "g") || streq(option, "g0") || streq(option, "g1")
