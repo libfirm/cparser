@@ -5890,6 +5890,7 @@ static type_t *parse_typename(void)
 	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
+	anonymous_entity = NULL;
 
 	return result;
 }
