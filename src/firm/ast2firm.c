@@ -1766,23 +1766,66 @@ static ir_node *handle_assume(expression_t const *const expr)
 	}
 }
 
+static ir_node *control_flow_to_1_0(expression_t const *const expr,
+                                    jump_target *const true_target,
+                                    jump_target *const false_target)
+{
+	ir_node        *val  = NULL;
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+	ir_mode  *const mode = get_ir_mode_storage(expr->base.type);
+	jump_target     exit_target;
+	init_jump_target(&exit_target, NULL);
+
+	if (enter_jump_target(true_target)) {
+		jump_to_target(&exit_target);
+		val = new_d_Const(dbgi, get_mode_one(mode));
+	}
+
+	if (enter_jump_target(false_target)) {
+		jump_to_target(&exit_target);
+		ir_node *const zero = new_d_Const(dbgi, get_mode_null(mode));
+		if (val) {
+			ir_node *const in[] = { val, zero };
+			val = new_rd_Phi(dbgi, exit_target.block, ARRAY_SIZE(in), in, mode);
+		} else {
+			val = zero;
+		}
+	}
+
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		val = new_d_Bad(dbgi, mode);
+	}
+	return val;
+}
+
 static ir_node *create_cast(unary_expression_t const *const expr)
 {
+	type_t *const to_type = skip_typeref(expr->base.type);
+	if (is_type_atomic(to_type, ATOMIC_TYPE_BOOL)) {
+		jump_target true_target;
+		jump_target false_target;
+		init_jump_target(&true_target,  NULL);
+		init_jump_target(&false_target, NULL);
+		const expression_t *const as_expr = (const expression_t*)expr;
+		expression_to_control_flow(as_expr, &true_target, &false_target);
+		return control_flow_to_1_0(as_expr, &true_target, &false_target);
+	}
+
 	type_t  *const from_type = skip_typeref(expr->value->base.type);
-	ir_node       *value     = is_type_complex(from_type)
+	ir_node *      value     = is_type_complex(from_type)
 		? expression_to_complex(expr->value).real
 		: expression_to_value(expr->value);
 
-	type_t *const type = skip_typeref(expr->base.type);
-	if (is_type_void(type))
+	if (is_type_void(to_type))
 		return NULL;
 
 	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-	ir_mode  *const mode = get_ir_mode_storage(type);
+	ir_mode  *const mode = get_ir_mode_storage(to_type);
 	/* check for conversion from / to __based types */
-	if (is_type_pointer(type) && is_type_pointer(from_type)) {
+	if (is_type_pointer(to_type) && is_type_pointer(from_type)) {
 		const variable_t *from_var = from_type->pointer.base_variable;
-		const variable_t *to_var   = type->pointer.base_variable;
+		const variable_t *to_var   = to_type->pointer.base_variable;
 		if (from_var != to_var) {
 			if (from_var != NULL) {
 				ir_node *const addr = new_d_Address(dbgi, from_var->v.entity);
@@ -2019,37 +2062,6 @@ static void compare_to_control_flow(expression_t const *const expr, ir_node *con
 		add_pred_to_jump_target(false_target, false_proj);
 	}
 	set_unreachable_now();
-}
-
-static ir_node *control_flow_to_1_0(expression_t const *const expr, jump_target *const true_target, jump_target *const false_target)
-{
-	ir_node        *val  = NULL;
-	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-	ir_mode  *const mode = get_ir_mode_storage(expr->base.type);
-	jump_target     exit_target;
-	init_jump_target(&exit_target, NULL);
-
-	if (enter_jump_target(true_target)) {
-		jump_to_target(&exit_target);
-		val = new_d_Const(dbgi, get_mode_one(mode));
-	}
-
-	if (enter_jump_target(false_target)) {
-		jump_to_target(&exit_target);
-		ir_node *const zero = new_d_Const(dbgi, get_mode_null(mode));
-		if (val) {
-			ir_node *const in[] = { val, zero };
-			val = new_rd_Phi(dbgi, exit_target.block, ARRAY_SIZE(in), in, mode);
-		} else {
-			val = zero;
-		}
-	}
-
-	if (!enter_jump_target(&exit_target)) {
-		set_cur_block(new_Block(0, NULL));
-		val = new_d_Bad(dbgi, mode);
-	}
-	return val;
 }
 
 static ir_node *binop_assign_to_firm(binary_expression_t const *const expr)
@@ -2471,10 +2483,6 @@ static ir_node *expression_to_value(expression_t const *const expr)
 #endif
 
 	switch (expr->kind) {
-	case EXPR_UNARY_CAST:
-		if (!is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL))
-			return create_cast(&expr->unary);
-		/* FALLTHROUGH */
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_GREATER:
 	case EXPR_BINARY_GREATEREQUAL:
@@ -2544,6 +2552,7 @@ incdec:
 
 	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
 	case EXPR_BINARY_ASSIGN:              return assign_expression_to_firm(       &expr->binary);
+	case EXPR_UNARY_CAST:                 return create_cast(&expr->unary);
 	case EXPR_BINARY_COMMA:               return comma_expression_to_firm(        &expr->binary);
 	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
 	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
