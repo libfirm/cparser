@@ -8804,6 +8804,22 @@ static bool are_positions_contiguous(const position_t *pos_first,
 }
 
 /**
+ * Normally expressions like bitfield selects undergo automatic type
+ * promotion when used as a value, however when used as an lhs values we want
+ * to see a cast to the unconverted type.
+ */
+static type_t *get_lhs_type(expression_t *expression)
+{
+	if (is_bitfield(expression)) {
+		assert(expression->kind == EXPR_SELECT);
+		const entity_t *member   = expression->select.compound_entry;
+		type_t         *lhs_type = member->declaration.type;
+		return lhs_type;
+	}
+	return expression->base.type;
+}
+
+/**
  * Check the semantic restrictions of a binary assign expression.
  */
 static void semantic_binexpr_assign(binary_expression_t *expression)
@@ -8819,26 +8835,17 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		}
 	}
 
-	expression_t *left           = expression->left;
-	type_t       *orig_type_left = left->base.type;
-
+	expression_t *left = expression->left;
 	if (!is_valid_assignment_lhs(left))
 		return;
 
-	assign_error_t error = semantic_assign(orig_type_left, expression->right);
-	report_assign_error(error, orig_type_left, expression->right,
-	                    "assignment", &left->base.pos);
-	if (is_bitfield(left)) {
-		assert(left->kind == EXPR_SELECT);
-		const entity_t *member      = left->select.compound_entry;
-		type_t         *lhs_type    = member->declaration.type;
-		const type_t   *lhs_skipped = skip_typeref(lhs_type);
-		if (is_type_enum(lhs_skipped)) {
-			warn_enum_conversion(lhs_type, expression->right);
-		}
-	}
-	expression->right = create_implicit_cast(expression->right, orig_type_left);
-	expression->base.type = orig_type_left;
+
+	type_t        *assign_type = get_lhs_type(left);
+	assign_error_t error       = semantic_assign(assign_type, expression->right);
+	report_assign_error(error, assign_type, expression->right, "assignment",
+	                    &left->base.pos);
+	expression->right = create_implicit_cast(expression->right, assign_type);
+	expression->base.type = left->base.type;
 }
 
 /**
