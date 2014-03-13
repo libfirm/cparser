@@ -449,16 +449,12 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return false;
 
-	ir_graph *const old_irg = current_ir_graph;
-	current_ir_graph = irg;
-
 	timer_start(config->timer);
 	config->u.transform_irg(irg);
 	timer_stop(config->timer);
 
 	after_transform(irg, name);
 
-	current_ir_graph = old_irg;
 	return true;
 }
 
