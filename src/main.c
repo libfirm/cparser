@@ -49,12 +49,16 @@ static compile_mode_t mode = MODE_COMPILE_ASSEMBLE_LINK;
 
 static bool print_fluffy(compilation_env_t *env, compilation_unit_t *unit)
 {
+	if (!open_output(env))
+		return false;
 	write_fluffy_decls(env->out, unit->ast);
 	return true;
 }
 
 static bool print_jna(compilation_env_t *env, compilation_unit_t *unit)
 {
+	if (!open_output(env))
+		return false;
 	write_jna_decls(env->out, unit->ast);
 	return true;
 }
@@ -62,6 +66,8 @@ static bool print_jna(compilation_env_t *env, compilation_unit_t *unit)
 static bool print_compound_size(compilation_env_t *env,
                                 compilation_unit_t *unit)
 {
+	if (!open_output(env))
+		return false;
 	write_compoundsizes(env->out, unit->ast);
 	return true;
 }
