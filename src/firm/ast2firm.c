@@ -5143,7 +5143,6 @@ static void create_function(entity_t *entity)
 
 	irg_finalize_cons(irg);
 
-	irg_assert_verify(irg);
 	current_vararg_entity = old_current_vararg_entity;
 	current_function      = old_current_function;
 
