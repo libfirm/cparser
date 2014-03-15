@@ -18,7 +18,7 @@ CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
 CFLAGS_debug    = -O0 -g
-CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG
+CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG -DNO_DEFAULT_VERIFY
 CFLAGS_profile  = -pg -O3 -fno-inline
 CFLAGS_coverage = --coverage -O0
 CFLAGS += $(CFLAGS_$(variant))

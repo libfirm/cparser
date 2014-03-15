@@ -631,6 +631,11 @@ bool options_parse_meta(options_state_t *s)
 
 void options_parse_early(options_state_t *state)
 {
+	// disable backend verifiaction
+#ifdef NO_DEFAULT_VERIFY
+	be_parse_arg("verify=off");
+#endif
+
 	unsigned opt_level = 1;
 	for (int i = 1; i < state->argc; ++i) {
 		const char *arg = state->argv[i];

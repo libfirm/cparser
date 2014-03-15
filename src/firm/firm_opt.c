@@ -73,7 +73,11 @@ static struct a_firm_opt firm_opt = {
 	.alias_analysis   =  true,
 	.strict_alias     =  false,
 	.no_alias         =  false,
+#ifdef NO_DEFAULT_VERIFY
+	.verify           =  false,
+#else
 	.verify           =  true,
+#endif
 	.check_all        =  true,
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
