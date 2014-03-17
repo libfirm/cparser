@@ -6498,6 +6498,36 @@ static expression_t *parse_complex_extract_expression(expression_kind_t const ki
 	return extract;
 }
 
+static expression_t *get_statement_expression_last(
+		const statement_expression_t *const expr)
+{
+	statement_t *statement = expr->statement;
+	assert(statement->kind == STATEMENT_COMPOUND);
+	statement_t *last = NULL;
+	for (statement_t *s = statement->compound.statements; s != NULL;
+	     s = s->base.next) {
+		last = s;
+	}
+	if (last->kind == STATEMENT_EXPRESSION)
+		return last->expression.expression;
+	return NULL;
+}
+
+static void semantic_statement_expression(statement_expression_t *expr)
+{
+	assert(expr->statement->kind == STATEMENT_COMPOUND);
+	type_t *type = type_void;
+	if (expr->statement->compound.statements == NULL) {
+		position_t const *const pos = &expr->base.pos;
+		warningf(WARN_OTHER, pos, "empty statement expression ({})");
+	} else {
+		expression_t *expression = get_statement_expression_last(expr);
+		if (expression != NULL)
+			type = expression->base.type;
+	}
+	expr->base.type = type;
+}
+
 /**
  * Parse a statement expression.
  */
@@ -6511,25 +6541,11 @@ static expression_t *parse_statement_expression(void)
 	statement_t *statement          = parse_compound_statement(true);
 	statement->compound.stmt_expr   = true;
 	expression->statement.statement = statement;
-
-	/* find last statement and use its type */
-	type_t *type = type_void;
-	const statement_t *stmt = statement->compound.statements;
-	if (stmt != NULL) {
-		while (stmt->base.next != NULL)
-			stmt = stmt->base.next;
-
-		if (stmt->kind == STATEMENT_EXPRESSION) {
-			type = stmt->expression.expression->base.type;
-		}
-	} else {
-		position_t const *const pos = &expression->base.pos;
-		warningf(WARN_OTHER, pos, "empty statement expression ({})");
-	}
-	expression->base.type = type;
-
 	rem_anchor_token(')');
 	expect(')');
+
+	semantic_statement_expression(&expression->statement);
+
 	return expression;
 }
 
