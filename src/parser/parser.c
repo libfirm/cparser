@@ -33,7 +33,6 @@
 #include "preprocessor.h"
 #include "token_t.h"
 
-//#define PRINT_TOKENS
 #define MAX_LOOKAHEAD 1
 
 typedef struct {
@@ -470,11 +469,6 @@ static inline void next_token(void)
 	next_preprocessing_token();
 
 	lookahead_bufpos = (lookahead_bufpos + 1) % MAX_LOOKAHEAD;
-
-#ifdef PRINT_TOKENS
-	print_token(stderr, &token);
-	fprintf(stderr, "\n");
-#endif
 }
 
 static inline void eat(token_kind_t const kind)
