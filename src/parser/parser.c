@@ -8480,6 +8480,7 @@ static bool maybe_negative(expression_t const *const expr)
 			/* The result of comparison and logical operators never is negative. */
 			return false;
 
+		case EXPR_BINARY_ASSIGN:
 		case EXPR_BINARY_COMMA:
 			return maybe_negative(expr->binary.right);
 
@@ -8489,6 +8490,12 @@ static bool maybe_negative(expression_t const *const expr)
 			return
 				maybe_negative(t ? t : c->condition) ||
 				maybe_negative(c->false_expression);
+		}
+
+		case EXPR_STATEMENT: {
+			expression_t *value_expr
+				= get_statement_expression_last(&expr->statement);
+			return value_expr != NULL ? maybe_negative(value_expr) : false;
 		}
 
 		default:
@@ -8549,18 +8556,15 @@ static void semantic_comparison(binary_expression_t *expression,
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 
 		/* test for signed vs unsigned compares */
-		if (is_type_integer(arithmetic_type)) {
+		if (is_type_integer(arithmetic_type)
+		    && !is_type_signed(arithmetic_type)) {
 			bool const signed_left  = is_type_signed(type_left);
 			bool const signed_right = is_type_signed(type_right);
-			if (signed_left != signed_right) {
-				/* FIXME long long needs better const folding magic */
-				/* TODO check whether constant value can be represented by
-				 * other type */
-				if ((signed_left  && maybe_negative(left))
-				    || (signed_right && maybe_negative(right))) {
-					warningf(WARN_SIGN_COMPARE, pos,
-					         "comparison between signed and unsigned");
-				}
+			if (signed_left != signed_right
+			    && ((signed_left && maybe_negative(left))
+				    || (signed_right && maybe_negative(right)))) {
+				warningf(WARN_SIGN_COMPARE, pos,
+						 "comparison between signed and unsigned");
 			}
 		}
 
