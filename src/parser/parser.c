@@ -3761,6 +3761,11 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				case EXPR_CLASS_CONSTANT:
 				case EXPR_CLASS_VARIABLE:
 					array_type->array.is_vla = true;
+					if (current_scope == file_scope) {
+						errorf(&size_expression->base.pos,
+						       "variable length array '%T' at file scope",
+						       array_type);
+					}
 					break;
 
 				case EXPR_CLASS_ERROR:
