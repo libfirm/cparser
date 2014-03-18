@@ -838,12 +838,9 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	return true;
 }
 
-bool write_ir_file(compilation_env_t *env, compilation_unit_t *units)
+bool write_ir_file(compilation_env_t *env, compilation_unit_t *unit)
 {
-	(void)units;
-	if (env->outname == NULL)
-		env->outname = "a.ir";
-	if (!open_output(env))
+	if (!open_output_for_unit(env, unit, ".ir"))
 		return false;
 	ir_export_file(env->out);
 	int errors = ferror(env->out);

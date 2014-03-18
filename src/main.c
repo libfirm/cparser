@@ -177,8 +177,12 @@ static void set_handlers(compile_mode_t mode)
 		return;
 	case MODE_PARSE_ONLY:
 	case MODE_COMPILE_DUMP:
-	case MODE_COMPILE_EXPORTIR:
 		set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, true);
+		set_unused_after(MODE_COMPILE);
+	    return;
+	case MODE_COMPILE_EXPORTIR:
+		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+		                 write_ir_file, true);
 		set_unused_after(MODE_COMPILE);
 	    return;
 	case MODE_COMPILE:
@@ -268,7 +272,6 @@ int action_compile(const char *argv0)
 		bool (*final_step)(compilation_env_t *env, compilation_unit_t *units)
 			= mode == MODE_COMPILE_ASSEMBLE_LINK ? link_program
 			: mode == MODE_COMPILE_DUMP          ? dump_irg
-			: mode == MODE_COMPILE_EXPORTIR      ? write_ir_file
 			: warn_no_linking;
 		bool res = final_step(&env, units);
 		if (!res) {
