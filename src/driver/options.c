@@ -649,6 +649,10 @@ void options_parse_early(options_state_t *state)
 				opt_level = opt[0] - '0';
 			} else if (opt[0] == '\0') {
 				opt_level = 1; /* '-O' is equivalent to '-O1'. */
+			} else if (streq(opt, "fast")) {
+				opt_level = 3; /* TODO stub. */
+			} else if (streq(opt, "g")) {
+				opt_level = 0; /* TODO stub. */
 			} else if (streq(opt, "s")) {
 				opt_level = 2; /* TODO For now, until we have a real '-Os'. */
 			} else {
