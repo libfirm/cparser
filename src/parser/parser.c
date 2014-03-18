@@ -8582,11 +8582,28 @@ static void semantic_comparison(binary_expression_t *expression,
 			                        pos, type_left, type_right);
 		}
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		/* TODO check compatibility */
-	} else if (is_type_pointer(type_left)) {
+		type_t *points_to_left  = type_left->pointer.points_to;
+		type_t *points_to_right = type_right->pointer.points_to;
+		type_t *skipped_pt_left  = skip_typeref(points_to_left);
+		type_t *skipped_pt_right = skip_typeref(points_to_right);
+		if (!is_type_void(skipped_pt_left) && !is_type_void(skipped_pt_right)
+		    && !types_compatible(skipped_pt_left, skipped_pt_right)) {
+			warningf(WARN_DISTINCT_POINTER_TYPES, pos,
+			         "comparison of distinct pointer types: '%T' and '%T'",
+			         orig_type_left, orig_type_right);
+		}
+	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->right = create_implicit_cast(right, type_left);
-	} else if (is_type_pointer(type_right)) {
+		if (is_relational || !is_null_pointer_constant(right))
+			goto int_ptr_warning;
+	} else if (is_type_pointer(type_right) && is_type_integer(type_left)) {
 		expression->left = create_implicit_cast(left, type_right);
+		if (is_relational || !is_null_pointer_constant(left)) {
+int_ptr_warning:
+			warningf(WARN_OTHER, pos,
+					 "comparison between pointer and integer: '%T' and '%T'",
+					 orig_type_left, orig_type_right);
+		}
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		type_error_incompatible("invalid operands in comparison", pos,
 		                        type_left, type_right);

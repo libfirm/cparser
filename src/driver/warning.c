@@ -25,6 +25,7 @@ static warning_switch_t warning[] = {
 	[WARN_CONVERSION]                    = { WARN_STATE_NONE, "conversion"                    },
 	[WARN_DECLARATION_AFTER_STATEMENT]   = { WARN_STATE_NONE, "declaration-after-statement"   },
 	[WARN_DEPRECATED_DECLARATIONS]       = { WARN_STATE_ON,   "deprecated-declarations"       },
+	[WARN_DISTINCT_POINTER_TYPES]        = { WARN_STATE_ON,   "distinct-pointer-types"        },
 	[WARN_DIV_BY_ZERO]                   = { WARN_STATE_ON,   "div-by-zero"                   },
 	[WARN_EMPTY_BODY]                    = { WARN_STATE_NONE, "empty-body"                    },
 	[WARN_EMPTY_STATEMENT]               = { WARN_STATE_NONE, "empty-statement"               },

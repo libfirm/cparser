@@ -25,6 +25,7 @@ typedef enum warning_t {
 	WARN_CONVERSION,                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
 	WARN_DECLARATION_AFTER_STATEMENT,   /**< Warn when a declaration is found after a statement in a block */
 	WARN_DEPRECATED_DECLARATIONS,       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
+	WARN_DISTINCT_POINTER_TYPES,        /**< warn when comparing pointers to incompatible types */
 	WARN_DIV_BY_ZERO,                   /**< Warn about compile-time integer division by zero */
 	WARN_EMPTY_BODY,                    /**< Warn about an empty body of an if or else statement */
 	WARN_EMPTY_STATEMENT,               /**< Warn about empty statements, i.e. lone ';'  */
