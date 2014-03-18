@@ -8592,7 +8592,9 @@ static void semantic_comparison(binary_expression_t *expression,
 		type_t *skipped_pt_left  = skip_typeref(points_to_left);
 		type_t *skipped_pt_right = skip_typeref(points_to_right);
 		if (!is_type_void(skipped_pt_left) && !is_type_void(skipped_pt_right)
-		    && !types_compatible(skipped_pt_left, skipped_pt_right)) {
+		    && !types_compatible(skipped_pt_left, skipped_pt_right)
+		    && is_type_valid(skipped_pt_left)
+		    && is_type_valid(skipped_pt_right)) {
 			warningf(WARN_DISTINCT_POINTER_TYPES, pos,
 			         "comparison of distinct pointer types: '%T' and '%T'",
 			         orig_type_left, orig_type_right);
