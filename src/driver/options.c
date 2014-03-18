@@ -644,15 +644,14 @@ void options_parse_early(options_state_t *state)
 
 		const char *option = &arg[1];
 		if (option[0] == 'O') {
-			if (option[2] != '\0')
-				goto invalid_o_option;
-			char opt = option[1];
-			if (opt == 's') {
-				opt_level = 2; /* for now until we have a real -Os */
-			} else if (opt >= '0' && opt <= '9') {
-				opt_level = opt - '0';
+			char const *const opt = option + 1;
+			if ('0' <= opt[0] && opt[0] <= '9' && opt[1] == '\0') {
+				opt_level = opt[0] - '0';
+			} else if (opt[0] == '\0') {
+				opt_level = 1; /* '-O' is equivalent to '-O1'. */
+			} else if (streq(opt, "s")) {
+				opt_level = 2; /* TODO For now, until we have a real '-Os'. */
 			} else {
-invalid_o_option:
 				errorf(NULL, "invalid optimization option '%s'", arg);
 				state->argument_errors = true;
 			}
