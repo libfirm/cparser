@@ -1372,235 +1372,11 @@ static attribute_t *parse_attributes(attribute_t *first)
 	}
 }
 
-static void mark_vars_read(expression_t *expr, entity_t *lhs_ent);
-
-static entity_t *determine_lhs_ent(expression_t *const expr,
-                                   entity_t *lhs_ent)
-{
-	switch (expr->kind) {
-	case EXPR_REFERENCE: {
-		entity_t *const entity = expr->reference.entity;
-		/* we should only find variables as lvalues... */
-		if (entity->base.kind != ENTITY_VARIABLE
-		 && entity->base.kind != ENTITY_PARAMETER)
-			return NULL;
-
-		return entity;
-	}
-
-	case EXPR_ARRAY_ACCESS: {
-		expression_t *const ref = expr->array_access.array_ref;
-		entity_t     *      ent = NULL;
-		if (is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
-			ent     = determine_lhs_ent(ref, lhs_ent);
-			lhs_ent = ent;
-		} else {
-			mark_vars_read(ref, lhs_ent);
-		}
-		mark_vars_read(expr->array_access.index, lhs_ent);
-		return ent;
-	}
-
-	case EXPR_SELECT: {
-		mark_vars_read(expr->select.compound, lhs_ent);
-		if (is_type_compound(skip_typeref(expr->base.type)))
-			return determine_lhs_ent(expr->select.compound, lhs_ent);
-		return NULL;
-	}
-
-	case EXPR_UNARY_DEREFERENCE: {
-		expression_t *const val = expr->unary.value;
-		if (val->kind == EXPR_UNARY_TAKE_ADDRESS) {
-			/* *&x is a NOP */
-			return determine_lhs_ent(val->unary.value, lhs_ent);
-		} else {
-			mark_vars_read(val, NULL);
-			return NULL;
-		}
-	}
-
-	default:
-		mark_vars_read(expr, NULL);
-		return NULL;
-	}
-}
-
 #define ENT_ANY ((entity_t*)-1)
 
-/**
- * Mark declarations, which are read.  This is used to detect variables, which
- * are never read.
- * Example:
- * x = x + 1;
- *   x is not marked as "read", because it is only read to calculate its own new
- *   value.
- *
- * x += y; y += x;
- *   x and y are not detected as "not read", because multiple variables are
- *   involved.
- */
-static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
-{
-	switch (expr->kind) {
-	case EXPR_REFERENCE: {
-		entity_t *const entity = expr->reference.entity;
-		if (entity->kind != ENTITY_VARIABLE
-		 && entity->kind != ENTITY_PARAMETER)
-			return;
-
-		if (lhs_ent != entity && lhs_ent != ENT_ANY) {
-			entity->variable.read = true;
-		}
-		return;
-	}
-
-	case EXPR_CALL:
-		// TODO respect pure/const
-		mark_vars_read(expr->call.function, NULL);
-		for (call_argument_t *arg = expr->call.arguments; arg != NULL;
-		     arg = arg->next) {
-			mark_vars_read(arg->expression, NULL);
-		}
-		return;
-
-	case EXPR_CONDITIONAL:
-		// TODO lhs_decl should depend on whether true/false have an effect
-		mark_vars_read(expr->conditional.condition, NULL);
-		if (expr->conditional.true_expression != NULL)
-			mark_vars_read(expr->conditional.true_expression, lhs_ent);
-		mark_vars_read(expr->conditional.false_expression, lhs_ent);
-		return;
-
-	case EXPR_SELECT:
-		if (lhs_ent == ENT_ANY
-				&& !is_type_compound(skip_typeref(expr->base.type)))
-			lhs_ent = NULL;
-		mark_vars_read(expr->select.compound, lhs_ent);
-		return;
-
-	case EXPR_ARRAY_ACCESS: {
-		mark_vars_read(expr->array_access.index, lhs_ent);
-		expression_t *const ref = expr->array_access.array_ref;
-		if (!is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
-			if (lhs_ent == ENT_ANY)
-				lhs_ent = NULL;
-		}
-		mark_vars_read(ref, lhs_ent);
-		return;
-	}
-
-	case EXPR_VA_ARG:
-		mark_vars_read(expr->va_arge.ap, lhs_ent);
-		return;
-
-	case EXPR_VA_COPY:
-		mark_vars_read(expr->va_copye.src, lhs_ent);
-		return;
-
-	case EXPR_UNARY_CAST:
-		/* Special case: Use void cast to mark a variable as "read" */
-		if (is_type_void(skip_typeref(expr->base.type)))
-			lhs_ent = NULL;
-		goto unary;
-
-	case EXPR_UNARY_THROW:
-		if (expr->unary.value == NULL)
-			return;
-		/* FALLTHROUGH */
-	case EXPR_UNARY_DEREFERENCE:
-	case EXPR_UNARY_DELETE:
-	case EXPR_UNARY_DELETE_ARRAY:
-		if (lhs_ent == ENT_ANY)
-			lhs_ent = NULL;
-		goto unary;
-
-	case EXPR_UNARY_NEGATE:
-	case EXPR_UNARY_PLUS:
-	case EXPR_UNARY_COMPLEMENT:
-	case EXPR_UNARY_NOT:
-	case EXPR_UNARY_TAKE_ADDRESS:
-	case EXPR_UNARY_POSTFIX_INCREMENT:
-	case EXPR_UNARY_POSTFIX_DECREMENT:
-	case EXPR_UNARY_PREFIX_INCREMENT:
-	case EXPR_UNARY_PREFIX_DECREMENT:
-	case EXPR_UNARY_ASSUME:
-	case EXPR_UNARY_IMAG:
-	case EXPR_UNARY_REAL:
-unary:
-		mark_vars_read(expr->unary.value, lhs_ent);
-		return;
-
-	case EXPR_BINARY_ADD:
-	case EXPR_BINARY_SUB:
-	case EXPR_BINARY_MUL:
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_MOD:
-	case EXPR_BINARY_EQUAL:
-	case EXPR_BINARY_NOTEQUAL:
-	case EXPR_BINARY_LESS:
-	case EXPR_BINARY_LESSEQUAL:
-	case EXPR_BINARY_GREATER:
-	case EXPR_BINARY_GREATEREQUAL:
-	case EXPR_BINARY_BITWISE_AND:
-	case EXPR_BINARY_BITWISE_OR:
-	case EXPR_BINARY_BITWISE_XOR:
-	case EXPR_BINARY_LOGICAL_AND:
-	case EXPR_BINARY_LOGICAL_OR:
-	case EXPR_BINARY_SHIFTLEFT:
-	case EXPR_BINARY_SHIFTRIGHT:
-	case EXPR_BINARY_COMMA:
-	case EXPR_BINARY_ISGREATER:
-	case EXPR_BINARY_ISGREATEREQUAL:
-	case EXPR_BINARY_ISLESS:
-	case EXPR_BINARY_ISLESSEQUAL:
-	case EXPR_BINARY_ISLESSGREATER:
-	case EXPR_BINARY_ISUNORDERED:
-		mark_vars_read(expr->binary.left,  lhs_ent);
-		mark_vars_read(expr->binary.right, lhs_ent);
-		return;
-
-	case EXPR_BINARY_ASSIGN:
-	case EXPR_BINARY_MUL_ASSIGN:
-	case EXPR_BINARY_DIV_ASSIGN:
-	case EXPR_BINARY_MOD_ASSIGN:
-	case EXPR_BINARY_ADD_ASSIGN:
-	case EXPR_BINARY_SUB_ASSIGN:
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-	case EXPR_BINARY_BITWISE_AND_ASSIGN:
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
-	case EXPR_BINARY_BITWISE_OR_ASSIGN: {
-		if (lhs_ent == ENT_ANY)
-			lhs_ent = NULL;
-		lhs_ent = determine_lhs_ent(expr->binary.left, lhs_ent);
-		mark_vars_read(expr->binary.right, lhs_ent);
-		return;
-	}
-
-	case EXPR_VA_START:
-		determine_lhs_ent(expr->va_starte.ap, lhs_ent);
-		return;
-
-	case EXPR_LITERAL_CASES:
-	case EXPR_LITERAL_CHARACTER:
-	case EXPR_ERROR:
-	case EXPR_STRING_LITERAL:
-	case EXPR_COMPOUND_LITERAL: // TODO init?
-	case EXPR_SIZEOF:
-	case EXPR_CLASSIFY_TYPE:
-	case EXPR_ALIGNOF:
-	case EXPR_FUNCNAME:
-	case EXPR_BUILTIN_CONSTANT_P:
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-	case EXPR_OFFSETOF:
-	case EXPR_STATEMENT: // TODO
-	case EXPR_LABEL_ADDRESS:
-	case EXPR_ENUM_CONSTANT:
-		return;
-	}
-
-	panic("unhandled expression");
-}
+static void mark_vars_read(expression_t *expr, entity_t *lhs_ent);
+static entity_t *determine_lhs_ent(expression_t *const expr,
+                                   entity_t *lhs_ent);
 
 static designator_t *parse_designation(void)
 {
@@ -4835,7 +4611,9 @@ static void warn_unused_entity(warning_t const why, entity_t *entity, entity_t *
 		if (!declaration->used) {
 			print_in_function();
 			warningf(why, &entity->base.pos, "'%N' is unused", entity);
-		} else if (entity->kind == ENTITY_VARIABLE && !entity->variable.read) {
+		} else if ((entity->kind == ENTITY_VARIABLE
+		            || entity->kind == ENTITY_PARAMETER)
+		           && !entity->variable.read) {
 			print_in_function();
 			warningf(why, &entity->base.pos, "'%N' is never read", entity);
 		}
@@ -10788,6 +10566,245 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	POP_SCOPE();
 	POP_PARENT();
 	return statement;
+}
+
+static entity_t *determine_lhs_ent(expression_t *const expr,
+                                   entity_t *lhs_ent)
+{
+	switch (expr->kind) {
+	case EXPR_REFERENCE: {
+		entity_t *const entity = expr->reference.entity;
+		/* we should only find variables as lvalues... */
+		if (entity->base.kind != ENTITY_VARIABLE
+		 && entity->base.kind != ENTITY_PARAMETER)
+			return NULL;
+
+		return entity;
+	}
+
+	case EXPR_ARRAY_ACCESS: {
+		expression_t *const ref = expr->array_access.array_ref;
+		entity_t     *      ent = NULL;
+		if (is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
+			ent     = determine_lhs_ent(ref, lhs_ent);
+			lhs_ent = ent;
+		} else {
+			mark_vars_read(ref, lhs_ent);
+		}
+		mark_vars_read(expr->array_access.index, lhs_ent);
+		return ent;
+	}
+
+	case EXPR_SELECT: {
+		mark_vars_read(expr->select.compound, lhs_ent);
+		if (is_type_compound(skip_typeref(expr->base.type)))
+			return determine_lhs_ent(expr->select.compound, lhs_ent);
+		return NULL;
+	}
+
+	case EXPR_UNARY_DEREFERENCE: {
+		expression_t *const val = expr->unary.value;
+		if (val->kind == EXPR_UNARY_TAKE_ADDRESS) {
+			/* *&x is a NOP */
+			return determine_lhs_ent(val->unary.value, lhs_ent);
+		} else {
+			mark_vars_read(val, NULL);
+			return NULL;
+		}
+	}
+
+	default:
+		mark_vars_read(expr, NULL);
+		return NULL;
+	}
+}
+
+/**
+ * Mark declarations, which are read.  This is used to detect variables, which
+ * are never read.
+ * Example:
+ * x = x + 1;
+ *   x is not marked as "read", because it is only read to calculate its own new
+ *   value.
+ *
+ * x += y; y += x;
+ *   x and y are not detected as "not read", because multiple variables are
+ *   involved.
+ */
+static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
+{
+	switch (expr->kind) {
+	case EXPR_REFERENCE: {
+		entity_t *const entity = expr->reference.entity;
+		if (entity->kind != ENTITY_VARIABLE && entity->kind != ENTITY_PARAMETER)
+			return;
+
+		if (lhs_ent != entity && lhs_ent != ENT_ANY) {
+			entity->variable.read = true;
+		}
+		return;
+	}
+
+	case EXPR_CALL:
+		// TODO respect pure/const
+		mark_vars_read(expr->call.function, NULL);
+		for (call_argument_t *arg = expr->call.arguments; arg != NULL;
+		     arg = arg->next) {
+			mark_vars_read(arg->expression, NULL);
+		}
+		return;
+
+	case EXPR_CONDITIONAL:
+		// TODO lhs_decl should depend on whether true/false have an effect
+		mark_vars_read(expr->conditional.condition, NULL);
+		if (expr->conditional.true_expression != NULL)
+			mark_vars_read(expr->conditional.true_expression, lhs_ent);
+		mark_vars_read(expr->conditional.false_expression, lhs_ent);
+		return;
+
+	case EXPR_SELECT:
+		if (lhs_ent == ENT_ANY
+				&& !is_type_compound(skip_typeref(expr->base.type)))
+			lhs_ent = NULL;
+		mark_vars_read(expr->select.compound, lhs_ent);
+		return;
+
+	case EXPR_ARRAY_ACCESS: {
+		mark_vars_read(expr->array_access.index,
+		               lhs_ent == ENT_ANY ? NULL : lhs_ent);
+		expression_t *const ref = expr->array_access.array_ref;
+		if (!is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))
+		    && lhs_ent == ENT_ANY)
+			lhs_ent = NULL;
+		mark_vars_read(ref, lhs_ent);
+		return;
+	}
+
+	case EXPR_VA_ARG:
+		mark_vars_read(expr->va_arge.ap, lhs_ent);
+		return;
+
+	case EXPR_VA_COPY:
+		mark_vars_read(expr->va_copye.src, lhs_ent);
+		return;
+
+	case EXPR_UNARY_CAST:
+		/* Special case: Use void cast to mark a variable as "read" */
+		if (is_type_void(skip_typeref(expr->base.type)))
+			lhs_ent = NULL;
+		goto unary;
+
+	case EXPR_UNARY_THROW:
+		if (expr->unary.value == NULL)
+			return;
+		/* FALLTHROUGH */
+	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_DELETE:
+	case EXPR_UNARY_DELETE_ARRAY:
+		if (lhs_ent == ENT_ANY)
+			lhs_ent = NULL;
+		goto unary;
+
+	case EXPR_UNARY_NEGATE:
+	case EXPR_UNARY_PLUS:
+	case EXPR_UNARY_COMPLEMENT:
+	case EXPR_UNARY_NOT:
+	case EXPR_UNARY_TAKE_ADDRESS:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
+	case EXPR_UNARY_ASSUME:
+	case EXPR_UNARY_IMAG:
+	case EXPR_UNARY_REAL:
+unary:
+		mark_vars_read(expr->unary.value, lhs_ent);
+		return;
+
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_SUB:
+	case EXPR_BINARY_MUL:
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_LOGICAL_AND:
+	case EXPR_BINARY_LOGICAL_OR:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED:
+binary:
+		mark_vars_read(expr->binary.left,  lhs_ent);
+		mark_vars_read(expr->binary.right, lhs_ent);
+		return;
+
+	case EXPR_BINARY_COMMA:
+		mark_vars_read(expr->binary.left, NULL);
+		mark_vars_read(expr->binary.right, lhs_ent);
+		return;
+
+	case EXPR_BINARY_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_DIV_ASSIGN:
+	case EXPR_BINARY_MOD_ASSIGN:
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN: {
+		if (lhs_ent == NULL)
+			goto binary;
+		if (lhs_ent == ENT_ANY)
+			lhs_ent = NULL;
+		lhs_ent = determine_lhs_ent(expr->binary.left, lhs_ent);
+		mark_vars_read(expr->binary.right, lhs_ent);
+		return;
+	}
+
+	case EXPR_VA_START:
+		determine_lhs_ent(expr->va_starte.ap, lhs_ent);
+		return;
+
+	case EXPR_STATEMENT: {
+		expression_t *last = get_statement_expression_last(&expr->statement);
+		if (last != NULL) {
+			mark_vars_read(last, lhs_ent);
+		}
+		return;
+	}
+
+	case EXPR_LITERAL_CASES:
+	case EXPR_LITERAL_CHARACTER:
+	case EXPR_ERROR:
+	case EXPR_STRING_LITERAL:
+	case EXPR_COMPOUND_LITERAL: // TODO init?
+	case EXPR_SIZEOF:
+	case EXPR_CLASSIFY_TYPE:
+	case EXPR_ALIGNOF:
+	case EXPR_FUNCNAME:
+	case EXPR_BUILTIN_CONSTANT_P:
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
+	case EXPR_OFFSETOF:
+	case EXPR_LABEL_ADDRESS:
+	case EXPR_ENUM_CONSTANT:
+		return;
+	}
+
+	panic("unhandled expression");
 }
 
 /**
