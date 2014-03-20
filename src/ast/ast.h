@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "entity.h"
+#include "string_rep.h"
 #include "type.h"
 
 typedef struct expression_base_t                     expression_base_t;
@@ -126,5 +127,7 @@ void determine_literal_type(literal_expression_t *literal);
  * to function-pointer types as defined §6.3.2.1
  */
 type_t *revert_automatic_type_conversion(const expression_t *expression);
+
+type_t *get_string_type(string_encoding_t const encoding);
 
 #endif

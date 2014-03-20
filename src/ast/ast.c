@@ -29,6 +29,7 @@
 #include "adt/util.h"
 #include "constfold.h"
 #include "driver/lang_features.h"
+#include "driver/warning.h"
 #include "printer.h"
 #include "symbol_t.h"
 #include "type_hash.h"
@@ -1957,6 +1958,19 @@ check_type:
 	panic("invalid expression");
 }
 
+type_t *get_string_type(string_encoding_t const enc)
+{
+	bool const warn = is_warn_on(WARN_WRITE_STRINGS);
+	switch (enc) {
+	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:   return warn ? type_const_char_ptr     : type_char_ptr;
+	case STRING_ENCODING_CHAR16: return warn ? type_char16_t_const_ptr : type_char16_t_ptr;
+	case STRING_ENCODING_CHAR32: return warn ? type_char32_t_const_ptr : type_char32_t_ptr;
+	case STRING_ENCODING_WIDE:   return warn ? type_const_wchar_t_ptr  : type_wchar_t_ptr;
+	}
+	panic("invalid string encoding");
+}
+
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
 	switch (expression->kind) {
@@ -1995,9 +2009,11 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t  const size = get_string_len(&expression->string_literal.value) + 1;
-		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
-		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
+		size_t const len = get_string_len(&expression->string_literal.value);
+		string_encoding_t const encoding
+			= expression->string_literal.value.encoding;
+		type_t *const elem = get_string_type(encoding)->pointer.points_to;
+		return make_array_type(elem, len+1, TYPE_QUALIFIER_NONE);
 	}
 
 	case EXPR_COMPOUND_LITERAL:

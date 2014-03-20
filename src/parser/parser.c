@@ -5648,19 +5648,6 @@ struct expression_parser_function_t {
 
 static expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
-static type_t *get_string_type(string_encoding_t const enc)
-{
-	bool const warn = is_warn_on(WARN_WRITE_STRINGS);
-	switch (enc) {
-	case STRING_ENCODING_CHAR:
-	case STRING_ENCODING_UTF8:   return warn ? type_const_char_ptr     : type_char_ptr;
-	case STRING_ENCODING_CHAR16: return warn ? type_char16_t_const_ptr : type_char16_t_ptr;
-	case STRING_ENCODING_CHAR32: return warn ? type_char32_t_const_ptr : type_char32_t_ptr;
-	case STRING_ENCODING_WIDE:   return warn ? type_const_wchar_t_ptr  : type_wchar_t_ptr;
-	}
-	panic("invalid string encoding");
-}
-
 /**
  * Parse a string constant.
  */
