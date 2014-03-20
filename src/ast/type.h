@@ -255,6 +255,12 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 
 const char *get_atomic_kind_name(atomic_type_kind_t kind);
 
+/** Returns integer promotion for a given type. (see §6.3.1.1:2) */
+type_t *promote_integer(type_t *type);
+
+/* Returns default promoted type (see §6.5.2.2:6) */
+type_t *get_default_promoted_type(type_t *type);
+
 /**
  * Finish the construction of a compound by calculating its size, offsets and
  * alignment.

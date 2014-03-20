@@ -852,21 +852,6 @@ static void label_pop_to(size_t new_top)
 }
 
 /**
- * §6.3.1.1:2  Do integer promotion for a given type.
- *
- * @param type  the type to promote
- * @return the promoted type
- */
-static type_t *promote_integer(type_t *type)
-{
-	atomic_type_kind_t akind = get_arithmetic_akind(type);
-	if (get_akind_rank(akind) < get_akind_rank(ATOMIC_TYPE_INT))
-		type = type_int;
-
-	return type;
-}
-
-/**
  * Check if a given expression represents a null pointer constant.
  *
  * @param expression  the expression to check
@@ -4412,21 +4397,6 @@ static void parse_declaration(parsed_declaration_func finished_declaration,
 		entity_t *entity = parse_declarator(&specifiers, flags);
 		parse_declaration_rest(entity, &specifiers, finished_declaration, flags);
 	}
-}
-
-/* §6.5.2.2:6 */
-static type_t *get_default_promoted_type(type_t *orig_type)
-{
-	type_t *result = orig_type;
-
-	type_t *type = skip_typeref(orig_type);
-	if (is_type_integer(type)) {
-		result = promote_integer(type);
-	} else if (is_type_atomic(type, ATOMIC_TYPE_FLOAT)) {
-		result = type_double;
-	}
-
-	return result;
 }
 
 static void parse_kr_declaration_list(entity_t *entity)

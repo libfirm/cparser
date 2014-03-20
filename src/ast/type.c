@@ -878,11 +878,26 @@ static bool function_types_compatible(const function_type_t *func1,
 		return false;
 
 	/* can parameters be compared? */
-	if ((func1->unspecified_parameters && !func1->kr_style_parameters)
-			|| (func2->unspecified_parameters && !func2->kr_style_parameters))
+	if (func1->unspecified_parameters && !func1->kr_style_parameters) {
+		if (func2->unspecified_parameters && !func2->kr_style_parameters)
+			return true;
+		const function_type_t *const temp = func1;
+		func1 = func2;
+		func2 = temp;
+		goto check_promoted_types;
+	} else if (func2->unspecified_parameters && !func2->kr_style_parameters) {
+check_promoted_types:
+		/* all argument types must already be promoted */
+		for (function_parameter_t *parameter = func1->parameters;
+		     parameter != NULL; parameter = parameter->next) {
+			type_t *const parameter_type = skip_typeref(parameter->type);
+			type_t *const promoted
+				= get_default_promoted_type(parameter_type);
+			if (promoted != parameter_type)
+				return false;
+		}
 		return true;
-
-	/* TODO: handling of unspecified parameters not correct yet */
+	}
 
 	/* all argument types must be compatible */
 	function_parameter_t *parameter1 = func1->parameters;
@@ -931,51 +946,56 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	if (type1 == type2)
 		return true;
 
-	if (type1->base.qualifiers == type2->base.qualifiers &&
-	    type1->kind            == type2->kind) {
-		switch (type1->kind) {
-		case TYPE_FUNCTION:
-			return function_types_compatible(&type1->function, &type2->function);
-		case TYPE_ATOMIC:
-		case TYPE_IMAGINARY:
-		case TYPE_COMPLEX:
-			return type1->atomic.akind == type2->atomic.akind;
-		case TYPE_ARRAY:
-			return array_types_compatible(&type1->array, &type2->array);
+	if (type1->base.qualifiers != type2->base.qualifiers)
+		return false;
 
-		case TYPE_POINTER: {
-			const type_t *const to1 = skip_typeref(type1->pointer.points_to);
-			const type_t *const to2 = skip_typeref(type2->pointer.points_to);
-			return types_compatible(to1, to2);
-		}
-
-		case TYPE_REFERENCE: {
-			const type_t *const to1 = skip_typeref(type1->reference.refers_to);
-			const type_t *const to2 = skip_typeref(type2->reference.refers_to);
-			return types_compatible(to1, to2);
-		}
-
-		case TYPE_COMPOUND_STRUCT:
-		case TYPE_COMPOUND_UNION:
-			break;
-
-		case TYPE_ENUM:
-			/* TODO: not implemented */
-			break;
-
-		case TYPE_ERROR:
-		case TYPE_VOID:
+	if (type1->kind != type2->kind) {
+		/* enum types are compatible to their base integer type */
+		if ((type1->kind == TYPE_ENUM
+			&& is_type_atomic(type2, type1->enumt.base.akind))
+		 || (type2->kind == TYPE_ENUM
+		    && is_type_atomic(type1, type2->enumt.base.akind)))
+		    return true;
+		/* error types are compatible to everything to avoid follow-up errors */
+		if (!is_type_valid(type1) || !is_type_valid(type2))
 			return true;
-
-		case TYPE_TYPEDEF:
-		case TYPE_TYPEOF:
-			panic("typeref not skipped");
-		case TYPE_BUILTIN_TEMPLATE:
-			panic("unexpected type");
-		}
+		return false;
 	}
 
-	return !is_type_valid(type1) || !is_type_valid(type2);
+	switch (type1->kind) {
+	case TYPE_FUNCTION:
+		return function_types_compatible(&type1->function, &type2->function);
+	case TYPE_ATOMIC:
+	case TYPE_IMAGINARY:
+	case TYPE_COMPLEX:
+		return type1->atomic.akind == type2->atomic.akind;
+	case TYPE_ARRAY:
+		return array_types_compatible(&type1->array, &type2->array);
+	case TYPE_POINTER: {
+		const type_t *const to1 = skip_typeref(type1->pointer.points_to);
+		const type_t *const to2 = skip_typeref(type2->pointer.points_to);
+		return types_compatible(to1, to2);
+	}
+	case TYPE_REFERENCE: {
+		const type_t *const to1 = skip_typeref(type1->reference.refers_to);
+		const type_t *const to2 = skip_typeref(type2->reference.refers_to);
+		return types_compatible(to1, to2);
+	}
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+		return type1->compound.compound == type2->compound.compound;
+	case TYPE_ENUM:
+		return type1->enumt.enume == type2->enumt.enume;
+	case TYPE_ERROR:
+	case TYPE_VOID:
+		return true;
+	case TYPE_TYPEDEF:
+	case TYPE_TYPEOF:
+		break; /* we already tested for is_typeref() above */
+	case TYPE_BUILTIN_TEMPLATE:
+		panic("unexpected type");
+	}
+	panic("invalid type kind");
 }
 
 /**
@@ -1240,6 +1260,29 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
 		}
 	}
 	panic("couldn't find atomic type");
+}
+
+type_t *promote_integer(type_t *type)
+{
+	atomic_type_kind_t akind = get_arithmetic_akind(type);
+	if (get_akind_rank(akind) < get_akind_rank(ATOMIC_TYPE_INT))
+		type = type_int;
+
+	return type;
+}
+
+type_t *get_default_promoted_type(type_t *orig_type)
+{
+	type_t *result = orig_type;
+
+	type_t *type = skip_typeref(orig_type);
+	if (is_type_integer(type)) {
+		result = promote_integer(type);
+	} else if (is_type_atomic(type, ATOMIC_TYPE_FLOAT)) {
+		result = type_double;
+	}
+
+	return result;
 }
 
 /**
