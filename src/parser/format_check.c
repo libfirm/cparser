@@ -499,17 +499,17 @@ too_few_args:
 					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
 					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
 					if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
-						types_compatible(get_unqualified_type(arg_to), exp_to))
+						types_compatible_ignore_qualifiers(arg_to, exp_to))
 						goto next_arg;
 				}
-			} else if (types_compatible(get_unqualified_type(arg_skip),
-			                            expected_type_skip)) {
+			} else if (types_compatible_ignore_qualifiers(arg_skip,
+			                                              expected_type_skip)) {
 				goto next_arg;
 			} else if (arg->expression->kind == EXPR_UNARY_CAST) {
 				expression_t const *const expr        = arg->expression->unary.value;
 				type_t             *const unprom_type = skip_typeref(expr->base.type);
-				if (types_compatible(get_unqualified_type(unprom_type),
-				                     expected_type_skip)) {
+				if (types_compatible_ignore_qualifiers(unprom_type,
+				                                       expected_type_skip)) {
 					goto next_arg;
 				}
 				if (expected_type_skip == type_unsigned_int

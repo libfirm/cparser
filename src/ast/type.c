@@ -907,10 +907,8 @@ check_promoted_types:
 		type_t *parameter1_type = skip_typeref(parameter1->type);
 		type_t *parameter2_type = skip_typeref(parameter2->type);
 
-		parameter1_type = get_unqualified_type(parameter1_type);
-		parameter2_type = get_unqualified_type(parameter2_type);
-
-		if (!types_compatible(parameter1_type, parameter2_type))
+		if (!types_compatible_ignore_qualifiers(parameter1_type,
+		                                        parameter2_type))
 			return false;
 	}
 	/* same number of arguments? */
@@ -937,7 +935,8 @@ static bool array_types_compatible(const array_type_t *array1,
 	return array1->size == array2->size;
 }
 
-bool types_compatible(const type_t *type1, const type_t *type2)
+bool types_compatible_ignore_qualifiers(const type_t *type1,
+                                        const type_t *type2)
 {
 	assert(!is_typeref(type1));
 	assert(!is_typeref(type2));
@@ -945,9 +944,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	/* shortcut: the same type is always compatible */
 	if (type1 == type2)
 		return true;
-
-	if (type1->base.qualifiers != type2->base.qualifiers)
-		return false;
 
 	if (type1->kind != type2->kind) {
 		/* enum types are compatible to their base integer type */
@@ -996,6 +992,19 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		panic("unexpected type");
 	}
 	panic("invalid type kind");
+}
+
+bool types_compatible(const type_t *type1, const type_t *type2)
+{
+	assert(!is_typeref(type1));
+	assert(!is_typeref(type2));
+
+	/* shortcut: the same type is always compatible */
+	if (type1 == type2)
+		return true;
+	if (type1->base.qualifiers != type2->base.qualifiers)
+		return false;
+	return types_compatible_ignore_qualifiers(type1, type2);
 }
 
 /**

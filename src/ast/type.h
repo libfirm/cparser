@@ -198,6 +198,9 @@ bool is_type_complete(type_t const *type);
  */
 bool types_compatible(const type_t *type1, const type_t *type2);
 
+bool types_compatible_ignore_qualifiers(const type_t *type1,
+                                        const type_t *type2);
+
 /**
  * Returns the unqualified type of a given type.
  *

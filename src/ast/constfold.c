@@ -452,9 +452,9 @@ static ir_tarval *builtin_constant_to_tarval(
 static ir_tarval *builtin_types_compatible_to_tarval(
 		builtin_types_compatible_expression_t const *const expression)
 {
-	type_t  *const left  = get_unqualified_type(skip_typeref(expression->left));
-	type_t  *const right = get_unqualified_type(skip_typeref(expression->right));
-	bool     const value = types_compatible(left, right);
+	type_t  *const left  = skip_typeref(expression->left);
+	type_t  *const right = skip_typeref(expression->right);
+	bool     const value = types_compatible_ignore_qualifiers(left, right);
 	ir_mode *const mode  = get_ir_mode_storage(expression->base.type);
 	return create_tarval_from_bool(mode, value);
 }

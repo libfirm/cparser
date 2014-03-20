@@ -1022,9 +1022,6 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 				res = ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
 			}
 
-			points_to_left  = get_unqualified_type(points_to_left);
-			points_to_right = get_unqualified_type(points_to_right);
-
 			if (is_type_void(points_to_left))
 				return res;
 
@@ -1033,7 +1030,8 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 				return dialect.cpp ? ASSIGN_ERROR_INCOMPATIBLE : res;
 			}
 
-			if (!types_compatible(points_to_left, points_to_right)) {
+			if (!types_compatible_ignore_qualifiers(points_to_left,
+			                                        points_to_right)) {
 				return ASSIGN_WARNING_POINTER_INCOMPATIBLE;
 			}
 
@@ -1047,9 +1045,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 	            && is_type_pointer(type_right))) {
 		return ASSIGN_SUCCESS;
 	} else if (is_type_compound(type_left) && is_type_compound(type_right)) {
-		type_t *const unqual_type_left  = get_unqualified_type(type_left);
-		type_t *const unqual_type_right = get_unqualified_type(type_right);
-		if (types_compatible(unqual_type_left, unqual_type_right)) {
+		if (types_compatible_ignore_qualifiers(type_left, type_right)) {
 			return ASSIGN_SUCCESS;
 		}
 	} else if (is_type_integer(type_left) && is_type_pointer(type_right)) {
@@ -1437,8 +1433,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		case STRING_ENCODING_CHAR32:
 		case STRING_ENCODING_WIDE: {
 			assert(is_type_pointer(expression->base.type));
-			type_t *const init_type = get_unqualified_type(expression->base.type->pointer.points_to);
-			if (types_compatible(get_unqualified_type(element_type), init_type)) {
+			type_t *const init_type = expression->base.type->pointer.points_to;
+			if (types_compatible_ignore_qualifiers(element_type, init_type)) {
 make_string_init:;
 				initializer_t *const init = allocate_initializer_zero(INITIALIZER_STRING);
 				init->value.value = expression;
@@ -3772,9 +3768,8 @@ static void check_main(const entity_t *entity)
 	}
 	const function_parameter_t *parm = func_type->parameters;
 	if (parm != NULL) {
-		type_t *const first_type        = skip_typeref(parm->type);
-		type_t *const first_type_unqual = get_unqualified_type(first_type);
-		if (!types_compatible(first_type_unqual, type_int)) {
+		type_t *const first_type = skip_typeref(parm->type);
+		if (!types_compatible_ignore_qualifiers(first_type, type_int)) {
 			warningf(WARN_MAIN, pos,
 			         "first argument of 'main' should be 'int', but is '%T'",
 			         parm->type);
@@ -3782,9 +3777,8 @@ static void check_main(const entity_t *entity)
 		parm = parm->next;
 		if (parm != NULL) {
 			type_t *const second_type = skip_typeref(parm->type);
-			type_t *const second_type_unqual
-				= get_unqualified_type(second_type);
-			if (!types_compatible(second_type_unqual, type_char_ptr_ptr)) {
+			if (!types_compatible_ignore_qualifiers(second_type,
+			                                        type_char_ptr_ptr)) {
 				warningf(WARN_MAIN, pos,
 				         "second argument of 'main' should be 'char**', but is '%T'",
 				         parm->type);
@@ -3792,9 +3786,8 @@ static void check_main(const entity_t *entity)
 			parm = parm->next;
 			if (parm != NULL) {
 				type_t *const third_type = skip_typeref(parm->type);
-				type_t *const third_type_unqual
-					= get_unqualified_type(third_type);
-				if (!types_compatible(third_type_unqual, type_char_ptr_ptr)) {
+				if (!types_compatible_ignore_qualifiers(third_type,
+				                                        type_char_ptr_ptr)) {
 					warningf(WARN_MAIN, pos,
 					         "third argument of 'main' should be 'char**', but is '%T'",
 					         parm->type);
@@ -7465,8 +7458,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 			type_t *to;
 			if (is_type_void(to1) || is_type_void(to2)) {
 				to = type_void;
-			} else if (types_compatible(get_unqualified_type(to1),
-			                            get_unqualified_type(to2))) {
+			} else if (types_compatible_ignore_qualifiers(to1, to2)) {
 				to = to1;
 			} else {
 				warningf(WARN_OTHER, pos,
@@ -8157,20 +8149,20 @@ static void semantic_sub(binary_expression_t *expression)
 		                         orig_type_left);
 		expression->base.type = type_left;
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		type_t *const unqual_left  = get_unqualified_type(skip_typeref(type_left->pointer.points_to));
-		type_t *const unqual_right = get_unqualified_type(skip_typeref(type_right->pointer.points_to));
-		if (!types_compatible(unqual_left, unqual_right)) {
+		const type_t *const left_pt  = skip_typeref(type_left->pointer.points_to);
+		const type_t *const right_pt = skip_typeref(type_right->pointer.points_to);
+		if (!types_compatible_ignore_qualifiers(left_pt, right_pt)) {
 			errorf(pos,
 			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
-		} else if (!is_type_complete(unqual_left)) {
-			if (is_type_void(unqual_left)) {
+		} else if (!is_type_complete(type_left)) {
+			if (is_type_void(type_left)) {
 				warningf(WARN_OTHER, pos,
 				         "pointer of type 'void*' used in subtraction");
 			} else {
 				errorf(pos, "arithmetic on pointer to an incomplete type");
 			}
-		} else if (is_type_function(unqual_left)) {
+		} else if (is_type_function(type_left)) {
 			warningf(WARN_OTHER, pos,
 			         "pointer to a function used in subtraction");
 		}
