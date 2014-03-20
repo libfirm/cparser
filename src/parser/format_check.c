@@ -888,13 +888,13 @@ too_few_args:
 			/* do NOT allow const or restrict, all other should be ok */
 			if (ptr_skip->base.qualifiers & (TYPE_QUALIFIER_CONST | TYPE_QUALIFIER_VOLATILE))
 				goto error_arg_type;
-			type_t *const unqual_ptr = get_unqualified_type(ptr_skip);
-			if (types_compatible(unqual_ptr, expected_type_skip)) {
+			if (types_compatible_ignore_qualifiers(ptr_skip,
+			                                       expected_type_skip)) {
 				goto next_arg;
 			} else if (expected_type_skip == type_char) {
 				/* char matches with unsigned char AND signed char */
-				if (types_compatible(unqual_ptr, type_signed_char)
-				 || types_compatible(unqual_ptr, type_unsigned_char))
+				if (types_compatible_ignore_qualifiers(ptr_skip, type_signed_char)
+				 || types_compatible_ignore_qualifiers(ptr_skip, type_unsigned_char))
 					goto next_arg;
 			}
 error_arg_type:
