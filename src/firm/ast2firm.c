@@ -1651,6 +1651,8 @@ static ir_node *incdec_to_firm(unary_expression_t const *const expr, bool const 
 	ir_node *offset;
 	if (is_type_pointer(type)) {
 		offset = get_type_size_node(type->pointer.points_to);
+		ir_mode *mode_offset = get_reference_mode_unsigned_eq(mode);
+		offset = new_Conv(offset, mode_offset);
 	} else {
 		assert(is_type_arithmetic(type));
 		offset = new_Const(get_mode_one(mode));
@@ -1854,10 +1856,10 @@ static ir_node *negate_to_firm(unary_expression_t const *const expr)
 	return new_d_Minus(dbgi, value, mode);
 }
 
-static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
-		ir_node *value, type_t *type)
+static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
+                                              type_t *type)
 {
-	ir_mode        *const mode         = get_ir_mode_storage(type_ptrdiff_t);
+	ir_mode        *const mode         = get_reference_mode_unsigned_eq(mode_P);
 	assert(is_type_pointer(type));
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
