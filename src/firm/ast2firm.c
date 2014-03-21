@@ -1822,24 +1822,6 @@ static ir_node *create_cast(unary_expression_t const *const expr)
 
 	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
 	ir_mode  *const mode = get_ir_mode_storage(to_type);
-	/* check for conversion from / to __based types */
-	if (is_type_pointer(to_type) && is_type_pointer(from_type)) {
-		const variable_t *from_var = from_type->pointer.base_variable;
-		const variable_t *to_var   = to_type->pointer.base_variable;
-		if (from_var != to_var) {
-			if (from_var != NULL) {
-				ir_node *const addr = new_d_Address(dbgi, from_var->v.entity);
-				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
-				value = new_d_Add(dbgi, value, base, mode);
-			}
-			if (to_var != NULL) {
-				ir_node *const addr = new_d_Address(dbgi, to_var->v.entity);
-				ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
-				value = new_d_Sub(dbgi, value, base, mode);
-			}
-		}
-	}
-
 	return create_conv(dbgi, value, mode);
 }
 
@@ -1855,17 +1837,10 @@ static ir_node *complement_to_firm(unary_expression_t const *const expr)
 static ir_node *dereference_to_firm(unary_expression_t const *const expr)
 {
 	dbg_info *const dbgi       = get_dbg_info(&expr->base.pos);
-	ir_node        *value      = expression_to_value(expr->value);
+	ir_node  *const value      = expression_to_value(expr->value);
 	type_t   *const value_type = skip_typeref(expr->value->base.type);
 	assert(is_type_pointer(value_type));
 
-	/* check for __based */
-	variable_t const *const base_var = value_type->pointer.base_variable;
-	if (base_var) {
-		ir_node *const addr = new_d_Address(dbgi, base_var->v.entity);
-		ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
-		value = new_d_Add(dbgi, value, base, get_ir_mode_storage(value_type));
-	}
 	type_t *const points_to = value_type->pointer.points_to;
 	return deref_address(dbgi, points_to, value);
 }

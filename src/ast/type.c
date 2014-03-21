@@ -387,12 +387,6 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 	intern_print_type_pre(points_to);
 	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
 		print_string(" (");
-	variable_t *const variable = type->base_variable;
-	if (variable != NULL) {
-		print_string(" __based(");
-		print_string(variable->base.base.symbol->string);
-		print_string(") ");
-	}
 	print_char('*');
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_START);
 }
@@ -1363,9 +1357,8 @@ type_t *make_imaginary_type(atomic_type_kind_t akind,
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 {
 	type_t *const type = allocate_type_zero(TYPE_POINTER);
-	type->base.qualifiers       = qualifiers;
-	type->pointer.points_to     = points_to;
-	type->pointer.base_variable = NULL;
+	type->base.qualifiers   = qualifiers;
+	type->pointer.points_to = points_to;
 
 	return identify_new_type(type);
 }
@@ -1383,25 +1376,6 @@ type_t *make_reference_type(type_t *refers_to)
 
 	return identify_new_type(type);
 }
-
-/**
- * Creates a new based pointer type.
- *
- * @param points_to   The points-to type for the new type.
- * @param qualifiers  Type qualifiers for the new type.
- * @param variable    The based variable
- */
-type_t *make_based_pointer_type(type_t *points_to,
-								type_qualifiers_t qualifiers, variable_t *variable)
-{
-	type_t *const type = allocate_type_zero(TYPE_POINTER);
-	type->base.qualifiers       = qualifiers;
-	type->pointer.points_to     = points_to;
-	type->pointer.base_variable = variable;
-
-	return identify_new_type(type);
-}
-
 
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers)

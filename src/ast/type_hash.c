@@ -37,7 +37,7 @@ static unsigned hash_atomic_type(const atomic_type_t *type)
 
 static unsigned hash_pointer_type(const pointer_type_t *type)
 {
-	return hash_ptr(type->points_to) ^ hash_ptr(type->base_variable);
+	return hash_ptr(type->points_to);
 }
 
 static unsigned hash_reference_type(const reference_type_t *type)
@@ -173,8 +173,7 @@ static bool function_types_equal(const function_type_t *type1,
 static bool pointer_types_equal(const pointer_type_t *type1,
                                 const pointer_type_t *type2)
 {
-	return type1->points_to     == type2->points_to &&
-	       type1->base_variable == type2->base_variable;
+	return type1->points_to == type2->points_to;
 }
 
 static bool reference_types_equal(const reference_type_t *type1,

@@ -50,7 +50,6 @@ struct atomic_type_t {
 struct pointer_type_t {
 	type_base_t  base;
 	type_t      *points_to;
-	variable_t  *base_variable;  /**< Microsoft __based() extension: base variable or NULL. */
 };
 
 struct reference_type_t {
@@ -180,8 +179,6 @@ type_t *make_complex_type(atomic_type_kind_t type, type_qualifiers_t qualifiers)
 type_t *make_imaginary_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 type_t *make_reference_type(type_t *refers_to);
-type_t *make_based_pointer_type(type_t *points_to,
-								type_qualifiers_t qualifiers, variable_t *variable);
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);
 

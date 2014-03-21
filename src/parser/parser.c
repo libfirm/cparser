@@ -3148,9 +3148,8 @@ typedef struct construct_type_base_t {
 } construct_type_base_t;
 
 typedef struct parsed_pointer_t {
-	construct_type_base_t  base;
-	type_qualifiers_t      type_qualifiers;
-	variable_t            *base_variable;  /**< MS __based extension. */
+	construct_type_base_t base;
+	type_qualifiers_t     type_qualifiers;
 } parsed_pointer_t;
 
 typedef struct parsed_reference_t {
@@ -3298,7 +3297,6 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 
 	for (;;) {
 		construct_type_t *type;
-		//variable_t       *based = NULL; /* MS __based extension */
 		switch (token.kind) {
 		case '&':
 			type = parse_reference_declarator();
@@ -3461,7 +3459,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				errorf(pos, "cannot declare a pointer to reference");
 
 			parsed_pointer_t *pointer = &iter->pointer;
-			type = make_based_pointer_type(type, pointer->type_qualifiers, pointer->base_variable);
+			type = make_pointer_type(type, pointer->type_qualifiers);
 			continue;
 		}
 
