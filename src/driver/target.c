@@ -125,19 +125,6 @@ static void setup_types(void)
 	snprintf(name, sizeof(name), "p%u", machine_size);
 	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
 
-	if (machine_size == 16) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Hs);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Hu);
-	} else if (machine_size == 32) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Is);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Iu);
-	} else if (machine_size == 64) {
-		set_reference_mode_signed_eq(ptr_mode, mode_Ls);
-		set_reference_mode_unsigned_eq(ptr_mode, mode_Lu);
-	} else {
-		panic("strange machine_size when determining pointer modes");
-	}
-
 	/* Hmm, pointers should be machine size */
 	set_modeP_data(ptr_mode);
 	set_modeP_code(ptr_mode);
