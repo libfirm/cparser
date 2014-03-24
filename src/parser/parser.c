@@ -10631,6 +10631,9 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 		return;
 
 	case EXPR_VA_COPY:
+		if (lhs_ent == ENT_ANY)
+			lhs_ent = NULL;
+		determine_lhs_ent(expr->va_copye.dst, lhs_ent);
 		mark_vars_read(expr->va_copye.src, lhs_ent);
 		return;
 
