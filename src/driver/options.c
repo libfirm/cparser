@@ -637,6 +637,7 @@ void options_parse_early(options_state_t *state)
 #endif
 
 	unsigned opt_level = 1;
+	bool     opt_size  = false;
 	for (int i = 1; i < state->argc; ++i) {
 		const char *arg = state->argv[i];
 		if (arg[0] != '-')
@@ -655,6 +656,7 @@ void options_parse_early(options_state_t *state)
 				opt_level = 0; /* TODO stub. */
 			} else if (streq(opt, "s")) {
 				opt_level = 2; /* TODO For now, until we have a real '-Os'. */
+				opt_size  = true;
 			} else {
 				errorf(NULL, "invalid optimization option '%s'", arg);
 				state->argument_errors = true;
@@ -662,4 +664,6 @@ void options_parse_early(options_state_t *state)
 		}
 	}
 	choose_optimization_pack(opt_level);
+	predef_optimize      = opt_level > 0;
+	predef_optimize_size = opt_size;
 }

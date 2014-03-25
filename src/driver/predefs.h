@@ -5,7 +5,11 @@
 #ifndef PREDEFS_H
 #define PREDEFS_H
 
+#include <stdbool.h>
+
 extern const char *user_label_prefix;
+extern bool predef_optimize;
+extern bool predef_optimize_size;
 
 void add_predefined_macros(void);
 

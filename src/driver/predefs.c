@@ -20,6 +20,8 @@
 #include "version.h"
 
 const char *user_label_prefix = "";
+bool predef_optimize;
+bool predef_optimize_size;
 
 static void add_define_prop_fmt(const char *name_template, const char *name,
                                 const char *value_fmt, ...)
@@ -257,6 +259,16 @@ void add_predefined_macros(void)
 	} else {
 		add_define("__GNUC_GNU_INLINE__", "1", false);
 	}
+
+	/* TODO: I'd really like to enable these, but for now they enable some form
+	 * of x87 inline assembly in the glibc/linux headers which we don't support
+	 * yet */
+#if 0
+	if (predef_optimize)
+		add_define("__OPTIMIZE__", "1", false);
+	if (predef_optimize_size)
+		add_define("__OPTIMIZE_SIZE__", "1", false);
+#endif
 
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
