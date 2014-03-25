@@ -2,7 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "parser.h"
+#include "parser_t.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -29,7 +29,6 @@
 #include "driver/lang_features.h"
 #include "driver/warning.h"
 #include "format_check.h"
-#include "parser.h"
 #include "preprocessor.h"
 #include "token_t.h"
 
@@ -684,11 +683,7 @@ static void scope_pop(scope_t *old_scope)
 	current_scope = old_scope;
 }
 
-/**
- * Search an entity by its symbol in a given namespace.
- */
-static entity_t *get_entity(const symbol_t *const symbol,
-                            entity_namespace_t namespc)
+entity_t *get_entity(const symbol_t *const symbol, entity_namespace_t namespc)
 {
 	for (entity_t *entity = symbol->entity; entity != NULL;
 	     entity = entity->base.symbol_next) {
@@ -3910,7 +3905,7 @@ static void warn_missing_declaration(const entity_t *entity, bool is_definition)
 	}
 }
 
-static void merge_into_decl(entity_t *decl, const entity_t *other)
+void merge_into_decl(entity_t *decl, const entity_t *other)
 {
 	assert(decl->kind == other->kind);
 	decl->declaration.modifiers |= other->declaration.modifiers;
@@ -3920,6 +3915,14 @@ static void merge_into_decl(entity_t *decl, const entity_t *other)
 			assert(decl->function.alias.symbol == NULL);
 			decl->function.alias.symbol = other->function.alias.symbol;
 			ARR_APP1(entity_t*, alias_entities, decl);
+		}
+		if (other->function.btk != BUILTIN_NONE) {
+			decl->function.btk            = other->function.btk;
+			decl->function.builtin_in_lib = other->function.builtin_in_lib;
+			if (other->function.btk == BUILTIN_FIRM) {
+				decl->function.b.firm_builtin_kind =
+					other->function.b.firm_builtin_kind;
+			}
 		}
 	} else if (decl->kind == ENTITY_VARIABLE) {
 		if (other->variable.alias.symbol != NULL) {
@@ -11001,6 +11004,8 @@ void start_parsing(void)
 
 translation_unit_t *finish_parsing(void)
 {
+	find_known_libc_functions();
+
 	resolve_aliases();
 	DEL_ARR_F(alias_entities);
 	alias_entities = NULL;

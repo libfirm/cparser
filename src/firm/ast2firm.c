@@ -683,14 +683,9 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	if (entity->function.irentity != NULL)
 		return entity->function.irentity;
 
-	switch (entity->function.btk) {
-	case BUILTIN_NONE:
-	case BUILTIN_LIBC:
-	case BUILTIN_LIBC_CHECK:
-		break;
-	default:
-		return NULL;
-	}
+	if (entity->function.btk != BUILTIN_NONE
+	    && !entity->function.builtin_in_lib)
+	    return NULL;
 
 	symbol_t *symbol = entity->base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
@@ -1180,7 +1175,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 	type_t *function_type = skip_typeref(expr_type->pointer.points_to);
 
-	switch (builtin->entity->function.btk) {
+	switch ((builtin_kind_t)builtin->entity->function.btk) {
 	case BUILTIN_NONE:
 		break;
 	case BUILTIN_ALLOCA: {
@@ -1238,11 +1233,20 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *shr = new_d_Shr(dbgi, shrop, shf, mode);
 		return new_d_Or(dbgi, shl, shr, mode);
 	}
+	case BUILTIN_CIMAG: {
+		complex_value val = expression_to_complex(call->arguments->expression);
+		return val.imag;
+	}
+	case BUILTIN_CREAL: {
+		complex_value val = expression_to_complex(call->arguments->expression);
+		return val.real;
+	}
 	case BUILTIN_FIRM:
 		break;
 	case BUILTIN_LIBC:
 	case BUILTIN_LIBC_CHECK:
-		panic("builtin did not produce an entity");
+		/* this function should not have been called with such builtins */
+		break;
 	}
 	panic("invalid builtin");
 }

@@ -35,12 +35,6 @@ void parse(void);
  */
 translation_unit_t *finish_parsing(void);
 
-/**
- * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
- * for various problems that occur for multiple definitions
- */
-entity_t *record_entity(entity_t *entity, bool is_definition);
-
 /** set default elf visbility */
 void set_default_visibility(elf_visibility_t visibility);
 

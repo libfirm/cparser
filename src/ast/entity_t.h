@@ -90,18 +90,20 @@ typedef enum elf_visibility_t {
 } elf_visibility_t;
 
 typedef enum {
-	BUILTIN_NONE,
+	BUILTIN_NONE = 0,
 	BUILTIN_ALLOCA,
-	BUILTIN_INF,
-	BUILTIN_NAN,
+	BUILTIN_CIMAG,
+	BUILTIN_CREAL,
 	BUILTIN_EXPECT,
-	BUILTIN_VA_END,
+	BUILTIN_FIRM,
+	BUILTIN_INF,
+	BUILTIN_LIBC,
+	BUILTIN_LIBC_CHECK,
+	BUILTIN_NAN,
 	BUILTIN_OBJECT_SIZE,
 	BUILTIN_ROTL,
 	BUILTIN_ROTR,
-	BUILTIN_LIBC,
-	BUILTIN_LIBC_CHECK,
-	BUILTIN_FIRM,
+	BUILTIN_VA_END,
 } builtin_kind_t;
 
 /**
@@ -241,7 +243,9 @@ struct function_t {
 	bool           goto_to_outer  : 1;  /**< Inner function has goto to outer
 	                                         function. */
 	unsigned       elf_visibility : 2;
-	builtin_kind_t btk;
+	ENUMBF(builtin_kind_t) btk    : 16;
+	bool           builtin_in_lib : 1;  /**< builtin is library, this means
+	                                         you can safely take its address */
 	scope_t        parameters;
 	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */

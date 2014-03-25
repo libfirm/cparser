@@ -10,8 +10,10 @@
 #include "ast/symbol_table.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
+#include "driver/diagnostic.h"
 #include "driver/lang_features.h"
-#include "parser.h"
+#include "driver/warning.h"
+#include "parser_t.h"
 
 static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
                                          type_t *function_type)
@@ -23,6 +25,13 @@ static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
 	entity->declaration.implicit               = true;
 	entity->function.btk                       = kind;
 
+	return entity;
+}
+
+static entity_t *record_builtin_function(builtin_kind_t kind, symbol_t *symbol,
+                                         type_t *function_type)
+{
+	entity_t *entity = create_builtin_function(kind, symbol, function_type);
 	record_entity(entity, /*is_definition=*/false);
 	return entity;
 }
@@ -42,7 +51,7 @@ static entity_t *create_gnu_builtin(builtin_kind_t kind, const char *name,
 {
 	obstack_printf(&symbol_obstack, "__builtin_%s", name);
 	symbol_t *symbol = finalize_symbol_string();
-	entity_t *entity = create_builtin_function(kind, symbol, type);
+	entity_t *entity = record_builtin_function(kind, symbol, type);
 	return entity;
 }
 
@@ -51,7 +60,7 @@ static entity_t *create_gnu_builtin_firm(ir_builtin_kind kind, const char *name,
 {
 	obstack_printf(&symbol_obstack, "__builtin_%s", name);
 	symbol_t *symbol = finalize_symbol_string();
-	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity_t *entity = record_builtin_function(BUILTIN_FIRM, symbol, type);
 	entity->function.b.firm_builtin_kind = kind;
 	return entity;
 }
@@ -60,7 +69,7 @@ static entity_t *create_builtin_firm(ir_builtin_kind kind, const char *name,
                                      type_t *type)
 {
 	symbol_t *symbol = symbol_table_insert(name);
-	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity_t *entity = record_builtin_function(BUILTIN_FIRM, symbol, type);
 	entity->function.b.firm_builtin_kind = kind;
 	return entity;
 }
@@ -69,8 +78,9 @@ static entity_t *create_gnu_builtin_libc(const char *name, type_t *type)
 {
 	obstack_printf(&symbol_obstack, "__builtin_%s", name);
 	symbol_t *symbol = finalize_symbol_string();
-	entity_t *entity = create_builtin_function(BUILTIN_LIBC, symbol, type);
-	entity->function.actual_name = symbol_table_insert(name);
+	entity_t *entity = record_builtin_function(BUILTIN_LIBC, symbol, type);
+	entity->function.builtin_in_lib = true;
+	entity->function.actual_name    = symbol_table_insert(name);
 	return entity;
 }
 
@@ -79,9 +89,10 @@ static entity_t *create_gnu_builtin_chk(const char *name, unsigned chk_arg_pos,
 {
 	obstack_printf(&symbol_obstack, "__builtin___%s_chk", name);
 	symbol_t *symbol = finalize_symbol_string();
-	entity_t *entity = create_builtin_function(BUILTIN_LIBC_CHECK, symbol, type);
-	entity->function.actual_name   = symbol_table_insert(name);
-	entity->function.b.chk_arg_pos = chk_arg_pos;
+	entity_t *entity = record_builtin_function(BUILTIN_LIBC_CHECK, symbol, type);
+	entity->function.builtin_in_lib = true;
+	entity->function.actual_name    = symbol_table_insert(name);
+	entity->function.b.chk_arg_pos  = chk_arg_pos;
 	return entity;
 }
 
@@ -169,11 +180,73 @@ void create_gnu_builtins(void)
 	 * C89-C99 and others. Complete this */
 }
 
+static entity_t *find_existing_entity(const char *name)
+{
+	symbol_t *symbol = symbol_table_insert(name);
+	return get_entity(symbol, NAMESPACE_NORMAL);
+}
+
+static void merge_builtin(entity_t *def, builtin_kind_t kind, type_t *type)
+{
+	if (def->kind != ENTITY_FUNCTION) {
+		warningf(WARN_OTHER, &def->base.pos,
+				 "language standard mandates that '%N' is a function", def);
+		return;
+	} else {
+		/* check if the type is compatible with the libc specified one */
+		type_t *def_type    = def->declaration.type;
+		type_t *def_skipped = skip_typeref(def_type);
+		if (!types_compatible(def_skipped, type)) {
+			warningf(WARN_OTHER, &def->base.pos,
+					 "declaration of '%N' with type '%T' is incompatible with language standard specified '%T'",
+					 def, def_type, type);
+			return;
+		}
+	}
+	/* produce a new declaration for the builtin */
+	symbol_t *symbol       = def->base.symbol;
+	entity_t *builtin_func = create_builtin_function(kind, symbol, type);
+	builtin_func->function.builtin_in_lib = true;
+	merge_into_decl(def, builtin_func);
+}
+
+void find_known_libc_functions(void)
+{
+	if (dialect.freestanding)
+		return;
+	entity_t *(*f)(const char*) = find_existing_entity;
+	void (*m)(entity_t*,builtin_kind_t,type_t*) = merge_builtin;
+
+	if (dialect.c99) {
+		type_t *type_complex_float
+			= make_complex_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
+		type_t *type_complex_double
+			= make_complex_type(ATOMIC_TYPE_DOUBLE, TYPE_QUALIFIER_NONE);
+		type_t *type_complex_ldouble
+			= make_complex_type(ATOMIC_TYPE_LONG_DOUBLE, TYPE_QUALIFIER_NONE);
+		type_t *type_ldouble = type_long_double;
+
+		entity_t *cimag = f("cimag");
+		if (cimag != NULL)  m(cimag,  BUILTIN_CIMAG, make_function_type(type_double,  1, (type_t *[]) { type_complex_double }, DM_CONST));
+		entity_t *cimagf = f("cimagf");
+		if (cimagf != NULL) m(cimagf, BUILTIN_CIMAG, make_function_type(type_float,   1, (type_t *[]) { type_complex_float },  DM_CONST));
+		entity_t *cimagl = f("cimagl");
+		if (cimagl != NULL) m(cimagl, BUILTIN_CIMAG, make_function_type(type_ldouble, 1, (type_t *[]) { type_complex_ldouble },  DM_CONST));
+
+		entity_t *creal = f("creal");
+		if (creal != NULL)  m(creal,  BUILTIN_CREAL, make_function_type(type_double,  1, (type_t *[]) { type_complex_double }, DM_CONST));
+		entity_t *crealf = f("crealf");
+		if (crealf != NULL) m(crealf, BUILTIN_CREAL, make_function_type(type_float,   1, (type_t *[]) { type_complex_float },  DM_CONST));
+		entity_t *creall = f("creall");
+		if (creall != NULL) m(creall, BUILTIN_CREAL, make_function_type(type_ldouble, 1, (type_t *[]) { type_complex_ldouble },  DM_CONST));
+	}
+}
+
 static entity_t *create_intrinsic_firm(ir_builtin_kind kind, const char *name,
                                        type_t *type)
 {
 	symbol_t *symbol = symbol_table_insert(name);
-	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity_t *entity = record_builtin_function(BUILTIN_FIRM, symbol, type);
 	entity->function.b.firm_builtin_kind = kind;
 	return entity;
 }
@@ -182,7 +255,7 @@ static entity_t *create_intrinsic(builtin_kind_t kind, const char *name,
                                   type_t *type)
 {
 	symbol_t *symbol = symbol_table_insert(name);
-	entity_t *entity = create_builtin_function(kind, symbol, type);
+	entity_t *entity = record_builtin_function(kind, symbol, type);
 	return entity;
 }
 

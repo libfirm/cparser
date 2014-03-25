@@ -26,4 +26,10 @@ void create_microsoft_intrinsics(void);
  */
 void adapt_special_functions(function_t *function);
 
+/**
+ * Search for known libc functions in the current scope (must be file top
+ * scope) and replace them with builtins.
+ */
+void find_known_libc_functions(void);
+
 #endif
