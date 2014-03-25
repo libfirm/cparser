@@ -4819,20 +4819,6 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	return NULL;
 }
 
-static ir_node *ms_try_statement_to_firm(ms_try_statement_t *statement)
-{
-	statement_to_firm(statement->try_statement);
-	position_t const *const pos = &statement->base.pos;
-	warningf(WARN_OTHER, pos, "structured exception handling ignored");
-	return NULL;
-}
-
-static ir_node *leave_statement_to_firm(leave_statement_t *statement)
-{
-	errorf(&statement->base.pos, "__leave not supported yet");
-	return NULL;
-}
-
 /**
  * Transform a statement.
  */
@@ -4856,8 +4842,6 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_GOTO:          return goto_statement_to_firm(       &stmt->gotos);
 	case STATEMENT_IF:            return if_statement_to_firm(         &stmt->ifs);
 	case STATEMENT_LABEL:         return label_to_firm(                &stmt->label);
-	case STATEMENT_LEAVE:         return leave_statement_to_firm(      &stmt->leave);
-	case STATEMENT_MS_TRY:        return ms_try_statement_to_firm(     &stmt->ms_try);
 	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
 	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
 

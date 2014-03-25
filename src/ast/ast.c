@@ -1078,37 +1078,6 @@ static void print_asm_statement(asm_statement_t const *const stmt)
 }
 
 /**
- * Print a microsoft __try statement.
- *
- * @param statement   the statement
- */
-static void print_ms_try_statement(const ms_try_statement_t *statement)
-{
-	print_string("__try");
-	print_inner_statement(statement->try_statement);
-	print_after_inner_statement(statement->try_statement);
-	if (statement->except_expression != NULL) {
-		print_string("__except(");
-		print_expression(statement->except_expression);
-		print_char(')');
-	} else {
-		print_string("__finally");
-	}
-	print_inner_statement(statement->final_statement);
-}
-
-/**
- * Print a microsoft __leave statement.
- *
- * @param statement   the statement
- */
-static void print_leave_statement(const leave_statement_t *statement)
-{
-	(void)statement;
-	print_string("__leave;");
-}
-
-/**
  * Print a statement.
  *
  * @param statement   the statement
@@ -1131,8 +1100,6 @@ void print_statement(statement_t const *const stmt)
 	case STATEMENT_GOTO:          print_goto_statement(         &stmt->gotos);         break;
 	case STATEMENT_IF:            print_if_statement(           &stmt->ifs);           break;
 	case STATEMENT_LABEL:         print_label_statement(        &stmt->label);         break;
-	case STATEMENT_LEAVE:         print_leave_statement(        &stmt->leave);         break;
-	case STATEMENT_MS_TRY:        print_ms_try_statement(       &stmt->ms_try);        break;
 	case STATEMENT_RETURN:        print_return_statement(       &stmt->returns);       break;
 	case STATEMENT_SWITCH:        print_switch_statement(       &stmt->switchs);       break;
 	}

@@ -455,24 +455,22 @@ static inline string_literal_expression_t const *get_init_string(initializer_t c
  */
 typedef enum statement_kind_t {
 	STATEMENT_ERROR = 1,
-	STATEMENT_EMPTY,
-	STATEMENT_COMPOUND,
-	STATEMENT_RETURN,
-	STATEMENT_DECLARATION,
-	STATEMENT_IF,
-	STATEMENT_SWITCH,
-	STATEMENT_EXPRESSION,
-	STATEMENT_CONTINUE,
-	STATEMENT_BREAK,
-	STATEMENT_COMPUTED_GOTO,
-	STATEMENT_GOTO,
-	STATEMENT_LABEL,
-	STATEMENT_CASE_LABEL,
-	STATEMENT_DO_WHILE,
-	STATEMENT_FOR,
 	STATEMENT_ASM,
-	STATEMENT_MS_TRY,          /**< MS __try/__finally or __try/__except */
-	STATEMENT_LEAVE            /**< MS __leave */
+	STATEMENT_BREAK,
+	STATEMENT_CASE_LABEL,
+	STATEMENT_COMPOUND,
+	STATEMENT_COMPUTED_GOTO,
+	STATEMENT_CONTINUE,
+	STATEMENT_DECLARATION,
+	STATEMENT_DO_WHILE,
+	STATEMENT_EMPTY,
+	STATEMENT_EXPRESSION,
+	STATEMENT_FOR,
+	STATEMENT_GOTO,
+	STATEMENT_IF,
+	STATEMENT_LABEL,
+	STATEMENT_RETURN,
+	STATEMENT_SWITCH,
 } statement_kind_t;
 
 /**
@@ -602,17 +600,6 @@ struct asm_statement_t {
 	bool             is_volatile:1;
 };
 
-struct ms_try_statement_t {
-	statement_base_t  base;
-	statement_t      *try_statement;
-	expression_t     *except_expression; /**< non-null for except, NULL for finally */
-	statement_t      *final_statement;
-};
-
-struct leave_statement_t {
-	statement_base_t  base;
-};
-
 union statement_t {
 	statement_kind_t          kind;
 	statement_base_t          base;
@@ -629,8 +616,6 @@ union statement_t {
 	do_while_statement_t      do_while;
 	for_statement_t           fors;
 	asm_statement_t           asms;
-	ms_try_statement_t        ms_try;
-	leave_statement_t         leave;
 };
 
 struct translation_unit_t {

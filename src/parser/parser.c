@@ -80,7 +80,6 @@ static entity_t            *current_entity    = NULL;
 static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
-static ms_try_statement_t  *current_try       = NULL;
 static linkage_kind_t       current_linkage;
 static goto_statement_t    *goto_first        = NULL;
 static goto_statement_t   **goto_anchor       = NULL;
@@ -296,8 +295,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_DO_WHILE]      = sizeof(do_while_statement_t),
 		[STATEMENT_FOR]           = sizeof(for_statement_t),
 		[STATEMENT_ASM]           = sizeof(asm_statement_t),
-		[STATEMENT_MS_TRY]        = sizeof(ms_try_statement_t),
-		[STATEMENT_LEAVE]         = sizeof(leave_statement_t)
 	};
 	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
@@ -4972,29 +4969,6 @@ found_break_parent:
 		break;
 	}
 
-	case STATEMENT_MS_TRY: {
-		ms_try_statement_t const *const ms_try = &stmt->ms_try;
-		check_reachable(ms_try->try_statement);
-		next = ms_try->final_statement;
-		break;
-	}
-
-	case STATEMENT_LEAVE: {
-		statement_t *parent = stmt;
-		for (;;) {
-			parent = parent->base.parent;
-			if (parent == NULL) /* __leave not within __try */
-				return;
-
-			if (parent->kind == STATEMENT_MS_TRY) {
-				last = parent;
-				next = parent->ms_try.final_statement;
-				break;
-			}
-		}
-		break;
-	}
-
 	default:
 		panic("invalid statement kind");
 	}
@@ -5027,7 +5001,6 @@ found_break_parent:
 		case STATEMENT_BREAK:
 		case STATEMENT_COMPUTED_GOTO:
 		case STATEMENT_GOTO:
-		case STATEMENT_LEAVE:
 			panic("invalid control flow in function");
 
 		case STATEMENT_COMPOUND:
@@ -5100,11 +5073,6 @@ continue_for:;
 			next = next->base.next;
 			break;
 		}
-
-		case STATEMENT_MS_TRY:
-			last = next;
-			next = next->ms_try.final_statement;
-			break;
 		}
 	}
 
@@ -9899,22 +9867,6 @@ static statement_t *parse_break(void)
 }
 
 /**
- * Parse a __leave statement.
- */
-static statement_t *parse_leave_statement(void)
-{
-	if (current_try == NULL) {
-		errorf(HERE, "__leave statement not within __try");
-	}
-
-	statement_t *statement = allocate_statement_zero(STATEMENT_LEAVE);
-
-	eat(T___leave);
-	expect(';');
-	return statement;
-}
-
-/**
  * Check if a given entity represents a local variable.
  */
 static bool is_local_variable(const entity_t *entity)
@@ -10051,43 +10003,6 @@ static statement_t *parse_expression_statement(void)
 	mark_vars_read(expr, ENT_ANY);
 
 	expect(';');
-	return statement;
-}
-
-/**
- * Parse a microsoft __try { } __finally { } or
- * __try{ } __except() { }
- */
-static statement_t *parse_ms_try_statment(void)
-{
-	statement_t *statement = allocate_statement_zero(STATEMENT_MS_TRY);
-	eat(T___try);
-
-	PUSH_PARENT(statement);
-
-	ms_try_statement_t *rem = current_try;
-	current_try = &statement->ms_try;
-	statement->ms_try.try_statement = parse_compound_statement(false);
-	current_try = rem;
-
-	POP_PARENT();
-
-	if (accept(T___except)) {
-		expression_t *const expr = parse_condition();
-		type_t       *      type = skip_typeref(expr->base.type);
-		if (is_type_integer(type)) {
-			type = promote_integer(type);
-		} else if (is_type_valid(type)) {
-			errorf(&expr->base.pos,
-			       "__expect expression is not an integer, but '%T'", type);
-			type = type_error_type;
-		}
-		statement->ms_try.except_expression = create_implicit_cast(expr, type);
-	} else if (!accept(T__finally)) {
-		parse_error_expected("while parsing __try statement",
-		                     T___except, T___finally, NULL);
-	}
-	statement->ms_try.final_statement = parse_compound_statement(false);
 	return statement;
 }
 
@@ -10239,8 +10154,6 @@ static statement_t *intern_parse_statement(void)
 
 	case ';':         statement = parse_empty_statement();         break;
 	case '{':         statement = parse_compound_statement(false); break;
-	case T___leave:   statement = parse_leave_statement();         break;
-	case T___try:     statement = parse_ms_try_statment();         break;
 	case T_asm:       statement = parse_asm_statement();           break;
 	case T_break:     statement = parse_break();                   break;
 	case T_case:      statement = parse_case_statement();          break;
