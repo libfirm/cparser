@@ -377,6 +377,7 @@ static opt_config_t opts[] = {
 	IRG("lower",             lower_highlevel_graph,    "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRG("lower-mux",         do_lower_mux,             "mux lowering",                                          OPT_FLAG_NONE),
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
+	IRG("memcombine",        combine_memops,           "combine adjacent memory operations",                    OPT_FLAG_NONE),
 	IRG("opt-tail-rec",      opt_tail_rec_irg,         "tail-recursion elimination",                            OPT_FLAG_NONE),
 	IRG("parallelize-mem",   opt_parallelize_mem,      "parallelize memory",                                    OPT_FLAG_NONE),
 	IRG("gcse",              do_gcse,                  "global common subexpression elimination",               OPT_FLAG_NONE),
@@ -703,6 +704,8 @@ static void do_firm_lowering(const char *input_filename)
 		do_irg_opt(irg, "local");
 
 		do_irg_opt(irg, "parallelize-mem");
+		do_irg_opt(irg, "memcombine");
+		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "frame");
 	}
 	/* hack so we get global initializers constant folded even at -O0 */
@@ -947,6 +950,7 @@ void choose_optimization_pack(int level)
 		set_option("inline");
 		set_option("occults");
 		set_option("deconv");
+		set_option("memcombine");
 		set_be_option("omitfp");
 		break;
 	}
