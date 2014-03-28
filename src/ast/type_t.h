@@ -9,6 +9,7 @@
 #include <libfirm/firm_types.h>
 #include <stdbool.h>
 
+#include "adt/util.h"
 #include "ast.h"
 #include "type.h"
 
@@ -32,11 +33,11 @@ typedef enum type_kind_t {
 } type_kind_t;
 
 struct type_base_t {
-	type_kind_t       kind;
-	type_qualifiers_t qualifiers;
+	ENUMBF(type_kind_t)       kind       : 8;
+	ENUMBF(type_qualifiers_t) qualifiers : 8;
 
 	/* cached ast2firm infos */
-	ir_type          *firm_type;
+	ir_type *firm_type;
 };
 
 /**
@@ -76,8 +77,8 @@ struct array_type_t {
  * An entry in the parameter list of a function type.
  */
 struct function_parameter_t {
-	type_t               *type;  /**< The parameter type. */
-	function_parameter_t *next;  /**< Points to the next type in the parameter list.*/
+	type_t               *type; /**< The parameter type. */
+	function_parameter_t *next; /**< Points to next type in parameter list.*/
 };
 
 /** Linkage specifications. */
@@ -99,24 +100,24 @@ typedef enum cc_kind_t {
  * A function type.
  */
 struct function_type_t {
-	type_base_t           base;
-	type_t               *return_type;        /**< The return type. */
-	function_parameter_t *parameters;         /**< A list of the parameter types. */
-	linkage_kind_t        linkage;
-	cc_kind_t             calling_convention; /**< The specified calling convention. */
-	decl_modifiers_t      modifiers;
-	bool                  variadic : 1;
-	bool                  unspecified_parameters : 1;
-	bool                  kr_style_parameters : 1;
-	bool                  typegeneric : 1; /**< type generic builtin */
+	type_base_t            base;
+	type_t                *return_type;        /**< The return type. */
+	function_parameter_t  *parameters;         /**< List of parameter types. */
+	decl_modifiers_t       modifiers;
+	bool                   variadic               : 1;
+	bool                   unspecified_parameters : 1;
+	bool                   kr_style_parameters    : 1;
+	bool                   typegeneric            : 1;
+	ENUMBF(linkage_kind_t) linkage                : 2;
+	ENUMBF(cc_kind_t)      calling_convention     : 3;
 };
 
 struct compound_type_t {
 	type_base_t  base;
-	bool         packed : 1; /**< Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
 	compound_t  *compound;
+	bool         packed : 1; /**< Set if packed was specified. */
 };
 
 struct enum_type_t {
@@ -141,17 +142,17 @@ struct typeof_type_t {
 };
 
 union type_t {
-	type_kind_t      kind;
-	type_base_t      base;
-	atomic_type_t    atomic;
-	pointer_type_t   pointer;
-	reference_type_t reference;
-	array_type_t     array;
-	function_type_t  function;
-	compound_type_t  compound;
-	enum_type_t      enumt;
-	typedef_type_t   typedeft;
-	typeof_type_t    typeoft;
+	ENUMBF(type_kind_t) kind : 8;
+	type_base_t         base;
+	atomic_type_t       atomic;
+	pointer_type_t      pointer;
+	reference_type_t    reference;
+	array_type_t        array;
+	function_type_t     function;
+	compound_type_t     compound;
+	enum_type_t         enumt;
+	typedef_type_t      typedeft;
+	typeof_type_t       typeoft;
 };
 
 typedef struct atomic_type_properties_t atomic_type_properties_t;
@@ -163,9 +164,9 @@ struct atomic_type_properties_t {
 	 * so people rather stick with the wrong values for compatibility.
 	 * (double type on x86 System V ABI)
 	 */
-	unsigned struct_alignment;
-	unsigned flags;             /**< type flags from atomic_type_flag_t */
-	unsigned rank;              /**< integer conversion rank */
+	unsigned            struct_alignment;
+	atomic_type_flags_t flags;
+	unsigned            rank;   /**< integer conversion rank */
 };
 
 extern atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1];

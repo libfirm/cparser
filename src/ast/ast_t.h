@@ -224,12 +224,12 @@ struct expression_base_t {
 	type_t           *type;     /**< The type of the expression. */
 	position_t        pos;      /**< The source position of this expression. */
 	bool              parenthesized : 1;
-	bool              implicit : 1;  /**< compiler generated expression.
-	                                    Examples: select into anonymous structs,
-	                                    implicit casts */
+	/** compiler generated expression. Examples: select into anonymous structs,
+	 * implicit casts */
+	bool              implicit      : 1;
 #ifndef NDEBUG
-	bool              transformed : 1; /**< Set if this expression was
-	                                        transformed in ast2firm. */
+	/** Set if this expression was already transformed in ast2firm. */
+	bool              transformed   : 1;
 #endif
 };
 
@@ -318,9 +318,10 @@ struct select_expression_t {
 
 struct array_access_expression_t {
 	expression_base_t  base;
-	expression_t      *array_ref; /**< the referenced array */
-	expression_t      *index;     /**< the index used */
-	bool               flipped;   /**< True if index/ref was written in a 5[a] way */
+	expression_t      *array_ref;   /**< the referenced array */
+	expression_t      *index;       /**< the index used */
+	/** True if access was written in a 5[a] way */
+	bool               flipped : 1;
 };
 
 struct typeprop_expression_t {
@@ -477,14 +478,16 @@ typedef enum statement_kind_t {
  * The base class of every statement.
  */
 struct statement_base_t {
-	statement_kind_t kind;
-	statement_t     *next;      /**< Point to the next statement in a compound statement. */
-	position_t       pos;
-	statement_t     *parent;    /**< The Parent statement that controls the execution. */
-	bool             reachable; /**< True, if this statement is reachable. */
+	ENUMBF(statement_kind_t) kind        : 8;
+	bool                     reachable   : 1;
 #ifndef NDEBUG
-	bool             transformed;
+	bool                     transformed : 1;
 #endif
+	/** Pointer to next statement in a compound statement. */
+	statement_t             *next;
+	position_t               pos;
+	/** The Parent statement that controls the execution. */
+	statement_t             *parent;
 };
 
 struct return_statement_t {
@@ -496,7 +499,8 @@ struct compound_statement_t {
 	statement_base_t  base;
 	statement_t      *statements;
 	scope_t           scope;
-	bool              stmt_expr; /**< True if this compound statement is a statement expression. */
+	/** True if this compound statement is a statement expression. */
+	bool              stmt_expr : 1;
 };
 
 struct declaration_statement_t {
@@ -518,14 +522,16 @@ struct switch_statement_t {
 	scope_t                 scope;
 	expression_t           *expression;
 	statement_t            *body;
-	case_label_statement_t *first_case, *last_case; /**< List of all cases, including default. */
-	case_label_statement_t *default_label;          /**< The default label if existent. */
+	/** List of all cases, including default. */
+	case_label_statement_t *first_case;
+	case_label_statement_t *last_case;
+	case_label_statement_t *default_label; /**< Default label if existent. */
 };
 
 struct goto_statement_t {
 	statement_base_t  base;
-	label_t          *label;         /**< The destination label. */
-	goto_statement_t *next;          /**< links all goto statements of a function */
+	label_t          *label;  /**< The destination label. */
+	goto_statement_t *next;   /**< links all goto statements of a function */
 };
 
 struct computed_goto_statement_t {
@@ -535,15 +541,20 @@ struct computed_goto_statement_t {
 
 struct case_label_statement_t {
 	statement_base_t        base;
-	expression_t           *expression;    /**< The case label expression, NULL for default label. */
-	expression_t           *end_range;     /**< For GNUC case a .. b: the end range expression, NULL else. */
-	case_label_statement_t *next;          /**< link to the next case label in switch */
+	/** The case label expression, NULL for default label. */
+	expression_t           *expression;
+	/** For GNUC case a .. b: the end range expression, NULL else. */
+	expression_t           *end_range;
+	/** link to the next case label in switch */
+	case_label_statement_t *next;
 	statement_t            *statement;
 	ir_tarval              *first_case;
 	ir_tarval              *last_case;
-	bool                   is_bad;         /**< If set marked as bad to suppress warnings. */
-	bool                   is_empty_range; /**< If set marked this as an empty range. */
 	long                   pn;
+	/** If set marked as bad to suppress warnings. */
+	bool                   is_bad         : 1;
+	/** If set marked this as an empty range. */
+	bool                   is_empty_range : 1;
 };
 
 struct label_statement_t {
@@ -572,8 +583,8 @@ struct for_statement_t {
 	expression_t     *condition;
 	expression_t     *step;
 	statement_t      *body;
-	bool              condition_reachable:1;
-	bool              step_reachable:1;
+	bool              condition_reachable : 1;
+	bool              step_reachable      : 1;
 };
 
 struct asm_clobber_t {
@@ -596,12 +607,12 @@ struct asm_statement_t {
 	entity_t        *outputs; /**< list of asm_argument_t entities */
 	asm_clobber_t   *clobbers;
 	asm_label_t     *labels;
-	bool             has_arguments:1;
-	bool             is_volatile:1;
+	bool             has_arguments : 1;
+	bool             is_volatile   : 1;
 };
 
 union statement_t {
-	statement_kind_t          kind;
+	ENUMBF(statement_kind_t)  kind : 8;
 	statement_base_t          base;
 	return_statement_t        returns;
 	compound_statement_t      compound;

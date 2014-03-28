@@ -33,10 +33,10 @@ typedef enum {
 } entity_kind_t;
 
 typedef enum entity_namespace_t {
-	NAMESPACE_NORMAL = 1,
-	NAMESPACE_TAG,
-	NAMESPACE_LABEL,
-	NAMESPACE_ASM_ARGUMENT,
+	NAMESPACE_NORMAL = 1,   /**< entity is a normal declaration */
+	NAMESPACE_TAG,          /**< entity is a struct/union/enum tag */
+	NAMESPACE_LABEL,        /**< entity is a (goto) label */
+	NAMESPACE_ASM_ARGUMENT, /**< entity is an asm statement argument */
 } entity_namespace_t;
 
 typedef enum storage_class_t {
@@ -47,39 +47,6 @@ typedef enum storage_class_t {
 	STORAGE_CLASS_AUTO,
 	STORAGE_CLASS_REGISTER,
 } storage_class_t;
-
-typedef enum decl_modifier_t {
-	DM_NONE              = 0,
-	DM_DLLIMPORT         = 1 <<  0,
-	DM_DLLEXPORT         = 1 <<  1,
-	DM_THREAD            = 1 <<  2,
-	DM_NAKED             = 1 <<  3,
-	DM_MICROSOFT_INLINE  = 1 <<  4,
-	DM_FORCEINLINE       = 1 <<  5,
-	DM_SELECTANY         = 1 <<  6,
-	DM_NOTHROW           = 1 <<  7,
-	DM_NOVTABLE          = 1 <<  8,
-	DM_NORETURN          = 1 <<  9,
-	DM_NOINLINE          = 1 << 10,
-	DM_RESTRICT          = 1 << 11,
-	DM_NOALIAS           = 1 << 12,
-	DM_TRANSPARENT_UNION = 1 << 13,
-	DM_CONST             = 1 << 14,
-	DM_PURE              = 1 << 15,
-	DM_CONSTRUCTOR       = 1 << 16,
-	DM_DESTRUCTOR        = 1 << 17,
-	DM_UNUSED            = 1 << 18,
-	DM_USED              = 1 << 19,
-	DM_CDECL             = 1 << 20,
-	DM_FASTCALL          = 1 << 21,
-	DM_STDCALL           = 1 << 22,
-	DM_THISCALL          = 1 << 23,
-	DM_DEPRECATED        = 1 << 24,
-	DM_RETURNS_TWICE     = 1 << 25,
-	DM_MALLOC            = 1 << 26,
-	DM_WEAK              = 1 << 27,
-	DM_LEAF              = 1 << 28,
-} decl_modifier_t;
 
 typedef enum elf_visibility_t {
 	ELF_VISIBILITY_DEFAULT,
@@ -125,14 +92,13 @@ struct entity_base_t {
 	ENUMBF(entity_namespace_t) namespc : 8;
 	symbol_t                  *symbol;
 	position_t                 pos;
-	scope_t                   *parent_scope;  /**< The scope where this entity
-	                                               is contained in */
+	/** The scope where this entity is contained in */
+	scope_t                   *parent_scope;
 	entity_t                  *parent_entity;
-
 	/** next declaration in a scope */
-	entity_t           *next;
+	entity_t                  *next;
 	/** next declaration with same symbol */
-	entity_t           *symbol_next;
+	entity_t                  *symbol_next;
 };
 
 struct compound_t {
@@ -166,9 +132,10 @@ struct enum_value_t {
 
 struct label_t {
 	entity_base_t  base;
-	bool           used : 1;
+	bool           used          : 1;
 	bool           address_taken : 1;
-	unsigned       n_users; /* Reference counter to mature the label block as early as possible. */
+	/* Reference counter to mature the label block as early as possible. */
+	unsigned       n_users;
 	statement_t   *statement;
 
 	/* ast2firm info */
@@ -177,8 +144,8 @@ struct label_t {
 };
 
 struct namespace_t {
-	entity_base_t  base;
-	scope_t        members;
+	entity_base_t base;
+	scope_t       members;
 };
 
 struct typedef_t {
@@ -190,15 +157,17 @@ struct typedef_t {
 };
 
 struct declaration_t {
-	entity_base_t     base;
-	type_t           *type;
+	entity_base_t           base;
+	type_t                 *type;
 	ENUMBF(storage_class_t) declared_storage_class : 8;
 	ENUMBF(storage_class_t) storage_class          : 8;
-	decl_modifiers_t  modifiers;
-	il_alignment_t    alignment;
-	attribute_t      *attributes;
-	bool              used     : 1;  /**< Set if the declaration is used. */
-	bool              implicit : 1;  /**< Set for implicit (not found in source code) declarations. */
+	/** Set if the declaration is used. */
+	bool                    used                   : 1;
+	/** Set for implicit (not found in source code) declarations. */
+	bool                    implicit               : 1;
+	decl_modifiers_t        modifiers;
+	il_alignment_t          alignment;
+	attribute_t            *attributes;
 
 	/* ast2firm info */
 	unsigned char     kind;
@@ -216,12 +185,13 @@ struct compound_member_t {
 };
 
 struct variable_t {
-	declaration_t  base;
-	bool           thread_local   : 1;
-	bool           address_taken  : 1;  /**< Set if the address of this
-	                                         declaration was taken. */
-	bool           read           : 1;
-	unsigned       elf_visibility : 2;
+	declaration_t            base;
+	bool                     thread_local   : 1;
+	/** Set if the address of this declaration was taken. */
+	bool                     address_taken  : 1;
+	bool                     read           : 1;
+	ENUMBF(elf_visibility_t) elf_visibility : 3;
+
 	initializer_t *initializer;
 	union {
 		symbol_t  *symbol;
@@ -238,14 +208,16 @@ struct variable_t {
 
 struct function_t {
 	declaration_t  base;
-	bool           is_inline      : 1;
-	bool           need_closure   : 1;  /**< Inner function needs closure. */
-	bool           goto_to_outer  : 1;  /**< Inner function has goto to outer
-	                                         function. */
-	unsigned       elf_visibility : 2;
-	ENUMBF(builtin_kind_t) btk    : 16;
-	bool           builtin_in_lib : 1;  /**< builtin is library, this means
-	                                         you can safely take its address */
+	/** builtin kind */
+	ENUMBF(builtin_kind_t)   btk            : 8;
+	bool                     is_inline      : 1;
+	/** Inner function needs closure. */
+	bool                     need_closure   : 1;
+	/** Inner function has goto to outer function. */
+	bool                     goto_to_outer  : 1;
+	ENUMBF(elf_visibility_t) elf_visibility : 3;
+	/** builtin is library, this means you can safely take its address */
+	bool                     builtin_in_lib : 1;
 	scope_t        parameters;
 	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
@@ -269,10 +241,10 @@ struct asm_argument_t {
 	string_t      constraints;
 	expression_t *expression;
 	unsigned      pos;
-	bool          direct_read:1;    /**< argument value is read */
-	bool          direct_write:1;   /**< argument is lvalue and written to */
-	bool          indirect_read:1;  /**< argument is address which is read */
-	bool          indirect_write:1; /**< argument is address which is written */
+	bool          direct_read    :1;/**< argument value is read */
+	bool          direct_write   :1;/**< argument is lvalue and written to */
+	bool          indirect_read  :1;/**< argument is address which is read */
+	bool          indirect_write :1;/**< argument is address which is written */
 };
 
 union entity_t {

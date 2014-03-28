@@ -39,14 +39,14 @@ typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE
 } atomic_type_kind_t;
 
-typedef enum atomic_type_flag_t {
+typedef enum atomic_type_flags_t {
 	ATOMIC_TYPE_FLAG_NONE    = 0,
 	ATOMIC_TYPE_FLAG_SIGNED  = 1 << 0,
 	ATOMIC_TYPE_FLAG_INTEGER = 1 << 1,
 	ATOMIC_TYPE_FLAG_FLOAT   = 1 << 2,
-} atomic_type_flag_t;
+} atomic_type_flags_t;
 
-typedef enum type_qualifier_t {
+typedef enum type_qualifiers_t {
 	TYPE_QUALIFIER_NONE     = 0,
 	TYPE_QUALIFIER_CONST    = 1 << 0,
 	TYPE_QUALIFIER_RESTRICT = 1 << 1,
@@ -57,8 +57,7 @@ typedef enum type_qualifier_t {
 	TYPE_QUALIFIER_PTR64    = 1 << 5,
 	TYPE_QUALIFIER_SPTR     = 1 << 6,
 	TYPE_QUALIFIER_UPTR     = 1 << 7,
-} type_qualifier_t;
-typedef unsigned short type_qualifiers_t;
+} type_qualifiers_t;
 
 typedef struct type_base_t          type_base_t;
 typedef struct atomic_type_t        atomic_type_t;
@@ -244,7 +243,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type);
 /**
  * returns flags of an atomic type kind
  */
-unsigned get_atomic_type_flags(atomic_type_kind_t kind);
+atomic_type_flags_t get_atomic_type_flags(atomic_type_kind_t kind);
 
 /**
  * Find the atomic type kind representing a given size (signed).

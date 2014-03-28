@@ -712,7 +712,7 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 		copy                     = duplicate_type(type);
 		copy->array.element_type = qual_element_type;
 	} else if (is_type_valid(type)) {
-		if ((type->base.qualifiers & qual) == (int)qual)
+		if ((type->base.qualifiers & qual) == qual)
 			return orig_type;
 
 		copy                   = duplicate_type(type);
@@ -725,7 +725,7 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 }
 
 static bool test_atomic_type_flag(atomic_type_kind_t kind,
-                                  atomic_type_flag_t flag)
+                                  atomic_type_flags_t flag)
 {
 	assert(kind <= ATOMIC_TYPE_LAST);
 	return (atomic_type_properties[kind].flags & flag) != 0;
