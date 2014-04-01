@@ -393,6 +393,8 @@ static ir_type *create_compound_type(type_t *const type)
 	ir_type       *const irtype
 		= is_union ? new_type_union(id) : new_type_struct(id);
 	set_type_dbg_info(irtype, tdbgi);
+	set_type_alignment_bytes(irtype, compound->alignment);
+	set_type_size_bytes(irtype, compound->size);
 
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
@@ -432,8 +434,6 @@ static ir_type *create_compound_type(type_t *const type)
 		entry->compound_member.entity = entity;
 	}
 
-	set_type_alignment_bytes(irtype, compound->alignment);
-	set_type_size_bytes(irtype, compound->size);
 	set_type_state(irtype, layout_fixed);
 
 	return irtype;
