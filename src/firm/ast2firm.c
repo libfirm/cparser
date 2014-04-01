@@ -962,10 +962,8 @@ static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned align
 static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
 {
 	ir_entity *region = NULL;
-	int        i;
-
 	if (current_trampolines != NULL) {
-		for (i = ARR_LEN(current_trampolines) - 1; i >= 0; --i) {
+		for (int i = ARR_LEN(current_trampolines); i-- > 0; ) {
 			if (current_trampolines[i].function == entity) {
 				region = current_trampolines[i].region;
 				break;
