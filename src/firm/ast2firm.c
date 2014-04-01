@@ -991,6 +991,12 @@ static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
 	return new_d_simpleSel(dbgi, get_irg_frame(irg), region);
 }
 
+static bool backend_supports_trampolines(void)
+{
+	const backend_params *be_params = be_get_backend_param();
+	return be_params->trampoline_size > 0;
+}
+
 /**
  * Creates a trampoline for a function represented by an entity.
  *
@@ -999,12 +1005,19 @@ static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
  * @param entity  the function entity
  */
 static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
-                                  ir_entity *entity)
+                                  entity_t *entity)
 {
-	assert(entity != NULL);
+	if (!backend_supports_trampolines()) {
+		errorf(&entity->base.pos,
+		       "code generator does not support trampolines/pointers to inner functions");
+		return new_Bad(mode);
+	}
+
+	ir_entity *irentity = entity->function.irentity;
+	assert(irentity != NULL);
 	ir_node *in[3];
-	in[0] = get_trampoline_region(dbgi, entity);
-	in[1] = new_d_Address(dbgi, entity);
+	in[0] = get_trampoline_region(dbgi, irentity);
+	in[1] = new_d_Address(dbgi, irentity);
 	in[2] = get_irg_frame(current_ir_graph);
 
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
@@ -1128,7 +1141,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 			return new_d_Address(dbgi, entity->function.irentity);
 		} else {
 			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity->function.irentity);
+			return create_trampoline(dbgi, mode, entity);
 		}
 	}
 

@@ -706,6 +706,9 @@ bool build_firm_ir(compilation_env_t *env, compilation_unit_t *unit)
 		stat_ev_int("size_graph_construction", count_firm_nodes());
 	}
 	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
+	if (error_count > 0)
+		return false;
+
 	return true;
 }
 
