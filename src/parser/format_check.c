@@ -306,9 +306,8 @@ break_fmt_flags:
 			break;
 		}
 
-		type_t            *expected_type;
-		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
-		format_flags_t     allowed_flags;
+		type_t        *expected_type;
+		format_flags_t allowed_flags;
 		switch (fmt) {
 			case 'd':
 			case 'i':
@@ -408,22 +407,20 @@ eval_fmt_mod_unsigned:
 					warn_invalid_length_modifier(pos, fmt_mod, fmt);
 					goto next_arg;
 				}
-				expected_type = type_wchar_t_ptr;
-				expected_qual = TYPE_QUALIFIER_CONST;
+				expected_type = type_const_wchar_t_ptr;
 				allowed_flags = FMT_FLAG_MINUS;
 				break;
 
 			case 's':
 				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_char_ptr;    break;
-					case FMT_MOD_l:    expected_type = type_wchar_t_ptr; break;
-					case FMT_MOD_w:    expected_type = type_wchar_t_ptr; break;
+					case FMT_MOD_NONE: expected_type = type_const_char_ptr;    break;
+					case FMT_MOD_l:    expected_type = type_const_wchar_t_ptr; break;
+					case FMT_MOD_w:    expected_type = type_const_wchar_t_ptr; break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
 						goto next_arg;
 				}
-				expected_qual = TYPE_QUALIFIER_CONST;
 				allowed_flags = FMT_FLAG_MINUS;
 				break;
 
@@ -498,7 +495,7 @@ too_few_args:
 				if (is_type_pointer(arg_skip)) {
 					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
 					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
-					if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
+					if ((arg_to->base.qualifiers & ~exp_to->base.qualifiers) == 0 &&
 						types_compatible_ignore_qualifiers(arg_to, exp_to))
 						goto next_arg;
 				}
