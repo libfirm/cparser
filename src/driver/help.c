@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <libfirm/be.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "firm/firm_opt.h"
 #include "warning.h"
