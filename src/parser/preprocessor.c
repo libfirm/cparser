@@ -3059,9 +3059,23 @@ finish_headername:
 	return identified;
 }
 
-static bool do_include(bool const bracket_include, bool const include_next, char const *const headername)
+static bool do_include(bool const bracket_include, bool const include_next,
+                       char const *const headername)
 {
-	size_t const        headername_len = strlen(headername);
+	size_t const headername_len = strlen(headername);
+	/* is it an absolute path? */
+	if (headername[0] == '/') {
+		obstack_grow(&symbol_obstack, headername, headername_len+1);
+		char *complete_path = obstack_finish(&symbol_obstack);
+		const char *full_name = identify_string(complete_path);
+		FILE *file = fopen(full_name, "r");
+		if (file == NULL)
+			return false;
+		bool is_system_header = false;
+		switch_pp_input_file(file, full_name, NULL, is_system_header);
+		return true;
+	}
+
 	searchpath_entry_t *entry;
 	if (include_next) {
 		entry = input.path      ? input.path->next
