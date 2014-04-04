@@ -1838,11 +1838,19 @@ check_type:
 		return EXPR_CLASS_VARIABLE;
 	}
 
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD: {
+		expression_t const         *const right = expression->binary.right;
+		expression_classification_t const r     = is_constant_expression(right);
+		if (r == EXPR_CLASS_INTEGER_CONSTANT && tarval_is_null(fold_expression(right)))
+			return EXPR_CLASS_VARIABLE;
+		expression_classification_t const l = is_constant_expression(expression->binary.left);
+		return MIN(l, r);
+	}
+
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_SUB:
 	case EXPR_BINARY_MUL:
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_BINARY_LESS:
