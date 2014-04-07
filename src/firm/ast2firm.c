@@ -597,7 +597,8 @@ static bool declaration_is_definition(const entity_t *entity)
 {
 	switch (entity->kind) {
 	case ENTITY_VARIABLE:
-		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
+		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN
+		    || entity->variable.alias.entity != NULL;
 	case ENTITY_FUNCTION:
 		return entity->function.body != NULL
 		    || entity->function.alias.entity != NULL;
@@ -648,8 +649,7 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
 	}
-	if ((modifiers & DM_WEAK) && declaration_is_definition(entity)
-	    && entity->declaration.storage_class != STORAGE_CLASS_EXTERN) {
+	if ((modifiers & DM_WEAK) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_WEAK);
 	}
 }

@@ -304,6 +304,13 @@ static void handle_attribute_alias(const attribute_t *attribute,
 		         entity);
 		return;
 	}
+	declaration_t *decl = &entity->declaration;
+	if (decl->storage_class == STORAGE_CLASS_EXTERN) {
+		/* code generator will ignore the extern declaration */
+		warningf(WARN_OTHER, &entity->base.pos,
+				 "extern storage class ignored for alias '%N'", entity);
+	}
+
 	ARR_APP1(entity_t*, alias_entities, entity);
 }
 
