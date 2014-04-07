@@ -25,6 +25,13 @@
 #define popen(cmd, mode)         _popen(cmd, mode)
 #define unlink(filename)         _unlink(filename)
 
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO _fileno(stdout)
+#endif
+#ifndef STDERR_FILENO 2
+#define STDERR_FILENO _fileno(stderr)
+#endif
+
 #else
 #	ifdef __APPLE__
 #		define _DARWIN_C_SOURCE /* Required for mkdtemp(). */

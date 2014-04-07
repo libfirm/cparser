@@ -329,7 +329,7 @@ static int detect_color_terminal(void)
 {
 	/* we want to avoid bloated linking against termcap/ncurses, so we use a
 	 * simple detection heuristic (similar to one git uses) */
-	if (!isatty(1))
+	if (!isatty(STDOUT_FILENO) || !isatty(STDERR_FILENO))
 		return 0;
 
 	char *term = getenv("TERM");
