@@ -303,6 +303,8 @@ bool options_parse_driver(options_state_t *s)
 		s->action = action_version;
 	} else if (streq(option, "dumpversion")) {
 		s->action = action_version_short;
+	} else if (streq(option, "dumpmachine")) {
+		s->action = action_dumpmachine;
 	} else if (option[0] == 'd') {
 		/* scan debug flags */
 		for (const char *flag = &option[1]; *flag != '\0'; ++flag) {

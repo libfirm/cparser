@@ -10,6 +10,7 @@
 
 #include "driver.h"
 #include "version.h"
+#include "machine_triple.h"
 #include <revision.h>
 
 int action_version(const char *argv0)
@@ -36,5 +37,16 @@ int action_version_short(const char *argv0)
 	(void)argv0;
 	printf("%s.%s.%s\n",
 	       CPARSER_MAJOR, CPARSER_MINOR, CPARSER_PATCHLEVEL);
+	return EXIT_SUCCESS;
+}
+
+int action_dumpmachine(const char *argv0)
+{
+	(void)argv0;
+	/* we should print the "target machine" but cparser can address multiple
+	 * targets, so we just print the host machine */
+	machine_triple_t *host = get_host_machine_triple();
+	printf("%s-%s-%s\n", host->cpu_type, host->manufacturer,
+	       host->operating_system);
 	return EXIT_SUCCESS;
 }

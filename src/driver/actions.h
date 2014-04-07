@@ -9,4 +9,6 @@ int action_version(const char *argv0);
 
 int action_version_short(const char *argv0);
 
+int action_dumpmachine(const char *argv0);
+
 #endif
