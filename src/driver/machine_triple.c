@@ -8,29 +8,29 @@
 #include "adt/strutil.h"
 #include "adt/xmalloc.h"
 
-bool firm_is_unixish_os(const char *os)
+bool is_unixish_os(const char *os)
 {
 	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
 	    || strstart(os, "solaris");
 }
 
-bool firm_is_elf_os(const char *os)
+bool is_elf_os(const char *os)
 {
-	return firm_is_unixish_os(os) || streq(os, "elf") || streq(os, "octopos")
+	return is_unixish_os(os) || streq(os, "elf") || streq(os, "octopos")
 	    || streq(os, "irtss");
 }
 
-bool firm_is_darwin_os(const char *os)
+bool is_darwin_os(const char *os)
 {
 	return strstart(os, "darwin");
 }
 
-bool firm_is_windows_os(const char *os)
+bool is_windows_os(const char *os)
 {
 	return strstart(os, "mingw") || streq(os, "win32");
 }
 
-bool firm_is_ia32_cpu(const char *architecture)
+bool is_ia32_cpu(const char *architecture)
 {
 	return streq(architecture, "i386")
 	    || streq(architecture, "i486")
@@ -39,12 +39,12 @@ bool firm_is_ia32_cpu(const char *architecture)
 	    || streq(architecture, "i786");
 }
 
-machine_triple_t *firm_get_host_machine(void)
+machine_triple_t *get_host_machine_triple(void)
 {
 #ifdef HOST_TRIPLE
 	/* a triple for the host machine was defined in the Makefile
 	 * or config.mak */
-	return firm_parse_machine_triple(HOST_TRIPLE);
+	return parse_machine_triple(HOST_TRIPLE);
 #else
 	/* no host triple specified, we do some guessing based on preprocessor
 	 * defines (look into predefs.c for inspiration) */
@@ -85,7 +85,7 @@ machine_triple_t *firm_get_host_machine(void)
 #endif
 }
 
-void firm_free_machine_triple(machine_triple_t *machine)
+void free_machine_triple(machine_triple_t *machine)
 {
 	free(machine->cpu_type);
 	free(machine->manufacturer);
@@ -93,7 +93,7 @@ void firm_free_machine_triple(machine_triple_t *machine)
 	free(machine);
 }
 
-machine_triple_t *firm_parse_machine_triple(const char *triple_string)
+machine_triple_t *parse_machine_triple(const char *triple_string)
 {
 	const char *manufacturer = strchr(triple_string, '-');
 	if (manufacturer == NULL) {

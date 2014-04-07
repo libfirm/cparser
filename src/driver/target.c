@@ -68,7 +68,7 @@ static void setup_types(void)
 
 	/* operating system ABI specifics */
 	const char *operating_system = target.machine->operating_system;
-	if (firm_is_darwin_os(operating_system)) {
+	if (is_darwin_os(operating_system)) {
 		if (streq(firm_isa, "ia32")) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
@@ -77,7 +77,7 @@ static void setup_types(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
-	} else if (firm_is_windows_os(operating_system)) {
+	} else if (is_windows_os(operating_system)) {
 		if (streq(firm_isa, "ia32")) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
@@ -157,13 +157,13 @@ static void init_os_support(void)
 	target.enable_main_collect2_hack = false;
 	driver_default_exe_output        = "a.out";
 
-	if (firm_is_elf_os(os)) {
+	if (is_elf_os(os)) {
 		set_create_ld_ident(create_name_linux_elf);
 		target.user_label_prefix = "";
 
 		set_be_option("ia32-gasmode=elf");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
-	} else if (firm_is_darwin_os(os)) {
+	} else if (is_darwin_os(os)) {
 		set_create_ld_ident(create_name_macho);
 		target.user_label_prefix = "_";
 		dialect.intmax_predefs   = true;
@@ -172,7 +172,7 @@ static void init_os_support(void)
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
-	} else if (firm_is_windows_os(os)) {
+	} else if (is_windows_os(os)) {
 		set_create_ld_ident(create_name_win32);
 		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
 		target.enable_main_collect2_hack = true;
@@ -326,7 +326,7 @@ static bool pass_options_to_firm_be(void)
 bool target_setup(void)
 {
 	if (target.machine == NULL)
-		target.machine = firm_get_host_machine();
+		target.machine = get_host_machine_triple();
 
 	bool res = setup_firm_isa();
 	init_os_support();

@@ -583,7 +583,7 @@ bool options_parse_help(options_state_t *s)
 
 static bool parse_target_triple(const char *arg)
 {
-	machine_triple_t *triple = firm_parse_machine_triple(arg);
+	machine_triple_t *triple = parse_machine_triple(arg);
 	if (triple == NULL) {
 		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
 		return false;

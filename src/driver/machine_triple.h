@@ -13,20 +13,20 @@ typedef struct machine_triple_t {
 	char *operating_system;
 } machine_triple_t;
 
-machine_triple_t *firm_get_host_machine(void);
+machine_triple_t *get_host_machine_triple(void);
 
-machine_triple_t *firm_parse_machine_triple(const char *triple_string);
+machine_triple_t *parse_machine_triple(const char *triple_string);
 
-void firm_free_machine_triple(machine_triple_t *triple);
+void free_machine_triple(machine_triple_t *triple);
 
-bool firm_is_unixish_os(const char *operating_system);
+bool is_unixish_os(const char *operating_system);
 
-bool firm_is_elf_os(const char *operating_system);
+bool is_elf_os(const char *operating_system);
 
-bool firm_is_darwin_os(const char *operating_system);
+bool is_darwin_os(const char *operating_system);
 
-bool firm_is_windows_os(const char *operating_system);
+bool is_windows_os(const char *operating_system);
 
-bool firm_is_ia32_cpu(const char *architecture);
+bool is_ia32_cpu(const char *architecture);
 
 #endif

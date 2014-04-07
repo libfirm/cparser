@@ -274,7 +274,7 @@ void add_predefined_macros(void)
 	add_define("_FORTIFY_SOURCE", "0", false);
 
 	const char *operating_system = target.machine->operating_system;
-	if (firm_is_unixish_os(operating_system)) {
+	if (is_unixish_os(operating_system)) {
 		if (dialect.gnu)
 			add_define("unix",     "1", false);
 		add_define("__unix",   "1", false);
@@ -289,7 +289,7 @@ void add_predefined_macros(void)
 				add_define("__gnu_linux__", "1", false);
 			}
 		}
-	} else if (firm_is_darwin_os(operating_system)) {
+	} else if (is_darwin_os(operating_system)) {
 		add_define("__MACH__",     "1", false);
 		add_define("__APPLE__",    "1", false);
 		add_define("__APPLE_CC__", "1", false);
@@ -326,7 +326,7 @@ void add_predefined_macros(void)
 
 	const char *cpu          = target.machine->cpu_type;
 	const char *manufacturer = target.machine->manufacturer;
-	if (firm_is_ia32_cpu(cpu)) {
+	if (is_ia32_cpu(cpu)) {
 		if (dialect.gnu)
 			add_define("i386",     "1", false);
 		add_define("__i386",   "1", false);
