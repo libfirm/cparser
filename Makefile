@@ -38,8 +38,8 @@ cparser_DEPS    = $(cparser_OBJECTS:%.o=%.d)
 cparser_EXE     = $(builddir)/cparser
 
 CPARSERS = $(addsuffix .check, $(cparser_SOURCES) $(libcparser_SOURCES))
-CPARSEROS = $(libcparser_SOURCES:%.c=$(builddir)/cpb/%.o) $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
-CPARSEROS2 = $(libcparser_SOURCES:%.c=$(builddir)/cpb2/%.o) $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
+CPARSEROS = $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
+CPARSEROS2 = $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
 
 # This hides the noisy commandline outputs. Show them with "make V=1"
 ifneq ($(V),1)
