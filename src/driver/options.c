@@ -239,7 +239,7 @@ bool options_parse_driver(options_state_t *s)
 			s->argument_errors = true;
 			return false;
 		}
-	} else if (streq(option, "-pipe")) {
+	} else if (streq(option, "pipe")) {
 		/* here for gcc compatibility */
 	} else if ((arg = equals_arg("std=", s)) != NULL) {
 		standard =
