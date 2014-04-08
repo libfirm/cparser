@@ -1840,9 +1840,11 @@ check_type:
 
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_MOD: {
-		expression_t const         *const right = expression->binary.right;
-		expression_classification_t const r     = is_constant_expression(right);
-		if (r == EXPR_CLASS_INTEGER_CONSTANT && tarval_is_null(fold_expression(right)))
+		expression_t const         *const right  = expression->binary.right;
+		expression_classification_t const r      = is_constant_expression(right);
+		type_t                     *const rtype  = skip_typeref(right->base.type);
+		bool                        const iconst = is_type_integer(rtype) && r >= EXPR_CLASS_CONSTANT;
+		if (iconst && tarval_is_null(fold_expression(right)))
 			return EXPR_CLASS_VARIABLE;
 		expression_classification_t const l = is_constant_expression(expression->binary.left);
 		return MIN(l, r);
