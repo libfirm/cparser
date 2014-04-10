@@ -331,6 +331,7 @@ bool options_parse_linker(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-L%s", arg);
 	} else if (streq(option, "static")
 	        || streq(option, "shared")
+	        || streq(option, "nostdlib")
 	        || streq(option, "s")
 	        || strstart(option, "Wl,")) {
 	    driver_add_flag(&ldflags_obst, full_option);
@@ -394,6 +395,9 @@ bool options_parse_codegen(options_state_t *s)
 			return false;
 	} else if (streq(option, "-unroll-loops")) {
 		/* ignore (gcc compatibility) */
+	} else if (streq(option, "fexcess-precision=standard")) {
+		/* ignore (gcc compatibility) we always adhere to the C99 standard
+		 * anyway in this respect */
 	} else if (streq(option, "g") || streq(option, "g0") || streq(option, "g1")
 			|| streq(option, "g2") || streq(option, "g3")) {
 		set_be_option("debug=frameinfo");
