@@ -349,9 +349,6 @@ void add_predefined_macros(void)
 			add_define("__pentium4",     "1", false);
 			add_define("__pentium4__",   "1", false);
 		}
-		/* TODO: __MMX__, __SSE__, __SSE2__, __SSE3__ */
-		/* x87 rounds towards positive infinity */
-		add_define("__FLT_EVAL_METHOD__", "2", false);
 	} else if (streq(cpu, "sparc")) {
 		add_define("sparc",     "1", false);
 		add_define("__sparc",   "1", false);
@@ -373,10 +370,15 @@ void add_predefined_macros(void)
 		add_define("__x86_64__", "1", false);
 		add_define("__amd64",    "1", false);
 		add_define("__amd64__",  "1", false);
-	} else {
-		/* round towards zero */
-		add_define("__FLT_EVAL_METHOD__", "0", false);
 	}
+	ir_mode *float_mode = be_get_mode_float_arithmetic();
+	const char *flt_eval_metod
+		= float_mode == NULL ? "0"
+		: get_mode_size_bytes(float_mode) > get_type_size(type_double)  ? "2"
+		: get_mode_size_bytes(float_mode) == get_type_size(type_double) ? "1"
+		: "-1";
+	add_define("__FLT_EVAL_METHOD__", flt_eval_metod, false);
+
 	/* TODO: query from backend? */
 	add_define("__USER_LABEL_PREFIX__", user_label_prefix, false);
 	add_define("__REGISTER_PREFIX__", "", false);
