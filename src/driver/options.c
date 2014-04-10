@@ -421,9 +421,14 @@ bool options_parse_codegen(options_state_t *s)
 			} else if (streq(fopt, "strength-reduce")) {
 				/* does nothing, for gcc compatibility (even gcc does
 				 * nothing for this switch anymore) */
-			} else if (!truth_value && streq(fopt, "asynchronous-unwind-tables")) {
-				/* nothing todo, a gcc feature which we do not support
+			} else if (!truth_value
+			           && (streq(fopt, "asynchronous-unwind-tables")
+			               || streq(fopt, "unwind-tables"))) {
+				/* do nothing: a gcc feature which we do not support
 				 * anyway was deactivated */
+			} else if (streq(fopt, "rounding-math")) {
+				/* ignore for gcc compatibility: we don't have any unsafe
+				 * optimizations in that area */
 			} else if (streq(fopt, "verbose-asm")) {
 				/* ignore: we always print verbose assembler */
 			} else if (streq(fopt, "jump-tables")             ||
