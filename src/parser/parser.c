@@ -932,6 +932,7 @@ typedef enum assign_error_t {
 	ASSIGN_ERROR_INCOMPATIBLE,
 	ASSIGN_ERROR_POINTER_QUALIFIER_MISSING,
 	ASSIGN_WARNING_POINTER_INCOMPATIBLE,
+	ASSIGN_WARNING_POINTER_SIGNEDNESS,
 	ASSIGN_WARNING_POINTER_FROM_INT,
 	ASSIGN_WARNING_INT_FROM_POINTER
 } assign_error_t;
@@ -968,6 +969,12 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 
 	case ASSIGN_WARNING_POINTER_INCOMPATIBLE:
 		warningf(WARN_OTHER, pos,
+		         "destination type '%T' in %s is incompatible with '%E' of type '%T'",
+		         orig_type_left, context, right, orig_type_right);
+		return;
+
+	case ASSIGN_WARNING_POINTER_SIGNEDNESS:
+		warningf(WARN_POINTER_SIGN, pos,
 		         "destination type '%T' in %s is incompatible with '%E' of type '%T'",
 		         orig_type_left, context, right, orig_type_right);
 		return;
@@ -1024,6 +1031,12 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 
 			if (!types_compatible_ignore_qualifiers(points_to_left,
 			                                        points_to_right)) {
+				if (is_type_integer(points_to_left) &&
+				    is_type_integer(points_to_right) &&
+				    get_type_size(points_to_left)
+				    == get_type_size(points_to_right)) {
+					return ASSIGN_WARNING_POINTER_SIGNEDNESS;
+				}
 				return ASSIGN_WARNING_POINTER_INCOMPATIBLE;
 			}
 

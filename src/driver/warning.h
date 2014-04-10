@@ -57,6 +57,7 @@ typedef enum warning_t {
 	WARN_PARENTHESES,                   /**< Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces) */
 	WARN_PEDANTIC,                      /**< Warn for cases where the c standard isn't stricly followed (but where we can easily continue) */
 	WARN_POINTER_ARITH,                 /**< Warn about anything that depends on the "size of" a function type or of 'void' */
+	WARN_POINTER_SIGN,                  /**< gcc silently allows casting int* to unsigned* if this is off */
 	WARN_REDUNDANT_DECLS,               /**< Warn about redundant declarations */
 	WARN_RETURN_TYPE,                   /* TODO not fully implemented */ /**< Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'. */
 	WARN_SHADOW,                        /**< Warn whenever a local variable shadows another local variable, parameter or global variable or whenever a built-in function is shadowed */
