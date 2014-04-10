@@ -28,7 +28,7 @@
 #ifndef STDOUT_FILENO
 #define STDOUT_FILENO _fileno(stdout)
 #endif
-#ifndef STDERR_FILENO 2
+#ifndef STDERR_FILENO
 #define STDERR_FILENO _fileno(stderr)
 #endif
 
