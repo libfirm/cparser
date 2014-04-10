@@ -1831,8 +1831,12 @@ check_type:
 					: is_constant_expression(val);
 			}
 		}
-		if (is_type_scalar(type))
-			return is_constant_expression(expression->unary.value);
+		if (is_type_scalar(type)) {
+			expression_classification_t const cls
+				= is_constant_expression(expression->unary.value);
+			/* Can't be an integer constant anymore */
+			return cls > EXPR_CLASS_CONSTANT ? EXPR_CLASS_CONSTANT : cls;
+		}
 		if (!is_type_valid(type))
 			return EXPR_CLASS_ERROR;
 		return EXPR_CLASS_VARIABLE;
