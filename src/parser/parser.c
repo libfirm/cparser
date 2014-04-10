@@ -853,8 +853,11 @@ static bool is_null_pointer_constant(const expression_t *expression)
 	/* skip void* cast */
 	if (expression->kind == EXPR_UNARY_CAST) {
 		type_t *const type = skip_typeref(expression->base.type);
-		if (type == type_void_ptr)
+		if (type->kind == TYPE_POINTER
+		    && type->base.qualifiers == TYPE_QUALIFIER_NONE
+		    && skip_typeref(type->pointer.points_to) == type_void) {
 			expression = expression->unary.value;
+		}
 	}
 
 	switch (is_constant_expression(expression)) {
