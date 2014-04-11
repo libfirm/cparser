@@ -1835,7 +1835,7 @@ check_type:
 			expression_classification_t const cls
 				= is_constant_expression(expression->unary.value);
 			/* Can't be an integer constant anymore */
-			return cls > EXPR_CLASS_CONSTANT ? EXPR_CLASS_CONSTANT : cls;
+			return MIN(cls, EXPR_CLASS_CONSTANT);
 		}
 		if (!is_type_valid(type))
 			return EXPR_CLASS_ERROR;
