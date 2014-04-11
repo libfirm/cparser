@@ -9380,8 +9380,8 @@ static statement_t *parse_case_statement(void)
 				if (l->is_bad || l->is_empty_range || l->expression == NULL)
 					continue;
 
-				if (c->last_case < l->first_case
-				 || c->first_case > l->last_case)
+				if (tarval_cmp(c->last_case, l->first_case) == ir_relation_less ||
+				    tarval_cmp(l->last_case, c->first_case) == ir_relation_less)
 					continue;
 
 				errorf(pos, "duplicate case value");
