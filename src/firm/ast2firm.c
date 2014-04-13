@@ -3776,161 +3776,136 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
-/** ANSI C §6.7.8:21: If there are fewer initializers [..] than there
- *  are elements [...] the remainder of the aggregate shall be initialized
- *  implicitly the same as objects that have static storage duration. */
-static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
-		ir_node *base_addr)
+static ir_node *new_arrsel(dbg_info *dbgi, ir_node *addr, ir_node *index,
+                           ir_type *type)
 {
-	/* for unions we must NOT do anything for null initializers */
-	ir_type *owner = get_entity_owner(entity);
-	if (is_Union_type(owner)) {
-		return;
-	}
-
-	ir_type *ent_type = get_entity_type(entity);
-	/* create sub-initializers for a compound type */
-	if (is_compound_type(ent_type)) {
-		unsigned n_members = get_compound_n_members(ent_type);
-		for (unsigned n = 0; n < n_members; ++n) {
-			ir_entity *member = get_compound_member(ent_type, n);
-			ir_node   *addr   = new_d_simpleSel(dbgi, base_addr, member);
-			create_dynamic_null_initializer(member, dbgi, addr);
-		}
-		return;
-	}
-	if (is_Array_type(ent_type)) {
-		assert(has_array_size(ent_type));
-		long n = get_array_size_int(ent_type);
-		for (long i = 0; i < n; ++i) {
-			ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
-			ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
-			ir_node   *cnst     = new_d_Const(dbgi, index_tv);
-			ir_node   *in[1]    = { cnst };
-			ir_entity *arrent   = get_array_element_entity(ent_type);
-			ir_node   *addr     = new_d_Sel(dbgi, base_addr, 1, in, arrent);
-			create_dynamic_null_initializer(arrent, dbgi, addr);
-		}
-		return;
-	}
-
-	ir_mode *value_mode = get_type_mode(ent_type);
-	ir_node *node       = new_Const(get_mode_null(value_mode));
-
-	/* is it a bitfield type? */
-	if (is_compound_type(get_entity_owner(entity))
-	    && get_entity_bitfield_size(entity) > 0) {
-		bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
-		return;
-	}
-
-	ir_node *mem    = get_store();
-	ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
-	ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
-	set_store(proj_m);
+	ir_entity *entity = get_array_element_entity(type);
+	ir_node   *in[]   = { index };
+	return new_d_Sel(dbgi, addr, ARRAY_SIZE(in), in, entity);
 }
 
-static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
-		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
+static void create_dynamic_bitfield_init(dbg_info *dbgi, ir_node *addr,
+                                         ir_entity *entity,
+                                         ir_initializer_t *initializer)
+{
+	ir_node *node;
+	switch (get_initializer_kind(initializer)) {
+	case IR_INITIALIZER_NULL: {
+		ir_type *type = get_entity_type(entity);
+		ir_mode *mode = get_type_mode(type);
+		node = new_d_Const(dbgi, get_mode_null(mode));
+		break;
+	}
+	case IR_INITIALIZER_TARVAL: {
+		ir_tarval *tv = get_initializer_tarval_value(initializer);
+		node = new_d_Const(dbgi, tv);
+		break;
+	}
+	case IR_INITIALIZER_CONST:
+		node = get_initializer_const_value(initializer);
+		break;
+	default:
+		panic("unexpected bitfield initializer");
+	}
+	bitfield_store_to_firm(dbgi, entity, addr, node, false, false);
+}
+
+static void create_dynamic_initializer_sub(dbg_info *dbgi,
+                                           ir_node *addr, ir_type *type,
+                                           ir_initializer_t *initializer)
 {
 	switch (get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL:
-		create_dynamic_null_initializer(entity, dbgi, base_addr);
-		return;
-	case IR_INITIALIZER_CONST: {
-		ir_node *node     = get_initializer_const_value(initializer);
-		ir_type *ent_type = get_entity_type(entity);
-
-		/* is it a bitfield type? */
-		if (is_compound_type(get_entity_owner(entity))
-		    && get_entity_bitfield_size(entity) > 0) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
+		if (is_compound_type(type))
+			goto compound_init;
+		if (is_Array_type(type))
+			goto array_init;
+		ir_mode *mode = get_type_mode(type);
+		ir_node *node = new_d_Const(dbgi, get_mode_null(mode));
+		goto store;
+	case IR_INITIALIZER_CONST:;
+		node = get_initializer_const_value(initializer);
+		if (is_compound_type(type)) {
+			ir_node *mem = get_store();
+			ir_node *copyb
+				= new_d_CopyB(dbgi, mem, addr, node, type, cons_none);
+			set_store(copyb);
 			return;
-		}
-
-		ir_node *mem = get_store();
-		ir_node *new_mem;
-		if (is_compound_type(ent_type)) {
-			new_mem = new_d_CopyB(dbgi, mem, base_addr, node, ent_type, cons_none);
 		} else {
-			assert(get_type_mode(type) == get_irn_mode(node));
-			ir_node *store = new_d_Store(dbgi, mem, base_addr, node, cons_none);
-			new_mem = new_Proj(store, mode_M, pn_Store_M);
+			goto store;
 		}
-		set_store(new_mem);
-		return;
-	}
 	case IR_INITIALIZER_TARVAL: {
-		ir_tarval *tv   = get_initializer_tarval_value(initializer);
-		ir_node   *cnst = new_d_Const(dbgi, tv);
-
-		/* is it a bitfield type? */
-		if (is_compound_type(get_entity_owner(entity))
-		    && get_entity_bitfield_size(entity) > 0) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false, false);
-			return;
-		}
-
-		assert(get_type_mode(type) == get_tarval_mode(tv));
+		ir_tarval *tv = get_initializer_tarval_value(initializer);
+		node = new_d_Const(dbgi, tv);
+store:;
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, cons_none);
+		ir_node *store  = new_d_Store(dbgi, mem, addr, node, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
 	}
-	case IR_INITIALIZER_COMPOUND: {
-		assert(is_compound_type(type) || is_Array_type(type));
-		int n_members;
-		if (is_Array_type(type)) {
-			assert(has_array_size(type));
-			n_members = get_array_size_int(type);
+	case IR_INITIALIZER_COMPOUND:
+		if (is_compound_type(type)) {
+compound_init:;
+			size_t n = get_compound_n_members(type);
+			assert(get_initializer_kind(initializer) == IR_INITIALIZER_NULL
+			       || get_initializer_compound_n_entries(initializer) == n);
+
+			for (size_t i = 0; i < n; ++i) {
+				ir_initializer_t *subinit;
+				if (get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
+					subinit = initializer;
+				} else {
+					subinit = get_initializer_compound_value(initializer, i);
+					/* do not null-initialize union members */
+					if (is_Union_type(type)
+					    && get_initializer_kind(subinit) == IR_INITIALIZER_NULL)
+						continue;
+				}
+
+				ir_entity *member      = get_compound_member(type, i);
+				ir_node   *member_addr = new_d_simpleSel(dbgi, addr, member);
+				if (get_entity_bitfield_size(member) > 0) {
+					create_dynamic_bitfield_init(dbgi, member_addr, member,
+					                             subinit);
+				} else {
+					ir_type *type = get_entity_type(member);
+					create_dynamic_initializer_sub(dbgi, member_addr, type,
+					                               subinit);
+				}
+			}
 		} else {
-			n_members = get_compound_n_members(type);
-		}
+array_init:
+			assert(is_Array_type(type));
+			size_t n = (size_t)get_array_size_int(type);
+			assert(get_initializer_kind(initializer) == IR_INITIALIZER_NULL
+			       || get_initializer_compound_n_entries(initializer) == n);
 
-		if (get_initializer_compound_n_entries(initializer)
-				!= (unsigned) n_members)
-			panic("initializer doesn't match compound type");
-
-		for (int i = 0; i < n_members; ++i) {
-			ir_node   *addr;
-			ir_type   *irtype;
-			ir_entity *sub_entity;
-			if (is_Array_type(type)) {
-				ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
+			ir_type *eltype    = get_array_element_type(type);
+			ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
+			for (size_t i = 0; i < n; ++i) {
 				ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
-				ir_node   *in[1]    = { cnst };
-				irtype     = get_array_element_type(type);
-				sub_entity = get_array_element_entity(type);
-				addr       = new_d_Sel(dbgi, base_addr, 1, in, sub_entity);
-			} else {
-				sub_entity = get_compound_member(type, i);
-				irtype     = get_entity_type(sub_entity);
-				addr       = new_d_simpleSel(dbgi, base_addr, sub_entity);
+				ir_node   *eladdr   = new_arrsel(dbgi, addr, cnst, type);
+				ir_initializer_t *subinit
+					= get_initializer_kind(initializer) == IR_INITIALIZER_NULL
+					? initializer
+					: get_initializer_compound_value(initializer, i);
+				create_dynamic_initializer_sub(dbgi, eladdr, eltype, subinit);
 			}
-
-			ir_initializer_t *sub_init
-				= get_initializer_compound_value(initializer, i);
-
-			create_dynamic_initializer_sub(sub_init, sub_entity, irtype, dbgi,
-			                               addr);
 		}
 		return;
 	}
-	}
-
 	panic("invalid ir_initializer");
 }
 
-static void create_dynamic_initializer(ir_initializer_t *initializer,
-		dbg_info *dbgi, ir_entity *entity)
+static void create_dynamic_initializer(dbg_info *dbgi, ir_entity *entity,
+                                       ir_initializer_t *initializer)
 {
-	ir_node *frame     = get_irg_frame(current_ir_graph);
-	ir_node *base_addr = new_d_simpleSel(dbgi, frame, entity);
-	ir_type *type      = get_entity_type(entity);
-
-	create_dynamic_initializer_sub(initializer, entity, type, dbgi, base_addr);
+	ir_node *frame = get_irg_frame(current_ir_graph);
+	ir_node *addr  = new_d_simpleSel(dbgi, frame, entity);
+	ir_type *type  = get_entity_type(entity);
+	create_dynamic_initializer_sub(dbgi, addr, type, initializer);
 }
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
@@ -3952,8 +3927,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	if (is_constant_initializer(initializer) == EXPR_CLASS_VARIABLE) {
 		ir_initializer_t *irinitializer
 			= create_ir_initializer(initializer, type);
-
-		create_dynamic_initializer(irinitializer, dbgi, entity);
+		create_dynamic_initializer(dbgi, entity, irinitializer);
 		return;
 	}
 
