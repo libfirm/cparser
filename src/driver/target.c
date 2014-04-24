@@ -121,6 +121,8 @@ static void setup_types(void)
 	char     name[64];
 	unsigned bit_size     = machine_size;
 	unsigned modulo_shift = target.modulo_shift;
+	if (modulo_shift != 0 && modulo_shift < bit_size)
+		modulo_shift = bit_size;
 
 	snprintf(name, sizeof(name), "p%u", machine_size);
 	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
