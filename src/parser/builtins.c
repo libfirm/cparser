@@ -126,7 +126,7 @@ void create_gnu_builtins(void)
 	f(ir_bk_ffs,            "ffs",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
 	f(ir_bk_ffs,            "ffsl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_ffs,            "ffsll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
-	f(ir_bk_frame_address,  "frame_address",  make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
+	f(ir_bk_frame_address,  "frame_address",  make_function_1_type(type_void_ptr, type_unsigned_int, DM_CONST));
 	f(ir_bk_parity,         "parity",         make_function_1_type(type_int, type_unsigned_int, DM_CONST));
 	f(ir_bk_parity,         "parityl",        make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_parity,         "parityll",       make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
@@ -134,7 +134,7 @@ void create_gnu_builtins(void)
 	f(ir_bk_popcount,       "popcountl",      make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_popcount,       "popcountll",     make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
 	f(ir_bk_prefetch,       "prefetch",       make_function_1_type_variadic(type_float, type_void_ptr, DM_NONE));
-	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
+	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_CONST));
 	f(ir_bk_trap,           "trap",           make_function_type(type_void, 0, NULL, DM_NORETURN));
 
 	entity_t *(*s)(ir_builtin_kind,const char*,type_t*) = create_builtin_firm;
