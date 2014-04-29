@@ -1403,6 +1403,14 @@ finish_newdef:;
 	return true;
 }
 
+/** Set current token to a special token (newline, unknown char), esp.
+ * avoid setting a token symbol */
+static inline void set_special(token_kind_t const kind)
+{
+	pp_token.kind = kind;
+}
+
+/** Set current token to a punctuator (+, <<=, ...) token */
 static inline void set_punctuator(token_kind_t const kind)
 {
 	pp_token.kind        = kind;
@@ -1998,7 +2006,7 @@ restart:
 		info.whitespace_at_line_begin = 0;
 		if (stop_at_newline) {
 			--input.pos.lineno;
-			set_punctuator(T_NEWLINE);
+			set_special(T_NEWLINE);
 			put_back('\n');
 			return;
 		}
@@ -2156,7 +2164,7 @@ digraph_percentcolon:
 
 	case UTF32_EOF:
 		if (stop_at_newline) {
-			set_punctuator(T_NEWLINE);
+			set_special(T_NEWLINE);
 			return;
 		}
 
@@ -2170,7 +2178,7 @@ digraph_percentcolon:
 			goto restart;
 		} else {
 			info.at_line_begin = true;
-			set_punctuator(T_EOF);
+			set_special(T_EOF);
 		}
 		return;
 
