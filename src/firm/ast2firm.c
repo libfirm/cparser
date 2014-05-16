@@ -1888,9 +1888,10 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
 static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right,
                            ir_mode *mode)
 {
-	ir_node *pin = new_Pin(new_NoMem());
-	ir_node *op  = new_d_Div(dbgi, pin, left, right, mode,
-	                         op_pin_state_floats);
+	ir_node *memory = get_store();
+	ir_node *pin    = new_Pin(memory);
+	ir_node *op     = new_d_Div(dbgi, pin, left, right, mode,
+	                            op_pin_state_floats);
 	return new_d_Proj(dbgi, op, mode, pn_Div_res);
 }
 
@@ -1988,10 +1989,11 @@ normal_node:
 		}
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN: {
-		ir_node *pin = new_Pin(new_NoMem());
-		ir_node *op  = new_d_Mod(dbgi, pin, left, right, mode,
-		                         op_pin_state_floats);
-		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+		ir_node *memory = get_store();
+		ir_node *pin    = new_Pin(memory);
+		ir_node *op     = new_d_Mod(dbgi, pin, left, right, mode,
+		                            op_pin_state_floats);
+		ir_node *res    = new_d_Proj(dbgi, op, mode, pn_Mod_res);
 		return res;
 	}
 	default:
