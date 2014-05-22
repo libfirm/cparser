@@ -1224,8 +1224,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		type_t       *type            = function_type->function.return_type;
 		ir_mode      *mode            = get_ir_mode_storage(type);
 		/* just produce a "I don't know" result */
-		ir_tarval    *result          = type_val & 2 ? get_mode_null(mode) :
-		                                get_mode_minus_one(mode);
+		ir_tarval    *result          = (type_val&2) ? get_mode_null(mode)
+		                                             : get_mode_all_one(mode);
 
 		return new_d_Const(dbgi, result);
 	}
