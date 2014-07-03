@@ -207,7 +207,7 @@ static string_t const *get_argument_string(attribute_argument_t const *const arg
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		return NULL;
-	return &expression->string_literal.value;
+	return expression->string_literal.value;
 }
 
 static void handle_attribute_visibility(const attribute_t *attribute,
@@ -276,7 +276,7 @@ static void handle_attribute_asm(const attribute_t *attribute,
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		errorf(&attribute->pos, "Invalid asm attribute expression");
-	symbol_t *sym = symbol_table_insert(expression->string_literal.value.begin);
+	symbol_t *sym = symbol_table_insert(expression->string_literal.value->begin);
 	entity->function.actual_name = sym;
 	assert(argument->next == NULL);
 	return;

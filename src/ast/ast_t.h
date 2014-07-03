@@ -238,7 +238,7 @@ struct expression_base_t {
  */
 struct literal_expression_t {
 	expression_base_t base;
-	string_t          value;
+	const string_t   *value;
 	char const       *suffix; /**< Start of the suffix in value. */
 
 	/* ast2firm data */
@@ -250,7 +250,7 @@ struct literal_expression_t {
  */
 struct string_literal_expression_t {
 	expression_base_t base;
-	string_t          value;
+	string_t         *value;
 };
 
 struct funcname_expression_t {
@@ -588,7 +588,7 @@ struct for_statement_t {
 };
 
 struct asm_clobber_t {
-	string_t       clobber;
+	string_t      *clobber;
 	asm_clobber_t *next;
 };
 
@@ -600,8 +600,8 @@ struct asm_label_t {
 struct asm_statement_t {
 	statement_base_t base;
 	position_t       textpos;
-	string_t         asm_text;
-	string_t         normalized_text; /**< asm_text with %[symbol] references
+	string_t        *asm_text;
+	string_t        *normalized_text; /**< asm_text with %[symbol] references
 	                                       replaced by %XX number references */
 	entity_t        *inputs;  /**< list of asm_argument_t entities */
 	entity_t        *outputs; /**< list of asm_argument_t entities */

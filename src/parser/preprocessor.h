@@ -41,7 +41,7 @@ void add_define_macro(char const *name, char const *macro_arg,
 void parse_define(char const *string);
 void undefine(char const *name);
 
-string_t make_string(char const *string);
+string_t *make_string(char const *string);
 
 extern bool             allow_dollar_in_symbol;
 extern token_t          pp_token;

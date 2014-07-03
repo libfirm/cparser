@@ -256,14 +256,14 @@ static ir_tarval *literal_to_tarval_(const literal_expression_t *literal,
 		return literal->target_value;
 
 	case EXPR_LITERAL_FLOATINGPOINT:
-		return new_tarval_from_str(literal->value.begin,
-		                           literal->value.size, mode);
+		return new_tarval_from_str(literal->value->begin,
+		                           literal->value->size, mode);
 
 	case EXPR_LITERAL_BOOLEAN:
-		if (literal->value.begin[0] == 't') {
+		if (literal->value->begin[0] == 't') {
 			return get_mode_one(mode);
 		} else {
-			assert(literal->value.begin[0] == 'f');
+			assert(literal->value->begin[0] == 'f');
 	case EXPR_LITERAL_MS_NOOP:
 			return get_mode_null(mode);
 		}
@@ -284,10 +284,10 @@ static ir_tarval *char_literal_to_tarval(string_literal_expression_t const *lite
 {
 	type_t     *type   = skip_typeref(literal->base.type);
 	ir_mode    *mode   = get_ir_mode_storage(type);
-	const char *string = literal->value.begin;
-	size_t      size   = literal->value.size;
+	const char *string = literal->value->begin;
+	size_t      size   = literal->value->size;
 
-	switch (literal->value.encoding) {
+	switch (literal->value->encoding) {
 	case STRING_ENCODING_WIDE: {
 		utf32  v = read_utf8_char(&string);
 		char   buf[128];

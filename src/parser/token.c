@@ -108,10 +108,10 @@ void print_token(FILE *f, const token_t *token)
 		delim = '"';
 		/* FALLTHROUGH */
 	case T_CHARACTER_CONSTANT:
-		enc = get_string_encoding_prefix(token->literal.string.encoding);
+		enc = get_string_encoding_prefix(token->literal.string->encoding);
 		/* FALLTHROUGH */
 	case T_NUMBER:
-		val = token->literal.string.begin;
+		val = token->literal.string->begin;
 		break;
 
 	default: {

@@ -49,7 +49,7 @@ struct token_base_t {
 
 struct literal_t {
 	token_base_t base;
-	string_t     string;
+	string_t    *string;
 };
 
 struct macro_parameter_t {

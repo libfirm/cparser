@@ -23,10 +23,11 @@
 #include "ast/entity_t.h"
 #include "ast/position.h"
 #include "ast/printer.h"
-#include "ast/symbol_t.h"
+#include "ast/string_hash.h"
 #include "ast/symbol_table.h"
-#include "ast/type_t.h"
+#include "ast/symbol_t.h"
 #include "ast/types.h"
+#include "ast/type_t.h"
 #include "ast/walk.h"
 #include "driver/diagnostic.h"
 #include "driver/lang_features.h"
@@ -809,11 +810,17 @@ static ir_node *conv_to_storage_type(dbg_info *const dbgi, ir_node *const val, t
  * Creates a node representing a string constant.
  *
  * @param src_pos    the source position of the string constant
- * @param id_prefix  a prefix for the name of the generated string constant
  * @param value      the value of the string constant
  */
-static ir_node *string_to_firm(position_t const *const src_pos, char const *const id_prefix, string_t const *const value)
+static ir_node *string_to_firm(position_t const *const src_pos,
+                               string_t *const value)
 {
+	ir_entity *entity;
+	if (value->entity != NULL) {
+		entity = (ir_entity*)value->entity;
+		goto make_address;
+	}
+
 	size_t            const slen        = get_string_len(value) + 1;
 	ir_initializer_t *const initializer = create_initializer_compound(slen);
 	ir_type          *      elem_type;
@@ -832,12 +839,11 @@ static ir_node *string_to_firm(position_t const *const src_pos, char const *cons
 		goto finish;
 	}
 
-	{
-		type_t *type;
+	type_t *type;
 	case STRING_ENCODING_CHAR16: type = type_char16_t; goto init_wide;
 	case STRING_ENCODING_CHAR32: type = type_char32_t; goto init_wide;
 	case STRING_ENCODING_WIDE:   type = type_wchar_t;  goto init_wide;
-init_wide:;
+init_wide:
 		elem_type = get_ir_type(type);
 
 		ir_mode *const mode = get_type_mode(elem_type);
@@ -851,7 +857,6 @@ init_wide:;
 		}
 		goto finish;
 	}
-	}
 	panic("invalid string encoding");
 
 finish:;
@@ -861,15 +866,16 @@ finish:;
 	set_type_state(      type, layout_fixed);
 
 	ir_type   *const global_type = get_glob_type();
-	ident     *const id          = id_unique(id_prefix);
-	dbg_info  *const dbgi        = get_dbg_info(src_pos);
-	ir_entity *const entity      = new_entity(global_type, id, type);
-	set_entity_dbg_info(   entity, dbgi);
+	ident     *const id          = id_unique("str.%u");
+	entity = new_entity(global_type, id, type);
 	set_entity_ld_ident(   entity, id);
 	set_entity_visibility( entity, ir_visibility_private);
 	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, initializer);
 
+	value->entity = entity;
+make_address:;
+	dbg_info *const dbgi = get_dbg_info(src_pos);
 	return new_d_Address(dbgi, entity);
 }
 
@@ -879,7 +885,7 @@ static bool try_create_integer(literal_expression_t *literal, type_t *type)
 	atomic_type_kind_t akind = type->atomic.akind;
 
 	ir_mode    *const mode = atomic_modes[akind];
-	char const *const str  = literal->value.begin;
+	char const *const str  = literal->value->begin;
 	ir_tarval  *const tv   = new_tarval_from_str(str, literal->suffix - str, mode);
 	if (tv == tarval_bad)
 		return false;
@@ -896,7 +902,7 @@ void determine_literal_type(literal_expression_t *const literal)
 	/* -1: signed only, 0: any, 1: unsigned only */
 	int const sign =
 		!is_type_signed(literal->base.type) ? 1 :
-		literal->value.begin[0] == '0'      ? 0 :
+		literal->value->begin[0] == '0'     ? 0 :
 		-1; /* Decimal literals only try signed types. */
 
 	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
@@ -2204,8 +2210,8 @@ static ir_node *compound_literal_to_firm(
 		case INITIALIZER_VALUE:
 			return expression_to_value(initializer->value.value);
 		case INITIALIZER_STRING:
-			return string_to_firm(&expr->base.pos, "str.%u",
-			                      &(get_init_string(initializer)->value));
+			return string_to_firm(&expr->base.pos,
+			                      get_init_string(initializer)->value);
 		case INITIALIZER_LIST:
 		case INITIALIZER_DESIGNATOR: {
 			/* shouldn't really happen in valid programs, return 0 for
@@ -2322,8 +2328,7 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	return deref_address(dbgi, type, addr);
 }
 
-static ir_node *function_name_to_firm(
-		const funcname_expression_t *const expr)
+static ir_node *function_name_to_firm(const funcname_expression_t *const expr)
 {
 	switch (expr->kind) {
 	case FUNCNAME_FUNCTION:
@@ -2332,8 +2337,10 @@ static ir_node *function_name_to_firm(
 		if (current_function_name == NULL) {
 			position_t const *const src_pos = &expr->base.pos;
 			char       const *const name    = current_function_entity->base.symbol->string;
-			string_t          const string  = { name, strlen(name), STRING_ENCODING_CHAR };
-			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
+			begin_string_construction();
+			obstack_grow(&string_obst, name, strlen(name));
+			string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+			current_function_name = string_to_firm(src_pos, string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
@@ -2341,8 +2348,10 @@ static ir_node *function_name_to_firm(
 			position_t const *const src_pos = &expr->base.pos;
 			ir_entity        *const ent     = get_irg_entity(current_ir_graph);
 			char       const *const name    = get_entity_ld_name(ent);
-			string_t          const string  = { name, strlen(name), STRING_ENCODING_CHAR };
-			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
+			begin_string_construction();
+			obstack_grow(&string_obst, name, strlen(name));
+			string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+			current_funcsig = string_to_firm(src_pos, string);
 		}
 		return current_funcsig;
 	}
@@ -2557,7 +2566,7 @@ incdec:
 	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
 	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
 	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
-	case EXPR_STRING_LITERAL:             return string_to_firm(                  &expr->base.pos, "str.%u", &expr->string_literal.value);
+	case EXPR_STRING_LITERAL:             return string_to_firm(                  &expr->base.pos, expr->string_literal.value);
 	case EXPR_UNARY_ASSUME:               return handle_assume(                    expr->unary.value);
 	case EXPR_UNARY_COMPLEMENT:           return complement_to_firm(              &expr->unary);
 	case EXPR_UNARY_DEREFERENCE:          return dereference_to_firm(             &expr->unary);
@@ -3725,12 +3734,12 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 	assert(type->kind == TYPE_ARRAY);
 	assert(type->array.size_constant);
 	string_literal_expression_t const *const str = get_init_string(init);
-	size_t            const str_len = str->value.size;
+	size_t            const str_len = str->value->size;
 	size_t            const arr_len = type->array.size;
 	ir_initializer_t *const irinit  = create_initializer_compound(arr_len);
 	ir_mode          *const mode    = get_ir_mode_storage(type->array.element_type);
-	char const       *      p       = str->value.begin;
-	switch (str->value.encoding) {
+	char const       *      p       = str->value->begin;
+	switch (str->value->encoding) {
 	case STRING_ENCODING_CHAR:
 	case STRING_ENCODING_UTF8:
 		for (size_t i = 0; i != arr_len; ++i) {
@@ -4637,7 +4646,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	size_t         n_clobbers   = 0;
 	asm_clobber_t *clobber      = statement->clobbers;
 	for ( ; clobber != NULL; clobber = clobber->next) {
-		const char *clobber_str = clobber->clobber.begin;
+		const char *clobber_str = clobber->clobber->begin;
 
 		if (streq(clobber_str, "memory")) {
 			needs_memory = true;
@@ -4680,7 +4689,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	     entity = entity->base.next) {
 	    const asm_argument_t *argument = &entity->asm_argument;
 		unsigned pos         = next_pos++;
-		ident   *constraints = new_id_from_str(argument->constraints.begin);
+		ident   *constraints = new_id_from_str(argument->constraints->begin);
 		if (argument->direct_write) {
 			expression_t *expr   = argument->expression;
 			ir_node      *addr   = expression_to_addr(expr);
@@ -4751,7 +4760,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 		ir_asm_constraint constraint;
 		constraint.pos        = next_pos++;
-		constraint.constraint = new_id_from_str(argument->constraints.begin);
+		constraint.constraint = new_id_from_str(argument->constraints->begin);
 		constraint.mode       = get_irn_mode(input);
 
 		obstack_grow(&asm_obst, &constraint, sizeof(constraint));
@@ -4765,7 +4774,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
-	ident    *asm_text = new_id_from_str(statement->normalized_text.begin);
+	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
 	ir_node  *node     = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
 	                               out_size, output_constraints,
 	                               n_clobbers, clobbers, asm_text);
@@ -5231,8 +5240,8 @@ static void global_asm_to_firm(statement_t *s)
 	for (; s != NULL; s = s->base.next) {
 		assert(s->kind == STATEMENT_ASM);
 
-		char const *const text = s->asms.asm_text.begin;
-		size_t      const size = s->asms.asm_text.size;
+		char const *const text = s->asms.asm_text->begin;
+		size_t      const size = s->asms.asm_text->size;
 		ident      *const id   = new_id_from_chars(text, size);
 		add_irp_asm(id);
 	}

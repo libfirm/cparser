@@ -114,8 +114,8 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return -1;
 
-	const char *string = fmt_expr->string_literal.value.begin;
-	size_t      size   = fmt_expr->string_literal.value.size;
+	const char *string = fmt_expr->string_literal.value->begin;
+	size_t      size   = fmt_expr->string_literal.value->size;
 	const char *c      = string;
 
 	const position_t *pos = &fmt_expr->base.pos;
@@ -585,8 +585,8 @@ static void check_scanf_format(const call_argument_t *arg,
 	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return;
 
-	const char *string = fmt_expr->string_literal.value.begin;
-	size_t      size   = fmt_expr->string_literal.value.size;
+	const char *string = fmt_expr->string_literal.value->begin;
+	size_t      size   = fmt_expr->string_literal.value->size;
 	const char *c      = string;
 
 	/* find the real args */

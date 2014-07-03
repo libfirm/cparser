@@ -17,11 +17,12 @@ enum string_encoding_t {
 typedef enum string_encoding_t string_encoding_t;
 
 typedef struct string_t {
-	char const       *begin; /**< UTF-8 encoded string, the last character is
-	                              guaranteed to be \0. */
 	size_t            size;  /**< size of string in bytes (not characters),
 	                              without terminating \0. */
 	string_encoding_t encoding;
+	void             *entity;  /**< firm entity if available */
+	char              begin[]; /**< UTF-8 encoded string, the last character is
+	                                guaranteed to be \0. */
 } string_t;
 
 size_t get_string_len(string_t const *str);

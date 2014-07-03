@@ -15,14 +15,15 @@
 #include "adt/util.h"
 #include "ast/ast_t.h"
 #include "ast/attribute_t.h"
-#include "ast/constfold.h"
 #include "ast/constfoldbits.h"
+#include "ast/constfold.h"
 #include "ast/printer.h"
-#include "ast/symbol_t.h"
+#include "ast/string_hash.h"
 #include "ast/symbol_table.h"
+#include "ast/symbol_t.h"
 #include "ast/type_hash.h"
-#include "ast/type_t.h"
 #include "ast/types.h"
+#include "ast/type_t.h"
 #include "ast/walk.h"
 #include "builtins.h"
 #include "driver/diagnostic.h"
@@ -94,6 +95,8 @@ static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
 static elf_visibility_t     default_visibility = ELF_VISIBILITY_DEFAULT;
+static const string_t      *string_true;
+static const string_t      *string_false;
 
 #define PUSH_CURRENT_ENTITY(entity) \
 	entity_t *const new_current_entity = (entity); \
@@ -1100,32 +1103,25 @@ static expression_t *parse_assignment_expression(void)
 
 static void append_string(string_t const *const s)
 {
-	/* FIXME Using the ast_obstack is a hack.  Using the symbol_obstack is not
-	 * possible, because other tokens are grown there alongside. */
 	obstack_grow(&ast_obstack, s->begin, s->size);
 }
 
-static string_t finish_string(string_encoding_t const enc)
-{
-	obstack_1grow(&ast_obstack, '\0');
-	size_t      const size   = obstack_object_size(&ast_obstack) - 1;
-	char const *const string = obstack_finish(&ast_obstack);
-	return (string_t){ string, size, enc };
-}
-
-static string_t concat_string_literals(void)
+static string_t *concat_string_literals(void)
 {
 	assert(token.kind == T_STRING_LITERAL);
 
-	string_t result;
+	string_t *result;
 	if (look_ahead(1)->kind == T_STRING_LITERAL) {
-		append_string(&token.literal.string);
+		/* construct new string on ast_obstack, as string_obstack may be used
+		 * simulatneously be the preprocessor */
+		begin_string_construction_on(&ast_obstack);
+		append_string(token.literal.string);
 		eat(T_STRING_LITERAL);
 		warningf(WARN_TRADITIONAL, HERE,
 		         "traditional C rejects string constant concatenation");
-		string_encoding_t enc = token.literal.string.encoding;
+		string_encoding_t enc = token.literal.string->encoding;
 		do {
-			string_encoding_t const new_enc = token.literal.string.encoding;
+			string_encoding_t const new_enc = token.literal.string->encoding;
 			if (new_enc != enc && new_enc != STRING_ENCODING_CHAR) {
 				if (enc == STRING_ENCODING_CHAR) {
 					enc = new_enc;
@@ -1136,10 +1132,10 @@ static string_t concat_string_literals(void)
 					       get_string_encoding_prefix(new_enc));
 				}
 			}
-			append_string(&token.literal.string);
+			append_string(token.literal.string);
 			eat(T_STRING_LITERAL);
 		} while (token.kind == T_STRING_LITERAL);
-		result = finish_string(enc);
+		result = finish_string_construction_on(&ast_obstack, enc);
 	} else {
 		result = token.literal.string;
 		eat(T_STRING_LITERAL);
@@ -1148,17 +1144,19 @@ static string_t concat_string_literals(void)
 	return result;
 }
 
-static string_t parse_string_literals(char const *const context)
+static string_t *parse_string_literals(char const *const context)
 {
-	if (!skip_till(T_STRING_LITERAL, context))
-		return (string_t){ "", 0, STRING_ENCODING_CHAR };
+	if (!skip_till(T_STRING_LITERAL, context)) {
+		begin_string_construction();
+		return finish_string_construction(STRING_ENCODING_CHAR);
+	}
 
 	position_t const pos = *HERE;
-	string_t   const res = concat_string_literals();
+	string_t        *res = concat_string_literals();
 
-	if (res.encoding != STRING_ENCODING_CHAR) {
+	if (res->encoding != STRING_ENCODING_CHAR) {
 		errorf(&pos, "expected plain string literal, got %s string literal",
-		       get_string_encoding_prefix(res.encoding));
+		       get_string_encoding_prefix(res->encoding));
 	}
 
 	return res;
@@ -1426,7 +1424,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	if (expression->kind == EXPR_STRING_LITERAL && is_type_array(type)) {
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
-		switch (expression->string_literal.value.encoding) {
+		switch (expression->string_literal.value->encoding) {
 		case STRING_ENCODING_CHAR:
 		case STRING_ENCODING_UTF8: {
 			if (is_type_atomic(element_type, ATOMIC_TYPE_CHAR)  ||
@@ -2096,7 +2094,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		case INITIALIZER_STRING: {
-			size = get_string_len(&get_init_string(result)->value) + 1;
+			size = get_string_len(get_init_string(result)->value) + 1;
 			break;
 		}
 
@@ -4371,14 +4369,14 @@ static void parse_static_assert(void)
 	rem_anchor_token(',');
 	expect(',');
 
-	string_t message = parse_string_literals("static assert");
+	const string_t *message = parse_string_literals("static assert");
 
 	rem_anchor_token(')');
 	expect(')');
 
 	/* semantic */
 	if (expr->base.type != type_error_type && !fold_expression_to_bool(expr)) {
-		errorf(&pos, "assertion '%E' failed: \"%S\"", expr, &message);
+		errorf(&pos, "assertion '%E' failed: \"%S\"", expr, message);
 	}
 
 	rem_anchor_token(';');
@@ -5640,7 +5638,7 @@ static expression_t *parse_string_literal(void)
 {
 	expression_t *const expr = allocate_expression_zero(EXPR_STRING_LITERAL);
 	expr->string_literal.value = concat_string_literals();
-	expr->base.type            = get_string_type(expr->string_literal.value.encoding);
+	expr->base.type            = get_string_type(expr->string_literal.value->encoding);
 	return expr;
 }
 
@@ -5650,9 +5648,8 @@ static expression_t *parse_string_literal(void)
 static expression_t *parse_boolean_literal(bool value)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_BOOLEAN);
-	literal->base.type           = type_bool;
-	literal->literal.value.begin = value ? "true" : "false";
-	literal->literal.value.size  = value ? 4 : 5;
+	literal->base.type     = type_bool;
+	literal->literal.value = value ? string_true : string_false;
 
 	eat(value ? T_true : T_false);
 	return literal;
@@ -5736,7 +5733,7 @@ error:
 
 static expression_t *parse_number_literal(void)
 {
-	string_t const *const str      = &token.literal.string;
+	string_t const *const str      = token.literal.string;
 	char     const *      i        = str->begin;
 	unsigned              digits   = 0;
 	bool                  is_float = false;
@@ -5838,7 +5835,7 @@ parse_exponent:
 
 done:;
 	expression_t *const expr = allocate_expression_zero(is_float ? EXPR_LITERAL_FLOATINGPOINT : EXPR_LITERAL_INTEGER);
-	expr->literal.value = *str;
+	expr->literal.value = str;
 
 	if (i) {
 		if (digits == 0) {
@@ -5863,8 +5860,8 @@ static expression_t *parse_character_constant(void)
 	expression_t *const literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
 	literal->string_literal.value = token.literal.string;
 
-	size_t const size = get_string_len(&token.literal.string);
-	switch (token.literal.string.encoding) {
+	size_t const size = get_string_len(token.literal.string);
+	switch (token.literal.string->encoding) {
 	case STRING_ENCODING_CHAR:
 	case STRING_ENCODING_UTF8:
 		literal->base.type = dialect.cpp ? type_char : type_int;
@@ -6659,9 +6656,8 @@ static expression_t *parse_noop_expression(void)
 {
 	/* the result is a (int)0 */
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_MS_NOOP);
-	literal->base.type           = type_int;
-	literal->literal.value.begin = "__noop";
-	literal->literal.value.size  = 6;
+	literal->base.type     = type_int;
+	literal->literal.value = make_string("__noop");
 
 	eat(T___noop);
 
@@ -8931,7 +8927,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 	if (!is_type_valid(type))
 		return;
 
-	const char *constraints = argument->constraints.begin;
+	const char *constraints = argument->constraints->begin;
 	asm_constraint_flags_t asm_flags = be_parse_asm_constraints(constraints);
 	if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
 		errorf(&argument->base.pos, "some constraints in '%s' are invalid",
@@ -9097,7 +9093,7 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 			position_t const pos     = *HERE;
 			clobber->clobber         = parse_string_literals(NULL);
 
-			const char *const clobber_string = clobber->clobber.begin;
+			const char *const clobber_string = clobber->clobber->begin;
 			if (!be_is_valid_clobber(clobber_string)) {
 				errorf(&pos, "invalid register '%s' specified in clobbers",
 				       clobber_string);
@@ -9132,14 +9128,14 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 {
 	if (!asm_statement->has_arguments) {
 		/* escape % signs */
-		assert(obstack_object_size(&ast_obstack) == 0);
-		for (const char *c = asm_statement->asm_text.begin; *c != '\0'; ++c) {
+		begin_string_construction();
+		for (const char *c = asm_statement->asm_text->begin; *c != '\0'; ++c) {
 			if (*c == '%')
-				obstack_1grow(&ast_obstack, '%');
-			obstack_1grow(&ast_obstack, *c);
+				obstack_1grow(&string_obst, '%');
+			obstack_1grow(&string_obst, *c);
 		}
 		asm_statement->normalized_text
-			= finish_string(asm_statement->asm_text.encoding);
+			= finish_string_construction(asm_statement->asm_text->encoding);
 		return;
 	}
 
@@ -9177,8 +9173,8 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 		return;
 	}
 
-	assert(obstack_object_size(&ast_obstack) == 0);
-	for (const char *c = asm_statement->asm_text.begin; *c != '\0'; ++c) {
+	begin_string_construction();
+	for (const char *c = asm_statement->asm_text->begin; *c != '\0'; ++c) {
 		if (*c == '%') {
 			/* scan forward to see if we can find a [] */
 			const char *b = c+1;
@@ -9200,14 +9196,14 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 					entity_t *argument = get_entity(symbol, NAMESPACE_ASM_ARGUMENT);
 					if (argument == NULL) {
 						position_t errorpos = asm_statement->textpos;
-						errorpos.colno += b + 1 - asm_statement->asm_text.begin;
+						errorpos.colno += b + 1 - asm_statement->asm_text->begin;
 						errorf(&errorpos, "undefined assembler operand '%Y'",
 						       symbol);
 					} else {
 						for ( ; c < b; ++c) {
-							obstack_1grow(&ast_obstack, *c);
+							obstack_1grow(&string_obst, *c);
 						}
-						obstack_printf(&ast_obstack, "%u",
+						obstack_printf(&string_obst, "%u",
 						               argument->asm_argument.pos);
 						c = e;
 						continue;
@@ -9215,10 +9211,10 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 				}
 			}
 		}
-		obstack_1grow(&ast_obstack, *c);
+		obstack_1grow(&string_obst, *c);
 	}
 	asm_statement->normalized_text
-		= finish_string(asm_statement->asm_text.encoding);
+		= finish_string_construction(asm_statement->asm_text->encoding);
 
 	for (entity_t *input = asm_statement->inputs; input != NULL;
 	     input = input->base.next) {
@@ -10753,7 +10749,7 @@ static void parse_linkage_specification(void)
 	eat(T_extern);
 
 	position_t  const pos     = *HERE;
-	char const *const linkage = parse_string_literals(NULL).begin;
+	char const *const linkage = parse_string_literals(NULL)->begin;
 
 	linkage_kind_t old_linkage = current_linkage;
 	linkage_kind_t new_linkage;
@@ -11035,6 +11031,9 @@ void init_parser(void)
 
 	init_expression_parsers();
 	obstack_init(&temp_obst);
+
+	string_true  = make_string("true");
+	string_false = make_string("false");
 }
 
 void exit_parser(void)

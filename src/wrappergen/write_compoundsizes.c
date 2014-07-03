@@ -32,7 +32,7 @@ void write_compoundsizes(FILE *output, const translation_unit_t *unit)
 				assert(argument != NULL && argument->kind == ATTRIBUTE_ARGUMENT_EXPRESSION);
 				const expression_t *expr = argument->v.expression;
 				assert(expr->kind == EXPR_STRING_LITERAL);
-				string = expr->string_literal.value.begin;
+				string = expr->string_literal.value->begin;
 			}
 		}
 

@@ -280,7 +280,8 @@ static void write_binary_expression(const binary_expression_t *expression)
 
 static void write_integer(const literal_expression_t *literal)
 {
-	fwrite(literal->value.begin, 1, literal->suffix - literal->value.begin, out);
+	fwrite(literal->value->begin, 1, literal->suffix - literal->value->begin,
+	       out);
 }
 
 static void write_expression(const expression_t *expression)

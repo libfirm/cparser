@@ -202,7 +202,7 @@ static void write_expression(const expression_t *expression)
 {
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
-		fprintf(out, "%s", expression->literal.value.begin);
+		fprintf(out, "%s", expression->literal.value->begin);
 		break;
 	case EXPR_UNARY_CASES:
 		write_unary_expression((const unary_expression_t*) expression);

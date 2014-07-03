@@ -237,14 +237,14 @@ struct function_t {
 };
 
 struct asm_argument_t {
-	entity_base_t base;
-	string_t      constraints;
-	expression_t *expression;
-	unsigned      pos;
-	bool          direct_read    :1;/**< argument value is read */
-	bool          direct_write   :1;/**< argument is lvalue and written to */
-	bool          indirect_read  :1;/**< argument is address which is read */
-	bool          indirect_write :1;/**< argument is address which is written */
+	entity_base_t   base;
+	const string_t *constraints;
+	expression_t   *expression;
+	unsigned        pos;
+	bool            direct_read    :1;/**< argument value is read */
+	bool            direct_write   :1;/**< argument is lvalue and written to */
+	bool            indirect_read  :1;/**< argument is address which is read */
+	bool            indirect_write :1;/**< argument is address which is written */
 };
 
 union entity_t {

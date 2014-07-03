@@ -23,9 +23,10 @@
 #include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast/ast_t.h"
+#include "ast/string_hash.h"
 #include "ast/string_rep.h"
-#include "ast/symbol_t.h"
 #include "ast/symbol_table_t.h"
+#include "ast/symbol_t.h"
 #include "driver/diagnostic.h"
 #include "driver/lang_features.h"
 #include "input.h"
@@ -733,27 +734,6 @@ static utf32 parse_escape_sequence(void)
 	return UTF32_EOF;
 }
 
-static const char *identify_string(char *string)
-{
-	/* TODO: put strings into a set to reuse memory */
-	return string;
-}
-
-static string_t sym_make_string(string_encoding_t const enc)
-{
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t      const len    = obstack_object_size(&symbol_obstack) - 1;
-	char       *const string = obstack_finish(&symbol_obstack);
-	char const *const result = identify_string(string);
-	return (string_t){ result, len, enc };
-}
-
-string_t make_string(char const *const string)
-{
-	obstack_grow(&symbol_obstack, string, strlen(string));
-	return sym_make_string(STRING_ENCODING_CHAR);
-}
-
 static utf32 get_string_encoding_limit(string_encoding_t const enc)
 {
 	switch (enc) {
@@ -772,6 +752,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 {
 	eat(delimiter);
 
+	begin_string_construction();
 	utf32 const limit = get_string_encoding_limit(enc);
 	while (true) {
 		switch (input.c) {
@@ -783,14 +764,14 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 					         "escape sequence out of range");
 				}
 				if (enc == STRING_ENCODING_CHAR) {
-					obstack_1grow(&symbol_obstack, tc);
+					obstack_1grow(&string_obst, tc);
 				} else {
-					obstack_grow_utf8(&symbol_obstack, tc);
+					obstack_grow_utf8(&string_obst, tc);
 				}
 			} else {
-				obstack_1grow(&symbol_obstack, (char)input.c);
+				obstack_1grow(&string_obst, (char)input.c);
 				next_char();
-				obstack_1grow(&symbol_obstack, (char)input.c);
+				obstack_1grow(&string_obst, (char)input.c);
 				next_char();
 			}
 			break;
@@ -811,7 +792,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 				eat(delimiter);
 				goto end_of_string;
 			} else {
-				obstack_grow_utf8(&symbol_obstack, input.c);
+				obstack_grow_utf8(&string_obst, input.c);
 				next_char();
 				break;
 			}
@@ -820,7 +801,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 
 end_of_string:
 	pp_token.kind           = kind;
-	pp_token.literal.string = sym_make_string(enc);
+	pp_token.literal.string = finish_string_construction(enc);
 }
 
 static void parse_string_literal(string_encoding_t const enc)
@@ -831,7 +812,7 @@ static void parse_string_literal(string_encoding_t const enc)
 static void parse_character_constant(string_encoding_t const enc)
 {
 	parse_string('\'', T_CHARACTER_CONSTANT, enc, "character constant");
-	if (pp_token.literal.string.size == 0) {
+	if (pp_token.literal.string->size == 0) {
 		parse_error("empty character constant");
 	}
 }
@@ -1125,7 +1106,8 @@ static void grow_escaped(struct obstack *obst, const char *string, size_t size)
 	}
 }
 
-static void grow_string_escaped(struct obstack *obst, const string_t *string, char const *delimiter)
+static void grow_string_escaped(struct obstack *obst, const string_t *string,
+                                char const *delimiter)
 {
 	char const *prefix = get_string_encoding_prefix(string->encoding);
 	obstack_printf(obst, "%s%s", prefix, delimiter);
@@ -1141,17 +1123,18 @@ static void grow_token(struct obstack *obst, const token_t *token)
 {
 	switch (token->kind) {
 	case T_NUMBER:
-		obstack_grow(obst, token->literal.string.begin, token->literal.string.size);
+		obstack_grow(obst, token->literal.string->begin,
+		             token->literal.string->size);
 		break;
 
 	case T_STRING_LITERAL: {
 		char const *const delimiter = resolve_escape_sequences ? "\"" : "\\\"";
-		grow_string_escaped(obst, &token->literal.string, delimiter);
+		grow_string_escaped(obst, token->literal.string, delimiter);
 		break;
 	}
 
 	case T_CHARACTER_CONSTANT:
-		grow_string_escaped(obst, &token->literal.string, "'");
+		grow_string_escaped(obst, token->literal.string, "'");
 		break;
 
 	case T_IDENTIFIER:
@@ -1166,14 +1149,13 @@ static void grow_token(struct obstack *obst, const token_t *token)
 
 static token_t stringify(const pp_definition_t *definition, bool space_before)
 {
-	assert(obstack_object_size(&symbol_obstack) == 0);
-
+	begin_string_construction();
 	size_t list_len = definition->list_len;
 	for (size_t p = 0; p < list_len; ++p) {
 		const token_t *saved = &definition->token_list[p];
 		if (p > 0 && saved->base.space_before)
-			obstack_1grow(&symbol_obstack, ' ');
-		grow_token(&symbol_obstack, saved);
+			obstack_1grow(&string_obst, ' ');
+		grow_token(&string_obst, saved);
 	}
 	return (token_t) {
 		.literal = {
@@ -1183,7 +1165,7 @@ static token_t stringify(const pp_definition_t *definition, bool space_before)
 				.pos          = definition->pos,
 				.symbol       = NULL
 			},
-			.string = sym_make_string(STRING_ENCODING_CHAR)
+			.string = finish_string_construction(STRING_ENCODING_CHAR)
 		}
 	};
 }
@@ -1233,18 +1215,21 @@ static bool concat_identifier(const token_t *token0, const token_t *token1)
 	case T_STRING_LITERAL:
 	case T_CHARACTER_CONSTANT: {
 		string_encoding_t const enc = identify_encoding_prefix(token0->base.symbol);
-		if (enc != STRING_ENCODING_CHAR && token1->literal.string.encoding == STRING_ENCODING_CHAR) {
+		if (enc != STRING_ENCODING_CHAR
+		    && token1->literal.string->encoding == STRING_ENCODING_CHAR) {
 			pp_token = *token1;
 			pp_token.literal.base.symbol     = NULL;
-			pp_token.literal.string.encoding = enc;
+			begin_string_construction();
+			obstack_grow_string(&string_obst, pp_token.literal.string);
+			pp_token.literal.string = finish_string_construction(enc);
 			return true;
 		}
 		return false;
 	}
 
 	case T_NUMBER:
-		str1 = token1->literal.string.begin;
-		len1 = token1->literal.string.size;
+		str1 = token1->literal.string->begin;
+		len1 = token1->literal.string->size;
 		for (size_t i = 0; i != len1; ++i) {
 			switch (str1[i]) {
 			case DIGIT_CASES:
@@ -1285,36 +1270,35 @@ static void make_number(void)
 {
 	pp_token.literal.base.kind   = T_NUMBER;
 	pp_token.literal.base.symbol = NULL;
-	pp_token.literal.string      = sym_make_string(STRING_ENCODING_CHAR);
+	pp_token.literal.string = finish_string_construction(STRING_ENCODING_CHAR);
 }
 
 static bool concat_number(const token_t *token0, const token_t *token1)
 {
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	const string_t *str0 = &token0->literal.string;
-	obstack_grow_string(&symbol_obstack, str0);
+	begin_string_construction();
+	const string_t *str0 = token0->literal.string;
+	obstack_grow_string(&string_obst, str0);
 
 	const token_kind_t kind1 = token1->kind;
 	if (kind1 == T_NUMBER) {
-		const string_t *str1 = &token1->literal.string;
-		obstack_grow_string(&symbol_obstack, str1);
+		const string_t *str1 = token1->literal.string;
+		obstack_grow_string(&string_obst, str1);
 	} else if (kind1 == T_IDENTIFIER) {
 		const char *str1 = token1->base.symbol->string;
 		size_t      len1 = strlen(str1);
-		obstack_grow(&symbol_obstack, str1, len1);
+		obstack_grow(&string_obst, str1, len1);
 	} else if (kind1 == '.') {
-		obstack_1grow(&symbol_obstack, '.');
+		obstack_1grow(&string_obst, '.');
 	} else if (kind1 == T_DOTDOTDOT) {
-		obstack_grow(&symbol_obstack, "...", 3);
+		obstack_grow(&string_obst, "...", 3);
 	} else {
 		assert(str0->size > 0);
 		char lastn = str0->begin[str0->size-1];
 		if ((lastn == 'e' || lastn == 'E' || lastn == 'p' || lastn == 'P')
 			&& (kind1 == '+' || kind1 == '-')) {
-			obstack_1grow(&symbol_obstack, (char)kind1);
+			obstack_1grow(&string_obst, (char)kind1);
 		} else {
-			char *dummy = obstack_finish(&symbol_obstack);
-			obstack_free(&symbol_obstack, dummy);
+			abort_string_construction();
 			return false;
 		}
 	}
@@ -1559,9 +1543,10 @@ static bool concat_tokens(const position_t *pos,
 		if (kind1 == '|') { set_punctuator(T_PIPEPIPE);          return true; }
 		break;
 	case '.':
-		if (kind1 == T_NUMBER && is_digit(token1->literal.string.begin[0])) {
-			obstack_1grow(&symbol_obstack, '.');
-			obstack_grow_string(&symbol_obstack, &token1->literal.string);
+		if (kind1 == T_NUMBER && is_digit(token1->literal.string->begin[0])) {
+			begin_string_construction();
+			obstack_1grow(&string_obst, '.');
+			obstack_grow_string(&string_obst, token1->literal.string);
 			make_number();
 			return true;
 		}
@@ -1906,7 +1891,8 @@ end_symbol:
 
 static void parse_number(void)
 {
-	obstack_1grow(&symbol_obstack, (char) input.c);
+	begin_string_construction();
+	obstack_1grow(&string_obst, (char) input.c);
 	next_char();
 
 	while (true) {
@@ -1914,7 +1900,7 @@ static void parse_number(void)
 		case '.':
 		case DIGIT_CASES:
 		case SYMBOL_CASES_WITHOUT_E_P:
-			obstack_1grow(&symbol_obstack, (char) input.c);
+			obstack_1grow(&string_obst, (char) input.c);
 			next_char();
 			break;
 
@@ -1922,10 +1908,10 @@ static void parse_number(void)
 		case 'p':
 		case 'E':
 		case 'P':
-			obstack_1grow(&symbol_obstack, (char) input.c);
+			obstack_1grow(&string_obst, (char) input.c);
 			next_char();
 			if (input.c == '+' || input.c == '-') {
-				obstack_1grow(&symbol_obstack, (char) input.c);
+				obstack_1grow(&string_obst, (char) input.c);
 				next_char();
 			}
 			break;
@@ -1938,7 +1924,7 @@ dollar_sign:
 
 end_number:
 	pp_token.kind           = T_NUMBER;
-	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+	pp_token.literal.string = finish_string_construction(STRING_ENCODING_CHAR);
 }
 
 #define MAYBE_PROLOG \
@@ -2308,20 +2294,20 @@ void emit_pp_token(void)
 
 	switch (pp_token.kind) {
 	case T_NUMBER:
-		fputs(pp_token.literal.string.begin, out);
+		fputs(pp_token.literal.string->begin, out);
 		break;
 
 	case T_STRING_LITERAL:
-		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.literal.string->encoding), out);
 		fputc('"', out);
-		fputs(pp_token.literal.string.begin, out);
+		fputs(pp_token.literal.string->begin, out);
 		fputc('"', out);
 		break;
 
 	case T_CHARACTER_CONSTANT:
-		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.literal.string->encoding), out);
 		fputc('\'', out);
-		fputs(pp_token.literal.string.begin, out);
+		fputs(pp_token.literal.string->begin, out);
 		fputc('\'', out);
 		break;
 
@@ -2339,21 +2325,6 @@ static void eat_pp_directive(void)
 	}
 }
 
-static bool strings_equal(const string_t *string1, const string_t *string2)
-{
-	size_t size = string1->size;
-	if (size != string2->size)
-		return false;
-
-	const char *c1 = string1->begin;
-	const char *c2 = string2->begin;
-	for (size_t i = 0; i < size; ++i, ++c1, ++c2) {
-		if (*c1 != *c2)
-			return false;
-	}
-	return true;
-}
-
 static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 {
 	if (token1->kind != token2->kind)
@@ -2363,7 +2334,7 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 	case T_NUMBER:
 	case T_CHARACTER_CONSTANT:
 	case T_STRING_LITERAL:
-		return strings_equal(&token1->literal.string, &token2->literal.string);
+		return token1->literal.string == token2->literal.string;
 
 	case T_MACRO_PARAMETER:
 		return token1->macro_parameter.def->symbol
@@ -2451,20 +2422,28 @@ void add_define_string(char const *const name, char const *const val,
 {
 	pp_definition_t *const def = add_define_(name, standard_define);
 
-	assert(obstack_object_size(&symbol_obstack) == 0);
+	begin_string_construction();
 	size_t  const val_len = strlen(val);
-	char   *const string  = obstack_copy(&symbol_obstack, val, val_len+1);
-	grow_escaped(&symbol_obstack, string, val_len);
+	grow_escaped(&string_obst, val, val_len+1);
+	string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
 
 	token_t stringtok;
 	memset(&stringtok, 0, sizeof(stringtok));
 	stringtok.kind           = T_STRING_LITERAL;
-	stringtok.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+	stringtok.literal.string = string;
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 	obstack_grow(&pp_obstack, &stringtok, sizeof(stringtok));
 	def->list_len   = 1;
 	def->token_list = obstack_finish(&pp_obstack);
+}
+
+string_t *make_string(char const *const string)
+{
+	begin_string_construction();
+	size_t size = strlen(string);
+	obstack_grow(&string_obst, string, size);
+	return finish_string_construction(STRING_ENCODING_CHAR);
 }
 
 static void add_define_one(char const *const name)
@@ -2567,33 +2546,28 @@ static void add_define_dynamic_number(char const *const name, update_func update
 	def->update     = update;
 }
 
-static void update_definition_string_t(pp_definition_t *const definition, string_t const str)
+static void update_definition_string_t(pp_definition_t *const definition,
+                                       string_t *const str)
 {
 	token_t *token = &definition->token_list[0];
 	assert(token->kind == T_STRING_LITERAL || token->kind == T_NUMBER);
 	token->literal.string = str;
 }
 
-static void update_definition_obst(pp_definition_t *const definition)
-{
-	update_definition_string_t(definition, sym_make_string(STRING_ENCODING_CHAR));
-}
-
 static void update_definition_string(pp_definition_t *const definition,
                                      const char *const value)
 {
 	/* TODO: do we need additional quoting? */
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	obstack_grow(&symbol_obstack, value, strlen(value));
-	update_definition_obst(definition);
+	update_definition_string_t(definition, make_string(value));
 }
 
 static void update_definition_int(pp_definition_t *const definition,
                                   unsigned value)
 {
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	obstack_printf(&symbol_obstack, "%u", value);
-	update_definition_obst(definition);
+	begin_string_construction();
+	obstack_printf(&string_obst, "%u", value);
+	string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+	update_definition_string_t(definition, string);
 }
 
 static void update_file(pp_definition_t *definition)
@@ -2625,12 +2599,12 @@ static void update_counter(pp_definition_t *definition)
 	++counter;
 }
 
-static string_t pp_date;
-static string_t pp_time;
+static string_t *pp_date;
+static string_t *pp_time;
 
 static void get_date_time(void)
 {
-	if (pp_date.begin)
+	if (pp_date != NULL)
 		return;
 
 	time_t const now = time(NULL);
@@ -2646,13 +2620,13 @@ unknown_time:
 		str = "??? ??? ?? ??:??:?? ????";
 	}
 
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	obstack_grow(&symbol_obstack, str, 10); /* Extract date part. */
-	pp_date = sym_make_string(STRING_ENCODING_CHAR);
+	begin_string_construction();
+	obstack_grow(&string_obst, str, 10); /* Extract date part. */
+	pp_date = finish_string_construction(STRING_ENCODING_CHAR);
 
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	obstack_grow(&symbol_obstack, str + 11, 8); /* Extract time part. */
-	pp_time = sym_make_string(STRING_ENCODING_CHAR);
+	begin_string_construction();
+	obstack_grow(&string_obst, str + 11, 8); /* Extract time part. */
+	pp_time = finish_string_construction(STRING_ENCODING_CHAR);
 }
 
 static void update_date(pp_definition_t *definition)
@@ -3021,7 +2995,7 @@ parse_name:
 		next_preprocessing_token();
 		if (pp_token.kind == T_STRING_LITERAL) {
 			*system_include = false;
-			return pp_token.literal.string.begin;
+			return pp_token.literal.string->begin;
 		} else if (pp_token.kind == '<') {
 			*system_include = true;
 			token_t *tokens = NEW_ARR_F(token_t, 0);
@@ -3062,9 +3036,8 @@ error_invalid_input:
 finish_headername:
 	obstack_1grow(&symbol_obstack, '\0');
 	char *const  headername = obstack_finish(&symbol_obstack);
-	const char  *identified = identify_string(headername);
 	pp_token.base.pos = pos;
-	return identified;
+	return headername;
 }
 
 static bool do_include(bool const bracket_include, bool const include_next,
@@ -3073,9 +3046,10 @@ static bool do_include(bool const bracket_include, bool const include_next,
 	size_t const headername_len = strlen(headername);
 	/* is it an absolute path? */
 	if (headername[0] == '/') {
-		obstack_grow(&symbol_obstack, headername, headername_len+1);
-		char *complete_path = obstack_finish(&symbol_obstack);
-		const char *full_name = identify_string(complete_path);
+		begin_string_construction();
+		obstack_grow(&string_obst, headername, headername_len+1);
+		const string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+		const char *full_name = string->begin;
 		FILE *file = fopen(full_name, "r");
 		if (file == NULL)
 			return false;
@@ -3096,15 +3070,17 @@ static bool do_include(bool const bracket_include, bool const include_next,
 		const char *filename   = input.pos.input_name;
 		const char *last_slash = strrchr(filename, '/');
 		const char *full_name;
+		begin_string_construction();
 		if (last_slash != NULL) {
 			size_t len = last_slash - filename;
-			obstack_grow(&symbol_obstack, filename, len + 1);
-			obstack_grow0(&symbol_obstack, headername, headername_len);
-			char *complete_path = obstack_finish(&symbol_obstack);
-			full_name = identify_string(complete_path);
+			obstack_grow(&string_obst, filename, len + 1);
+			obstack_grow(&string_obst, headername, headername_len);
 		} else {
-			full_name = headername;
+			obstack_grow(&string_obst, headername, headername_len);
 		}
+		const string_t *string
+			= finish_string_construction(STRING_ENCODING_CHAR);
+		full_name = string->begin;
 
 		FILE *file = fopen(full_name, "r");
 		if (file != NULL) {
@@ -3124,10 +3100,16 @@ static bool do_include(bool const bracket_include, bool const include_next,
 			obstack_1grow(&symbol_obstack, '/');
 		obstack_grow(&symbol_obstack, headername, headername_len+1);
 
-		char *complete_path = obstack_finish(&symbol_obstack);
-		FILE *file          = fopen(complete_path, "r");
+		size_t complete_len  = obstack_object_size(&symbol_obstack);
+		char  *complete_path = obstack_finish(&symbol_obstack);
+		FILE  *file          = fopen(complete_path, "r");
 		if (file != NULL) {
-			const char *filename = identify_string(complete_path);
+			begin_string_construction();
+			obstack_grow(&string_obst, complete_path, complete_len-1);
+			obstack_free(&symbol_obstack, complete_path);
+			const string_t *string
+				= finish_string_construction(STRING_ENCODING_CHAR);
+			const char *filename = string->begin;
 			switch_pp_input_file(file, filename, entry, entry->is_system_path);
 			return true;
 		}
@@ -3224,8 +3206,8 @@ static ir_tarval *parse_pp_operand(void)
 	token_kind_t const kind = pp_token.kind;
 	switch (kind) {
 	case T_CHARACTER_CONSTANT: {
-		char       const *const str = pp_token.literal.string.begin;
-		string_encoding_t const enc = pp_token.literal.string.encoding;
+		char       const *const str = pp_token.literal.string->begin;
+		string_encoding_t const enc = pp_token.literal.string->encoding;
 		next_condition_token();
 		switch (enc) {
 		case STRING_ENCODING_CHAR:
@@ -3246,7 +3228,7 @@ static ir_tarval *parse_pp_operand(void)
 	}
 
 	case T_NUMBER: {
-		char const *const str = pp_token.literal.string.begin;
+		char const *const str = pp_token.literal.string->begin;
 
 		char const *i = str;
 		while (hex_digit_value(*i) >= 0 || *i == 'X' || *i == 'x')
@@ -3745,7 +3727,7 @@ static void parse_line_directive(void)
 			parse_error("expected integer");
 	} else {
 		char      *end;
-		long const line = strtol(pp_token.literal.string.begin, &end, 0);
+		long const line = strtol(pp_token.literal.string->begin, &end, 0);
 		if (*end == '\0') {
 			/* use offset -1 as this is about the next line */
 			input.pos.lineno = line - 1;
@@ -3762,8 +3744,8 @@ static void parse_line_directive(void)
 			return;
 	}
 	if (pp_token.kind == T_STRING_LITERAL
-	    && pp_token.literal.string.encoding == STRING_ENCODING_CHAR) {
-		input.pos.input_name       = pp_token.literal.string.begin;
+	    && pp_token.literal.string->encoding == STRING_ENCODING_CHAR) {
+		input.pos.input_name       = pp_token.literal.string->begin;
 		input.pos.is_system_header = false;
 		next_input_token();
 
@@ -3777,7 +3759,7 @@ static void parse_line_directive(void)
 			 *
 			 * currently we're only interested in "3"
 			 */
-			if (streq(pp_token.literal.string.begin, "3")) {
+			if (streq(pp_token.literal.string->begin, "3")) {
 				input.pos.is_system_header = true;
 			}
 			next_input_token();
@@ -3804,7 +3786,7 @@ static void parse_error_directive(void)
 
 		switch (pp_token.kind) {
 		case T_NUMBER: {
-			string_t const *const str = &pp_token.literal.string;
+			string_t const *const str = pp_token.literal.string;
 			obstack_grow(&pp_obstack, str->begin, str->size);
 			break;
 		}
@@ -3814,7 +3796,7 @@ static void parse_error_directive(void)
 		case T_STRING_LITERAL:     delim =  '"'; goto string;
 		case T_CHARACTER_CONSTANT: delim = '\''; goto string;
 string:;
-			string_t const *const str = &pp_token.literal.string;
+			string_t const *const str = pp_token.literal.string;
 			char     const *const enc = get_string_encoding_prefix(str->encoding);
 			obstack_printf(&pp_obstack, "%s%c%s%c", enc, delim, str->begin, delim);
 			break;
@@ -4153,6 +4135,7 @@ static void input_error(unsigned const delta_lines, unsigned const delta_cols, c
 
 void init_preprocessor(void)
 {
+	init_string_hash();
 	init_symbol_table();
 	init_tokens();
 	obstack_init(&config_obstack);
@@ -4193,4 +4176,5 @@ void exit_preprocessor(void)
 	obstack_free(&config_obstack, NULL);
 	exit_tokens();
 	exit_symbol_table();
+	exit_string_hash();
 }

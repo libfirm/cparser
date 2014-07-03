@@ -31,6 +31,7 @@
 #include "driver/lang_features.h"
 #include "driver/warning.h"
 #include "printer.h"
+#include "string_hash.h"
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "type_t.h"
@@ -223,7 +224,7 @@ static void print_quoted_string(const string_t *const string, char border)
 
 static void print_string_literal(string_literal_expression_t const *const literal, char const delimiter)
 {
-	print_quoted_string(&literal->value, delimiter);
+	print_quoted_string(literal->value, delimiter);
 }
 
 static void print_literal(const literal_expression_t *literal)
@@ -236,7 +237,7 @@ static void print_literal(const literal_expression_t *literal)
 	case EXPR_LITERAL_BOOLEAN:
 	case EXPR_LITERAL_FLOATINGPOINT:
 	case EXPR_LITERAL_INTEGER:
-		print_string(literal->value.begin);
+		print_string(literal->value->begin);
 		return;
 
 	default:
@@ -1018,7 +1019,7 @@ static void print_asm_arguments(entity_t const *const arguments)
 		symbol_t *symbol = i->base.symbol;
 		if (symbol != NULL)
 			print_format("[%s] ", symbol->string);
-		print_quoted_string(&i->asm_argument.constraints, '"');
+		print_quoted_string(i->asm_argument.constraints, '"');
 		print_string(" (");
 		print_expression(i->asm_argument.expression);
 		print_char(')');
@@ -1036,7 +1037,7 @@ static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 	separator_t sep = { " ", ", " };
 	for (asm_clobber_t const *i = clobbers; i; i = i->next) {
 		print_string(sep_next(&sep));
-		print_quoted_string(&i->clobber, '"');
+		print_quoted_string(i->clobber, '"');
 	}
 }
 
@@ -1061,7 +1062,7 @@ static void print_asm_statement(asm_statement_t const *const stmt)
 	if (stmt->is_volatile) print_string(" volatile");
 	if (stmt->labels)      print_string(" goto");
 	print_char('(');
-	print_quoted_string(&stmt->asm_text, '"');
+	print_quoted_string(stmt->asm_text, '"');
 
 	unsigned const n =
 		stmt->labels        ? 4 :
@@ -1990,9 +1991,9 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t const len = get_string_len(&expression->string_literal.value);
+		size_t const len = get_string_len(expression->string_literal.value);
 		string_encoding_t const encoding
-			= expression->string_literal.value.encoding;
+			= expression->string_literal.value->encoding;
 		type_t *const elem = get_string_type(encoding)->pointer.points_to;
 		return make_array_type(elem, len+1, TYPE_QUALIFIER_NONE);
 	}
