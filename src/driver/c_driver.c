@@ -524,6 +524,11 @@ static bool start_preprocessing(compilation_env_t *env,
 	if (driver_verbose)
 		print_include_paths();
 
+	if (construct_dep_target) {
+		warningf(WARN_OTHER, NULL,
+		         "builtin preprocessor does not support dependency generation yet\n");
+	}
+
 	add_predefined_macros();
 	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
