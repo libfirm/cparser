@@ -18,7 +18,6 @@
 #include "adt/array.h"
 #include "adt/error.h"
 #include "adt/separator_t.h"
-#include "adt/strset.h"
 #include "adt/strutil.h"
 #include "adt/unicode.h"
 #include "adt/util.h"
