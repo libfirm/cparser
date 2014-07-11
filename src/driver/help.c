@@ -76,9 +76,9 @@ static void print_help_preprocessor(void)
 	put_help("-MMD",                     "");
 	put_help("-MM",                      "");
 	put_help("-MP",                      "");
-	put_help("-MT",                      "");
-	put_help("-MQ",                      "");
-	put_help("-MF",                      "");
+	put_help("-MT target",               "");
+	put_help("-MQ target",               "");
+	put_help("-MF file",                 "");
 }
 
 static void print_help_parser(void)
