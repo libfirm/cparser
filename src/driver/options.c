@@ -142,12 +142,22 @@ bool options_parse_preprocessor(options_state_t *s)
 		undefine(arg);
 	} else if (streq(option, "MMD") || streq(option, "MD")) {
 		construct_dep_target = true;
+		include_system_headers_in_dependencies = streq(option, "MD");
 		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if (streq(option, "MP")) {
+		print_phony_targets = true;
 		driver_add_flag(&cppflags_obst, "-%s", option);
-	} else if ((arg = prefix_arg("MT", s)) != NULL
-	        || (arg = prefix_arg("MQ", s)) != NULL
-	        || (arg = prefix_arg("MF", s)) != NULL) {
+	} else if ((arg = prefix_arg("MF", s)) != NULL) {
+		dependency_file = arg;
+		goto add_arg_opt;
+	} else if ((arg = prefix_arg("MT", s)) != NULL) {
+		dependency_target = arg;
+		dont_escape_target = true;
+		goto add_arg_opt;
+	} else if ((arg = prefix_arg("MQ", s)) != NULL) {
+		dependency_target = arg;
+		dont_escape_target = false;
+add_arg_opt:
 		driver_add_flag(&cppflags_obst, "-%s", option);
 		driver_add_flag(&cppflags_obst, "%s", arg);
 	} else if ((arg = prefix_arg("include", s)) != NULL) {

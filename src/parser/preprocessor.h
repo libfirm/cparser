@@ -50,6 +50,10 @@ extern input_decoder_t *input_decoder;
 void set_preprocessor_output(FILE *output);
 void emit_pp_token(void);
 void check_unclosed_conditionals(void);
+void preprocessor_print_dependencies(FILE *output, bool show_system_headers,
+                                     const char *targetname,
+                                     bool dont_escape_target,
+                                     bool print_phony_targets);
 
 typedef struct searchpath_t searchpath_t;
 extern searchpath_t bracket_searchpath; /**< paths for < > includes */

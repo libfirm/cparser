@@ -6,6 +6,7 @@
 #include "c_driver.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <libfirm/statev.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -76,7 +77,12 @@ int             driver_use_integrated_preprocessor = -1;
 bool            driver_no_stdinc;
 bool            driver_verbose;
 bool            dump_defines;
-bool            dump_dependencies_instead_of_preprocessing;
+bool            print_dependencies_instead_of_preprocessing;
+bool            include_system_headers_in_dependencies;
+bool            print_phony_targets;
+const char     *dependency_file;
+const char     *dependency_target;
+bool            dont_escape_target;
 unsigned        features_on;
 unsigned        features_off;
 lang_standard_t standard;
@@ -292,6 +298,35 @@ static void init_c_dialect_for_unit(compilation_unit_t *unit)
 	init_c_dialect(is_cpp, unit->standard);
 }
 
+static const char *get_dependency_filename(compilation_env_t *env,
+                                           compilation_unit_t *unit)
+{
+	if (dependency_file != NULL)
+		return dependency_file;
+
+	dont_escape_target = false;
+	const char *outname = env->outname;
+	if (outname != 0) {
+		assert(obstack_object_size(&file_obst) == 0);
+		size_t len = strlen(outname);
+		/* search for extension dot */
+		const char *ext_begin = outname + len;
+		for (size_t i = len; i-- > 0; ) {
+			if (outname[i] == '.') {
+				ext_begin = &outname[i];
+				break;
+			}
+			if (outname[i] == '/')
+				break;
+		}
+		obstack_grow(&file_obst, outname, ext_begin - outname);
+		obstack_grow0(&file_obst, ".d", 2);
+		return obstack_finish(&file_obst);
+	} else {
+		return get_output_name(unit->original_name, ".d");
+	}
+}
+
 static bool run_external_preprocessor(compilation_env_t *env,
                                       compilation_unit_t *unit)
 {
@@ -342,27 +377,7 @@ static bool run_external_preprocessor(compilation_env_t *env,
 
 	/* handle dependency generation */
 	if (construct_dep_target) {
-		static char dep_target[4096];
-		const char *dep_target_name;
-		if (outname != 0) {
-			size_t len = strlen(outname);
-			len = MIN(len, sizeof(dep_target) - 4); /* leave room for .d extension */
-			memcpy(dep_target, outname, len);
-			/* replace extension with .d if found */
-			char *dot = &dep_target[len-1];
-			for ( ; dot >= dep_target && *dot != '/'; --dot) {
-				if (*dot == '.') {
-					dot[1] = 'd';
-					len = (dot-dep_target)+2;
-					break;
-				}
-			}
-			dep_target[len] = '\0';
-			dep_target_name = dep_target;
-		} else {
-			dep_target_name = get_output_name(unit->original_name, ".d");
-		}
-
+		const char *dep_target_name = get_dependency_filename(env, unit);
 		driver_add_flag(&cppflags_obst, "-MF");
 		driver_add_flag(&cppflags_obst, dep_target_name);
 	}
@@ -385,7 +400,7 @@ static bool run_external_preprocessor(compilation_env_t *env,
 
 	unit->input         = f;
 	unit->input_is_pipe = true;
-	if (dump_dependencies_instead_of_preprocessing) {
+	if (print_dependencies_instead_of_preprocessing) {
 		unit->type = COMPILATION_UNIT_DEPENDENCIES;
 	} else {
 		switch (unit->type) {
@@ -524,11 +539,6 @@ static bool start_preprocessing(compilation_env_t *env,
 	if (driver_verbose)
 		print_include_paths();
 
-	if (construct_dep_target) {
-		warningf(WARN_OTHER, NULL,
-		         "builtin preprocessor does not support dependency generation yet\n");
-	}
-
 	add_predefined_macros();
 	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
@@ -567,16 +577,23 @@ static bool preprocess(compilation_env_t *env, compilation_unit_t *unit)
 	return preprocessor(env, unit);
 }
 
-bool generate_dependencies(compilation_env_t *env, compilation_unit_t *unit)
+static void write_preproc_dependencies(FILE *out, compilation_env_t *env,
+                                       compilation_unit_t *unit)
 {
-	(void)env;
-	position_t const pos = { unit->name, 0, 0, 0 };
-	errorf(&pos,
-		   "builtin preprocessor does not support dependency generation yet");
-	return false;
+	const char *target = dependency_target;
+	if (target == NULL) {
+		target = env->outname;
+		if (target == NULL) {
+			target = get_output_name(unit->original_name, ".o");
+		}
+	}
+	preprocessor_print_dependencies(out, include_system_headers_in_dependencies,
+	                                target, dont_escape_target,
+	                                print_phony_targets);
 }
 
-static bool finish_preprocessing(compilation_unit_t *unit)
+static bool finish_preprocessing(compilation_env_t *env,
+                                 compilation_unit_t *unit)
 {
 	close_pp_input();
 	input_free(unit->input_decoder);
@@ -587,6 +604,17 @@ static bool finish_preprocessing(compilation_unit_t *unit)
 
 	if (dump_defines)
 		print_defines();
+	if (construct_dep_target) {
+		const char *dep_target_name = get_dependency_filename(env, unit);
+		FILE       *dep_out         = fopen(dep_target_name, "w");
+		if (dep_out == NULL) {
+			errorf(NULL, "Opening dependency file '%s' failed: %s",
+			       dep_target_name, strerror(errno));
+			return false;
+		}
+		write_preproc_dependencies(dep_out, env, unit);
+		fclose(dep_out);
+	}
 	return true;
 }
 
@@ -601,7 +629,8 @@ static void print_error_summary(void)
 	}
 }
 
-static bool do_print_preprocessing_tokens(FILE *out, compilation_unit_t *unit)
+static bool do_print_preprocessing_tokens(FILE *out, compilation_env_t *env,
+                                          compilation_unit_t *unit)
 {
 	set_preprocessor_output(out);
 	print_pp_header();
@@ -615,7 +644,7 @@ static bool do_print_preprocessing_tokens(FILE *out, compilation_unit_t *unit)
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	bool res = finish_preprocessing(unit);
+	bool res = finish_preprocessing(env, unit);
 	print_error_summary();
 	return res;
 }
@@ -625,7 +654,7 @@ bool print_preprocessing_tokens(compilation_env_t *env,
 {
 	if (!open_output(env))
 		return false;
-	bool res = do_print_preprocessing_tokens(env->out, unit);
+	bool res = do_print_preprocessing_tokens(env->out, env, unit);
 	close_output(env);
 	return res;
 }
@@ -638,10 +667,37 @@ static bool print_preprocessed_intermediate(compilation_env_t *env,
 	FILE *out = open_temp_file(unit->name, ".s", &s_name);
 	if (out == NULL)
 		return false;
-	bool res = do_print_preprocessing_tokens(out, unit);
+	bool res = do_print_preprocessing_tokens(out, env, unit);
 	fclose(out);
 	unit->name = s_name;
 	unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+	return res;
+}
+
+static bool do_print_dependencies(compilation_env_t *env,
+                                  compilation_unit_t *unit)
+{
+	set_preprocessor_output(NULL);
+	do {
+		next_preprocessing_token();
+	} while(pp_token.kind != T_EOF);
+	/* set to false, because finish_preprocessing should not print the deps,
+	 * we will do that ourself here */
+	construct_dep_target = false;
+	bool res = finish_preprocessing(env, unit);
+	print_error_summary();
+	if (res) {
+		write_preproc_dependencies(env->out, env, unit);
+	}
+	return res;
+}
+
+bool generate_dependencies(compilation_env_t *env, compilation_unit_t *unit)
+{
+	if (!open_output(env))
+		return false;
+	bool res = do_print_dependencies(env, unit);
+	close_output(env);
 	return res;
 }
 
@@ -659,7 +715,7 @@ bool do_parsing(compilation_env_t *env, compilation_unit_t *unit)
 	parse();
 	unit->ast = finish_parsing();
 	check_unclosed_conditionals();
-	bool res = finish_preprocessing(unit);
+	bool res = finish_preprocessing(env, unit);
 	print_error_summary();
 
 	unit->type = COMPILATION_UNIT_AST;

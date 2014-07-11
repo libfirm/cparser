@@ -218,7 +218,8 @@ static bool parse_compile_mode_options(options_state_t *s)
 	if (streq(option, "M") || streq(option, "MM")) {
 		set_mode_gcc_prec(MODE_GENERATE_DEPENDENCIES, full_option);
 		driver_add_flag(&cppflags_obst, "-%s", option);
-		dump_dependencies_instead_of_preprocessing = true;
+		print_dependencies_instead_of_preprocessing = true;
+		include_system_headers_in_dependencies = streq(option, "M");
 	} else if (streq(option, "c")) {
 		set_mode_gcc_prec(MODE_COMPILE_ASSEMBLE, full_option);
 	} else if (streq(option, "E")) {

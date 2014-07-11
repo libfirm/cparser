@@ -17,6 +17,7 @@
 
 #include "adt/array.h"
 #include "adt/error.h"
+#include "adt/pset_new.h"
 #include "adt/separator_t.h"
 #include "adt/strutil.h"
 #include "adt/unicode.h"
@@ -129,6 +130,13 @@ typedef struct macro_call_t {
 	bool             previous_may_recurse  : 1;
 } macro_call_t;
 
+typedef struct include_t include_t;
+struct include_t {
+	include_t  *next;
+	const char *filename;
+	bool        is_system_header;
+};
+
 static pp_input_t      input;
 
 static pp_input_t     *input_stack;
@@ -159,6 +167,10 @@ static token_kind_t          previous_token;
 static pp_expansion_state_t *expansion_stack;
 static pp_argument_t        *argument_stack;
 static macro_call_t         *macro_call_stack;
+
+static pset_new_t            includeset;
+static include_t            *includes;
+static include_t            *last_include;
 
 struct searchpath_t {
 	searchpath_entry_t  *first;
@@ -202,9 +214,13 @@ static void init_symbols(void)
 
 static void print_line_directive(const position_t *pos, const char *add);
 
-void switch_pp_input(input_t *const decoder, char const *const input_name,
-                     searchpath_entry_t *const path,
-                     bool const is_system_header)
+/**
+ * Switch input to another file/stream. Assume input_name is identified in the
+ * string hash.
+ */
+static void switch_input(input_t *const decoder, char const *const input_name,
+                         searchpath_entry_t *const path,
+                         bool const is_system_header)
 {
 	memset(&input, 0, sizeof(input));
 	input.input                = decoder;
@@ -233,14 +249,42 @@ void switch_pp_input(input_t *const decoder, char const *const input_name,
 	 * (remember this special case in input_error) */
 	input.pos.lineno = 0;
 	input.c          = '\n';
+
+	/* track include (for dependency output) */
+	bool new_dep = pset_new_insert(&includeset, (void*)input_name);
+	if (new_dep) {
+		include_t *include = OALLOC(&pp_obstack, include_t);
+		include->next             = NULL;
+		include->filename         = input_name;
+		include->is_system_header = is_system_header;
+		if (last_include != NULL) {
+			last_include->next = include;
+		} else {
+			includes = include;
+		}
+		last_include = include;
+	}
 }
 
-static void switch_pp_input_file(FILE *file, char const *const filename,
-                                 searchpath_entry_t *const path,
-                                 bool const is_system_header)
+void switch_pp_input(input_t *const decoder, char const *const input_name,
+                     searchpath_entry_t *const path,
+                     bool const is_system_header)
+{
+	begin_string_construction();
+	obstack_grow(&string_obst, input_name, strlen(input_name));
+	const string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+	switch_input(decoder, string->begin, path, is_system_header);
+}
+
+/**
+ * Switch pp input file to a new file. Assume filename is already identified.
+ */
+static void switch_input_file(FILE *file, char const *const filename,
+                              searchpath_entry_t *const path,
+                              bool const is_system_header)
 {
 	input_t *decoder = input_from_stream(file, input_decoder);
-	switch_pp_input(decoder, filename, path, is_system_header);
+	switch_input(decoder, filename, path, is_system_header);
 	input.file = file;
 }
 
@@ -2264,6 +2308,75 @@ void set_preprocessor_output(FILE *output)
 	resolve_escape_sequences = out == NULL;
 }
 
+/**
+ * Print a filename and quote characters which are special to make.
+ * This algorithm does not handle all corner cases by should replicate the
+ * behaviour of gcc (4.8).
+ */
+static void print_makefile_escaped(const char *string, FILE *out)
+{
+	for (const char *c = string; *c != '\0'; ++c) {
+		switch (*c) {
+		case ' ':
+		case '\t':
+			for (const char *q = c-1; string < q && *q == '\\'; --q)
+				fputc('\\', out);
+			fputc('\\', out);
+			goto normal_out;
+		case '#':
+			fputc('/', out);
+			goto normal_out;
+		case '$':
+			fputc('$', out);
+			goto normal_out;
+		default:
+		normal_out:
+			fputc(*c, out);
+			break;
+		}
+	}
+}
+
+void preprocessor_print_dependencies(FILE *output, bool show_system_headers,
+                                     const char *target,
+                                     bool dont_escape_target,
+                                     bool print_phony_targets)
+{
+	if (dont_escape_target) {
+		fputs(target, output);
+	} else {
+		print_makefile_escaped(target, output);
+	}
+	fputc(':', output);
+	for (const include_t *i = includes; i != NULL; i = i->next) {
+		if (i->is_system_header && !show_system_headers)
+			continue;
+		if (i->filename == builtin_position.input_name)
+			continue;
+		fputc(' ', output);
+		print_makefile_escaped(i->filename, output);
+	}
+	fputc('\n', output);
+
+	if (print_phony_targets) {
+		bool first= true;
+		for (const include_t *i = includes; i != NULL; i = i->next) {
+			if (i->filename == builtin_position.input_name)
+				continue;
+			/* skip first (real) entry */
+			if (first) {
+				first = false;
+				continue;
+			}
+			if (i->is_system_header && !show_system_headers)
+				continue;
+			fputc('\n', output);
+			print_makefile_escaped(i->filename, output);
+			fputs(":\n", output);
+		}
+	}
+}
+
 void emit_pp_token(void)
 {
 	bool had_newlines = emit_newlines();
@@ -2393,7 +2506,7 @@ void add_define(char const *const name, char const *const val,
 	pp_definition_t *const def = add_define_(name, standard_define);
 
 	input_t *decoder = input_from_string(val, input_decode_utf8);
-	switch_pp_input(decoder, builtin_position.input_name, NULL, true);
+	switch_input(decoder, builtin_position.input_name, NULL, true);
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 	for (;;) {
@@ -2461,7 +2574,7 @@ void add_define_macro(char const *const name, char const *const macro_arg,
 	pp_definition_t *const def = add_define_(name, standard_define);
 
 	input_t *decoder = input_from_string(val, input_decode_utf8);
-	switch_pp_input(decoder, builtin_position.input_name, NULL, true);
+	switch_input(decoder, builtin_position.input_name, NULL, true);
 
 	symbol_t *const parameter_symbol = symbol_table_insert(macro_arg);
 	pp_definition_t *parameter = OALLOCZ(&pp_obstack, pp_definition_t);
@@ -3048,7 +3161,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 		if (file == NULL)
 			return false;
 		bool is_system_header = false;
-		switch_pp_input_file(file, full_name, NULL, is_system_header);
+		switch_input_file(file, full_name, NULL, is_system_header);
 		return true;
 	}
 
@@ -3078,7 +3191,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 
 		FILE *file = fopen(full_name, "r");
 		if (file != NULL) {
-			switch_pp_input_file(file, full_name, NULL, false);
+			switch_input_file(file, full_name, NULL, false);
 			return true;
 		}
 		entry = quote_searchpath.first;
@@ -3104,7 +3217,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 			const string_t *string
 				= finish_string_construction(STRING_ENCODING_CHAR);
 			const char *filename = string->begin;
-			switch_pp_input_file(file, filename, entry, entry->is_system_path);
+			switch_input_file(file, filename, entry, entry->is_system_path);
 			return true;
 		}
 		obstack_free(&symbol_obstack, complete_path);
@@ -4115,7 +4228,7 @@ void print_defines(void)
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
 {
 	position_t pos = input.pos;
-	/* see hack at end for switch_pp_input() */
+	/* see hack at end for switch_input() */
 	if (pos.lineno == 0)
 		pos.lineno = 1;
 	if (delta_lines > 0) {
@@ -4148,6 +4261,9 @@ void setup_preprocessor(void)
 	expansion_stack  = NEW_ARR_F(pp_expansion_state_t, 0);
 	argument_stack   = NEW_ARR_F(pp_argument_t, 0);
 	macro_call_stack = NEW_ARR_F(macro_call_t, 0);
+	pset_new_init(&includeset);
+	includes = NULL;
+	last_include = NULL;
 
 	setup_include_path();
 
@@ -4162,6 +4278,7 @@ void exit_preprocessor(void)
 {
 	if (macro_call_stack == NULL)
 		return;
+	pset_new_destroy(&includeset);
 	DEL_ARR_F(macro_call_stack);
 	DEL_ARR_F(argument_stack);
 	DEL_ARR_F(expansion_stack);

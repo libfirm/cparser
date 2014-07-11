@@ -31,7 +31,12 @@ extern unsigned        features_on;
 extern unsigned        features_off;
 extern bool            construct_dep_target;
 extern bool            dump_defines;
-extern bool            dump_dependencies_instead_of_preprocessing;
+extern bool            print_dependencies_instead_of_preprocessing;
+extern bool            include_system_headers_in_dependencies;
+extern bool            print_phony_targets;
+extern const char     *dependency_file;
+extern const char     *dependency_target;
+extern bool            dont_escape_target;
 extern const char     *dumpfunction;
 /** -1: auto (use if not crosscompiling), 0 - no, 1 - yes */
 extern int             driver_use_integrated_preprocessor;
