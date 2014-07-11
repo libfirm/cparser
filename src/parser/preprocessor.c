@@ -139,7 +139,7 @@ static pp_conditional_t *conditional_stack;
 
 token_t                      pp_token;
 input_decoder_t             *input_decoder = &input_decode_utf8;
-bool                         allow_dollar_in_symbol   = true;
+bool                         no_dollar_in_symbol;
 static bool                  resolve_escape_sequences = true;
 static bool                  skip_mode;
 static bool                  stop_at_newline;
@@ -817,7 +817,7 @@ static void parse_character_constant(string_encoding_t const enc)
 }
 
 #define SYMBOL_CASES_WITHOUT_E_P \
-	     '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
+	     '$': if (no_dollar_in_symbol) goto dollar_sign; \
 	case 'a': \
 	case 'b': \
 	case 'c': \

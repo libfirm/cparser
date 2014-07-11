@@ -43,7 +43,7 @@ void undefine(char const *name);
 
 string_t *make_string(char const *string);
 
-extern bool             allow_dollar_in_symbol;
+extern bool             no_dollar_in_symbol;
 extern token_t          pp_token;
 extern input_decoder_t *input_decoder;
 

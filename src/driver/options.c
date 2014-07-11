@@ -186,9 +186,9 @@ bool options_parse_preprocessor(options_state_t *s)
 		/* pass these through to the preprocessor */
 		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if (streq(option, "fdollars-in-identifiers")) {
-		allow_dollar_in_symbol = true;
+		no_dollar_in_symbol = false;
 	} else if (streq(option, "fno-dollars-in-identifiers")) {
-		allow_dollar_in_symbol = false;
+		no_dollar_in_symbol = true;
 	} else {
 		return false;
 	}
