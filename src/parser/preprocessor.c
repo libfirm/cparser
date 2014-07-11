@@ -2249,7 +2249,7 @@ static bool emit_newlines(void)
 		print_line_directive(&pp_token.base.pos, NULL);
 		fputc('\n', out);
 	} else {
-		for (unsigned i = 0; i < delta; ++i) {
+		for (unsigned i = delta; i-- > 0; ) {
 			fputc('\n', out);
 		}
 	}
@@ -2279,7 +2279,7 @@ void emit_pp_token(void)
 		 * with whitespace == 0, which we have to adjust here */
 		if (whitespace == 0 && pp_token.base.space_before)
 			++whitespace;
-		for (unsigned i = 0; i < whitespace; ++i)
+		for (unsigned i = whitespace; i-- > 0; )
 			fputc(' ', out);
 	} else if (pp_token.base.space_before
 	  || tokens_would_paste(previous_token, pp_token.kind)) {
@@ -2345,7 +2345,7 @@ static bool pp_definitions_equal(const pp_definition_t *const definition1,
 	size_t const n_parameters = definition1->n_parameters;
 	if (n_parameters != definition2->n_parameters)
 		return false;
-	for (size_t p = 0; p < n_parameters; ++p) {
+	for (size_t p = n_parameters; p-- > 0; ) {
 		const pp_definition_t *param1 = &definition1->parameters[p];
 		const pp_definition_t *param2 = &definition2->parameters[p];
 		if (param1->symbol != param2->symbol
@@ -2356,7 +2356,7 @@ static bool pp_definitions_equal(const pp_definition_t *const definition1,
 	size_t const len = definition1->list_len;
 	if (len != definition2->list_len)
 		return false;
-	for (size_t t = 0; t < len; ++t) {
+	for (size_t t = len; t-- > 0; ) {
 		const token_t *const t1 = &definition1->token_list[t];
 		const token_t *const t2 = &definition2->token_list[t];
 		if (!pp_tokens_equal(t1, t2))
@@ -3086,7 +3086,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
-	for (; entry; entry = entry->next) {
+	for (; entry != NULL; entry = entry->next) {
 		const char *path = entry->path;
 		size_t      len  = strlen(path);
 		obstack_grow(&symbol_obstack, path, len);
