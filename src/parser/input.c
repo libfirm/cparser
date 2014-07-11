@@ -291,8 +291,8 @@ static size_t decode_windows_1252(input_t *input, utf32 *buffer,
 }
 
 typedef struct named_decoder_t {
-	char const       *name;
-	input_decoder_t  *decoder;
+	char const      *name;
+	input_decoder_t *decoder;
 } named_decoder_t;
 
 static named_decoder_t const decoders[] = {

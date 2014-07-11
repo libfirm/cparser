@@ -30,16 +30,16 @@
 #include "driver/lang_features.h"
 #include "input.h"
 
-#define MAX_PUTBACK 3
-#define BUFSIZE     1024
+#define MAX_PUTBACK   3
+#define BUFSIZE       1024
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */
 
 typedef struct whitespace_info_t {
+	/** number of spaces before the first token in a line */
+	unsigned whitespace_at_line_begin;
 	/** current token is at the beginning of a line.
 	 * => a "#" at line begin starts a preprocessing directive. */
 	bool     at_line_begin;
-	/** number of spaces before the first token in a line */
-	unsigned whitespace_at_line_begin;
 } whitespace_info_t;
 
 /* used to update "dynamic" definitions like __LINE__/__FILE__ */
@@ -47,14 +47,6 @@ typedef void (*update_func)(pp_definition_t *definition);
 
 struct pp_definition_t {
 	symbol_t        *symbol;
-	position_t       pos;
-	bool             is_expanding    : 1;
-	bool             may_recurse     : 1;
-	bool             has_parameters  : 1;
-	bool             is_parameter    : 1;
-	bool             is_variadic     : 1;
-	bool             standard_define : 1;
-	bool             not_specified   : 1;
 	pp_definition_t *function_definition;
 	pp_definition_t *previous_definition;
 	size_t           n_parameters;
@@ -64,20 +56,30 @@ struct pp_definition_t {
 	/* replacement */
 	size_t           list_len;
 	token_t         *token_list;
+
+	position_t       pos;
+	bool             is_expanding    : 1;
+	bool             may_recurse     : 1;
+	bool             has_parameters  : 1;
+	bool             is_parameter    : 1;
+	bool             is_variadic     : 1;
+	bool             standard_define : 1;
+	bool             not_specified   : 1;
 };
 
 typedef struct pp_expansion_state_t {
 	pp_definition_t   *definition;
 	size_t             list_len;
 	token_t           *token_list;
-	bool               previous_is_expanding;
-	bool               previous_may_recurse;
 
 	size_t             pos;
-	whitespace_info_t  expand_info;
 	/** the obstack level at the beginning of a macro call with parameters.
 	 * We can free the obstack until this level after expanding the call */
 	void              *obstack_level;
+
+	whitespace_info_t  expand_info;
+	bool               previous_is_expanding;
+	bool               previous_may_recurse;
 } pp_expansion_state_t;
 
 typedef struct pp_argument_t {
@@ -88,26 +90,26 @@ typedef struct pp_argument_t {
 
 typedef struct pp_conditional_t pp_conditional_t;
 struct pp_conditional_t {
-	position_t         pos;
-	bool               condition;
-	bool               in_else;
+	pp_conditional_t *parent;
+	position_t        pos;
+	bool              condition : 1;
+	bool              in_else   : 1;
 	/** conditional in skip mode (then+else gets skipped) */
-	bool               skip;
-	pp_conditional_t  *parent;
+	bool              skip      : 1;
 };
 
 typedef struct pp_input_t pp_input_t;
 struct pp_input_t {
-	FILE               *file;
-	input_t            *input;
 	utf32               c;
 	utf32              *buf;
 	const utf32        *bufend;
 	const utf32        *bufpos;
-	position_t          pos;
+	input_t            *input;
 	pp_input_t         *parent;
-	unsigned            output_line;
 	searchpath_entry_t *path;
+	FILE               *file;
+	position_t          pos;
+	unsigned            output_line;
 };
 
 struct searchpath_entry_t {
@@ -119,10 +121,10 @@ struct searchpath_entry_t {
 typedef struct macro_call_t {
 	pp_definition_t *macro;
 	pp_definition_t *parameter;
-	unsigned         parameter_idx;
 	token_t         *argument_tokens;
-	unsigned         argument_brace_count;
 	void            *obstack_level;
+	unsigned         argument_brace_count;
+	unsigned         parameter_idx         : 30;
 	bool             previous_is_expanding : 1;
 	bool             previous_may_recurse  : 1;
 } macro_call_t;
