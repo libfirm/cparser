@@ -297,7 +297,7 @@ static void pop_restore_input(void)
  */
 static void parse_error(const char *msg)
 {
-	errorf(&pp_token.base.pos,  "%s", msg);
+	errorf(&pp_token.base.pos, "%s", msg);
 }
 
 static inline void next_real_char(void)
@@ -375,16 +375,16 @@ static inline void next_char(void)
 	/* filter trigraphs and concatenated lines */
 	if (UNLIKELY(input.c == '\\')) {
 		maybe_concat_lines();
-		goto end_of_next_char;
+		return;
 	}
 
 	if (LIKELY(input.c != '?'))
-		goto end_of_next_char;
+		return;
 
 	next_real_char();
 	if (LIKELY(input.c != '?')) {
 		put_back('?');
-		goto end_of_next_char;
+		return;
 	}
 
 	next_real_char();
@@ -403,14 +403,7 @@ static inline void next_char(void)
 		put_back('?');
 		break;
 	}
-
-end_of_next_char:;
-#ifdef DEBUG_CHARS
-	printf("nchar '%c'\n", input.c);
-#endif
 }
-
-
 
 /**
  * Returns true if the given char is a octal digit.
