@@ -1138,6 +1138,9 @@ unsigned get_type_alignment_compound(type_t const *const type)
 	case TYPE_TYPEOF:
 		return get_type_alignment_compound(type->typeoft.typeof_type);
 
+	case TYPE_ARRAY:
+		return get_type_alignment_compound(type->array.element_type);
+
 	default:
 		return get_type_alignment(type);
 	}
