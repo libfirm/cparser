@@ -252,6 +252,39 @@ static type_t *get_parameter_type(type_t *orig_type)
 	return type;
 }
 
+static mtp_additional_properties get_additional_type_properties(
+		const decl_modifiers_t modifiers)
+{
+	mtp_additional_properties result = mtp_no_property;
+	if (modifiers & DM_CONST)
+		result |= mtp_property_pure | mtp_property_no_write
+		        | mtp_property_terminates;
+	if (modifiers & DM_PURE)
+		result |= mtp_property_no_write | mtp_property_terminates;
+	if (modifiers & DM_RETURNS_TWICE)
+		result |= mtp_property_returns_twice;
+	if (modifiers & DM_NORETURN)
+		result |= mtp_property_noreturn;
+	if (modifiers & DM_NOTHROW)
+		result |= mtp_property_nothrow;
+	if (modifiers & DM_MALLOC)
+		result |= mtp_property_malloc;
+	return result;
+}
+
+static mtp_additional_properties get_additional_entity_properties(
+		const decl_modifiers_t modifiers)
+{
+	mtp_additional_properties result = mtp_no_property;
+	if (modifiers & DM_NOINLINE)
+		result |= mtp_property_noinline;
+	if (modifiers & DM_FORCEINLINE)
+		result |= mtp_property_always_inline;
+	if (modifiers & DM_NAKED)
+		result |= mtp_property_naked;
+	return result;
+}
+
 static ir_type *create_method_type(const function_type_t *function_type,
                                    bool for_closure)
 {
@@ -318,20 +351,10 @@ is_cdecl:
 	if (for_closure)
 		set_method_calling_convention(irtype, get_method_calling_convention(irtype) | cc_this_call);
 
-	const decl_modifiers_t modifiers = function_type->modifiers;
-	if (modifiers & DM_CONST)
-		add_method_additional_properties(irtype, mtp_property_const);
-	if (modifiers & DM_PURE)
-		add_method_additional_properties(irtype, mtp_property_pure);
-	if (modifiers & DM_RETURNS_TWICE)
-		add_method_additional_properties(irtype, mtp_property_returns_twice);
-	if (modifiers & DM_NORETURN)
-		add_method_additional_properties(irtype, mtp_property_noreturn);
-	if (modifiers & DM_NOTHROW)
-		add_method_additional_properties(irtype, mtp_property_nothrow);
-	if (modifiers & DM_MALLOC)
-		add_method_additional_properties(irtype, mtp_property_malloc);
-
+	const decl_modifiers_t          modifiers = function_type->modifiers;
+	const mtp_additional_properties props
+		= get_additional_type_properties(modifiers);
+	add_method_additional_properties(irtype, props);
 	return irtype;
 }
 
@@ -633,19 +656,12 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	decl_modifiers_t modifiers = entity->declaration.modifiers;
 
 	if (is_method_entity(irentity)) {
-		if (modifiers & DM_PURE)
-			add_entity_additional_properties(irentity, mtp_property_pure);
-		if (modifiers & DM_CONST)
-			add_entity_additional_properties(irentity, mtp_property_const);
-		if (modifiers & DM_NOINLINE)
-			add_entity_additional_properties(irentity, mtp_property_noinline);
-		if (modifiers & DM_FORCEINLINE)
-			add_entity_additional_properties(irentity, mtp_property_always_inline);
-		if (modifiers & DM_NAKED)
-			add_entity_additional_properties(irentity, mtp_property_naked);
+		mtp_additional_properties props
+			= get_additional_type_properties(modifiers)
+			| get_additional_entity_properties(modifiers);
 		if (entity->kind == ENTITY_FUNCTION && entity->function.is_inline)
-			add_entity_additional_properties(irentity,
-											 mtp_property_inline_recommended);
+			props |= mtp_property_inline_recommended;
+		add_entity_additional_properties(irentity, props);
 	}
 	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
