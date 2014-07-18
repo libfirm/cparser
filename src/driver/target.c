@@ -128,8 +128,7 @@ static void setup_types(void)
 	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
 
 	/* Hmm, pointers should be machine size */
-	set_modeP_data(ptr_mode);
-	set_modeP_code(ptr_mode);
+	set_modeP(ptr_mode);
 }
 
 static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)

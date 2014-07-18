@@ -31,7 +31,7 @@ ir_mode *get_ir_mode_storage(type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 	case TYPE_FUNCTION: /* function is questionable here... */
-		return mode_P_data;
+		return mode_P;
 
 	case TYPE_ATOMIC:
 	case TYPE_IMAGINARY:

@@ -1219,7 +1219,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *allocan = new_d_Alloc(dbgi, store, size, 1);
 		ir_node *proj_m  = new_Proj(allocan, mode_M, pn_Alloc_M);
 		set_store(proj_m);
-		ir_node *res     = new_Proj(allocan, mode_P_data, pn_Alloc_res);
+		ir_node *res     = new_Proj(allocan, mode_P, pn_Alloc_res);
 
 		return res;
 	}
@@ -2135,7 +2135,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	ir_node  *offset      = expression_to_value(expression->index);
 	type_t   *ref_type    = skip_typeref(expression->array_ref->base.type);
 	ir_node  *real_offset = adjust_for_pointer_arithmetic(dbgi, offset, ref_type);
-	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
+	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset, mode_P);
 
 	return result;
 }
@@ -2421,7 +2421,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	ir_node      *const c2      = new_d_Add(dbgi, cnst, c1, mode);
 	ir_node      *const c3      = new_Const_long(mode, -(long)stack_param_align);
 	ir_node      *const c4      = new_d_And(dbgi, c2, c3, mode);
-	ir_node      *const add     = new_d_Add(dbgi, ap, c4, mode_P_data);
+	ir_node      *const add     = new_d_Add(dbgi, ap, c4, mode_P);
 
 	set_value_for_expression_addr(ap_expr, add, ap_addr);
 
@@ -4092,7 +4092,7 @@ static void allocate_variable_length_array(entity_t *entity)
 	ir_node  *alloc = new_d_Alloc(dbgi, mem, size, align);
 
 	ir_node  *proj_m = new_d_Proj(dbgi, alloc, mode_M, pn_Alloc_M);
-	ir_node  *addr   = new_d_Proj(dbgi, alloc, mode_P_data, pn_Alloc_res);
+	ir_node  *addr   = new_d_Proj(dbgi, alloc, mode_P, pn_Alloc_res);
 	set_store(proj_m);
 
 	assert(entity->declaration.kind == DECLARATION_KIND_VARIABLE_LENGTH_ARRAY);
@@ -4196,7 +4196,7 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 			complex_value value = expression_to_complex(statement->value);
 			in[0] = complex_to_memory(dbgi, type, value);
 		} else {
-			in[0] = new_Unknown(mode_P_data);
+			in[0] = new_Unknown(mode_P);
 		}
 		in_len = 1;
 	} else {
@@ -4926,7 +4926,7 @@ static void initialize_function_parameters(entity_t *entity)
 
 	if (entity->function.need_closure) {
 		/* add an extra parameter for the static link */
-		entity->function.static_link = new_r_Proj(args, mode_P_data, 0);
+		entity->function.static_link = new_r_Proj(args, mode_P, 0);
 		++n;
 
 		/* Matze: IMO this is wrong, nested functions should have an own
