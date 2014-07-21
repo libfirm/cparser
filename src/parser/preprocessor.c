@@ -251,18 +251,20 @@ static void switch_input(input_t *const decoder, char const *const input_name,
 	input.c          = '\n';
 
 	/* track include (for dependency output) */
-	bool new_dep = pset_new_insert(&includeset, (void*)input_name);
-	if (new_dep) {
-		include_t *include = OALLOC(&pp_obstack, include_t);
-		include->next             = NULL;
-		include->filename         = input_name;
-		include->is_system_header = is_system_header;
-		if (last_include != NULL) {
-			last_include->next = include;
-		} else {
-			includes = include;
+	if (input_name != builtin_position.input_name) {
+		bool new_dep = pset_new_insert(&includeset, (void*)input_name);
+		if (new_dep) {
+			include_t *include = OALLOC(&pp_obstack, include_t);
+			include->next             = NULL;
+			include->filename         = input_name;
+			include->is_system_header = is_system_header;
+			if (last_include != NULL) {
+				last_include->next = include;
+			} else {
+				includes = include;
+			}
+			last_include = include;
 		}
-		last_include = include;
 	}
 }
 
@@ -2351,8 +2353,6 @@ void preprocessor_print_dependencies(FILE *output, bool show_system_headers,
 	for (const include_t *i = includes; i != NULL; i = i->next) {
 		if (i->is_system_header && !show_system_headers)
 			continue;
-		if (i->filename == builtin_position.input_name)
-			continue;
 		fputc(' ', output);
 		print_makefile_escaped(i->filename, output);
 	}
@@ -2361,8 +2361,6 @@ void preprocessor_print_dependencies(FILE *output, bool show_system_headers,
 	if (print_phony_targets) {
 		bool first= true;
 		for (const include_t *i = includes; i != NULL; i = i->next) {
-			if (i->filename == builtin_position.input_name)
-				continue;
 			/* skip first (real) entry */
 			if (first) {
 				first = false;
