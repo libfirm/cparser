@@ -315,6 +315,7 @@ typedef struct {
 } opt_config_t;
 
 static opt_config_t *get_opt(const char *name);
+static void after_transform(ir_graph *irg, const char *name);
 
 static void do_stred(ir_graph *irg)
 {
@@ -325,6 +326,10 @@ static void after_inline_opt(ir_graph *irg)
 {
 	opt_config_t *const config = get_opt("inline");
 	timer_stop(config->timer);
+
+	/* dump the graph immediate after inlining before we start the "cleanup"
+	 * phases below. */
+	after_transform(irg, "inline");
 
 	do_irg_opt(irg, "scalar-replace");
 	do_irg_opt(irg, "opt-load-store");
