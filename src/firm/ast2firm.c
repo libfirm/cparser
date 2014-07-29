@@ -1101,7 +1101,7 @@ static ir_node *get_local_frame(ir_entity *const ent)
 static void keep_loop(void)
 {
 	keep_alive(get_cur_block());
-	keep_alive(get_store());
+	get_store(); /* force creation of PhiM in loops */
 }
 
 static ir_node *reference_addr(const reference_expression_t *ref)
