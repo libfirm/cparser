@@ -3296,8 +3296,8 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 {
 	/* construct a single linked list of construct_type_t's which describe
 	 * how to construct the final declarator type */
-	construct_type_t  *first      = NULL;
-	construct_type_t **anchor     = &first;
+	construct_type_t  *first  = NULL;
+	construct_type_t **anchor = &first;
 
 	env->attributes = parse_attributes(env->attributes);
 
@@ -3308,10 +3308,8 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 			type = parse_reference_declarator();
 			break;
 
-		case T__based: {
+		case T__based:
 			panic("based not supported anymore");
-			/* FALLTHROUGH */
-		}
 
 		case '*':
 			type = parse_pointer_declarator();
