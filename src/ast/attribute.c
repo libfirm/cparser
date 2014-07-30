@@ -377,6 +377,10 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_ALIGNED:
 			handle_attribute_aligned(attribute, entity);
 			break;
+		case ATTRIBUTE_GNU_NORETURN:
+		case ATTRIBUTE_MS_NORETURN:
+			modifiers |= DM_NORETURN;
+			break;
 		default: break;
 		}
 	}
