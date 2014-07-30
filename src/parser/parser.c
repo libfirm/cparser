@@ -606,9 +606,8 @@ __attribute__((sentinel))
 #endif
 void parse_error_expected(const char *message, ...)
 {
-	if (message != NULL) {
+	if (message != NULL)
 		errorf(HERE, "%s", message);
-	}
 	va_list ap;
 	va_start(ap, message);
 	errorf(HERE, "expected %#k, got %K", &ap, ", ", &token);
@@ -666,9 +665,8 @@ static symbol_t *expect_identifier(char const *const context,
  */
 static scope_t *scope_push(scope_t *new_scope)
 {
-	if (current_scope != NULL) {
+	if (current_scope != NULL)
 		new_scope->depth = current_scope->depth + 1;
-	}
 
 	scope_t *old_scope = current_scope;
 	current_scope      = new_scope;
@@ -922,9 +920,8 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	if (source_type == skipped_dest)
 		return expression;
 
-	if (is_type_enum(skipped_dest)) {
+	if (is_type_enum(skipped_dest))
 		warn_enum_conversion(dest_type, expression);
-	}
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->unary.value   = expression;
@@ -1023,17 +1020,15 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			/* the left type has all qualifiers from the right type */
 			unsigned missing_qualifiers
 				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
-			if (missing_qualifiers != 0) {
+			if (missing_qualifiers != 0)
 				res = ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
-			}
 
 			if (is_type_void(points_to_left))
 				return res;
 
-			if (is_type_void(points_to_right)) {
+			if (is_type_void(points_to_right))
 				/* ISO/IEC 14882:1998(E) §C.1.2:6 */
 				return dialect.cpp ? ASSIGN_ERROR_INCOMPATIBLE : res;
-			}
 
 			if (!types_compatible_ignore_qualifiers(points_to_left,
 			                                        points_to_right)) {
@@ -1056,9 +1051,8 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 	            && is_type_pointer(type_right))) {
 		return ASSIGN_SUCCESS;
 	} else if (is_type_compound(type_left) && is_type_compound(type_right)) {
-		if (types_compatible_ignore_qualifiers(type_left, type_right)) {
+		if (types_compatible_ignore_qualifiers(type_left, type_right))
 			return ASSIGN_SUCCESS;
-		}
 	} else if (is_type_integer(type_left) && is_type_pointer(type_right)) {
 		return ASSIGN_WARNING_INT_FROM_POINTER;
 	}
@@ -1153,11 +1147,9 @@ static string_t *parse_string_literals(char const *const context)
 
 	position_t const pos = *HERE;
 	string_t        *res = concat_string_literals();
-
-	if (res->encoding != STRING_ENCODING_CHAR) {
+	if (res->encoding != STRING_ENCODING_CHAR)
 		errorf(&pos, "expected plain string literal, got %s string literal",
 		       get_string_encoding_prefix(res->encoding));
-	}
 
 	return res;
 }
@@ -1497,11 +1489,10 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	expression_t *expression = parse_assignment_expression();
 	mark_vars_read(expression, NULL);
-	if (must_be_constant && !is_linker_constant(expression)) {
+	if (must_be_constant && !is_linker_constant(expression))
 		errorf(&expression->base.pos,
 		       "initialisation expression '%E' is not constant",
 		       expression);
-	}
 
 	initializer_t *initializer = initializer_from_expression(type, expression);
 
@@ -1678,11 +1669,10 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 		if (designator->symbol != NULL) {
 			symbol_t *symbol = designator->symbol;
 			if (!is_type_compound(type)) {
-				if (is_type_valid(type)) {
+				if (is_type_valid(type))
 					errorf(&designator->pos,
 					       "'.%Y' designator used for non-compound type '%T'",
 					       symbol, orig_type);
-				}
 
 				top->type             = type_error_type;
 				top->v.compound_entry = NULL;
@@ -1833,10 +1823,9 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		type_t *outer_type, size_t top_path_level,
 		parse_initializer_env_t *env)
 {
-	if (token.kind == '}') {
-		/* empty initializer */
+	/* empty initializer? */
+	if (token.kind == '}')
 		return create_empty_initializer();
-	}
 
 	initializer_t *result = NULL;
 
@@ -1867,10 +1856,9 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 finish_designator:
 			/* reset path to toplevel, evaluate designator from there */
 			ascend_to(path, top_path_level);
-			if (!walk_designator(path, designator, false)) {
-				/* can't continue after designation error */
+			/* can't continue after designation error */
+			if (!walk_designator(path, designator, false))
 				goto end_error;
-			}
 
 			initializer_t *designator_initializer
 				= allocate_initializer_zero(INITIALIZER_DESIGNATOR);
@@ -1967,12 +1955,10 @@ excess_elements:;
 				type      = skip_typeref(orig_type);
 
 				sub = initializer_from_expression(orig_type, expression);
-				if (sub != NULL) {
+				if (sub != NULL)
 					break;
-				}
-				if (!is_initializable_type(type)) {
+				if (!is_initializable_type(type))
 					goto end_error;
-				}
 				if (is_type_scalar(type)) {
 					errorf(&expression->base.pos,
 							"expression '%E' doesn't match expected type '%T'",
@@ -2000,9 +1986,8 @@ excess_elements:;
 error_parse_next:
 		if (!accept(','))
 			break;
-		if (token.kind == '}') {
+		if (token.kind == '}')
 			break;
-		}
 
 		if (type != NULL) {
 			/* advance to the next declaration if we are not at the end */
@@ -2178,9 +2163,8 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 		entity = allocate_entity_zero(kind, NAMESPACE_TAG, symbol, &pos);
 		entity->compound.alignment = 1;
 		entity->base.parent_scope  = current_scope;
-		if (symbol != NULL) {
+		if (symbol != NULL)
 			environment_push(entity);
-		}
 		append_entity(current_scope, entity);
 	}
 
@@ -2290,9 +2274,8 @@ static type_t *parse_enum_specifier(void)
 	type->enumt.base.akind = ATOMIC_TYPE_INT;
 
 	if (token.kind == '{') {
-		if (symbol != NULL) {
+		if (symbol != NULL)
 			environment_push(entity);
-		}
 		append_entity(current_scope, entity);
 		entity->enume.complete = true;
 
@@ -2553,9 +2536,8 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	attribute_t *attribute = allocate_attribute_zero(kind);
 	next_token();
 
-	if (kind == ATTRIBUTE_MS_PROPERTY) {
+	if (kind == ATTRIBUTE_MS_PROPERTY)
 		return parse_attribute_ms_property(attribute);
-	}
 
 	/* parse arguments */
 	if (accept('('))
@@ -2699,13 +2681,6 @@ wrong_thread_storage_class:
 			eat(T_inline);
 			specifiers->is_inline = true;
 			break;
-
-#if 0
-		case T__forceinline:
-			eat(T__forceinline);
-			specifiers->modifiers |= DM_FORCEINLINE;
-			break;
-#endif
 
 		case T_long:
 			if (type_specifiers & SPECIFIER_LONG_LONG) {
@@ -3199,7 +3174,6 @@ static construct_type_t *parse_pointer_declarator(void)
 	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_POINTER, sizeof(parsed_pointer_t));
 	eat('*');
 	cons->pointer.type_qualifiers = parse_type_qualifiers();
-	//cons->pointer.base_variable   = base_variable;
 
 	return cons;
 }
@@ -3397,9 +3371,8 @@ ptr_operator_end: ;
 		switch (token.kind) {
 		case '(': {
 			scope_t *scope = NULL;
-			if (!env->must_be_abstract) {
+			if (!env->must_be_abstract)
 				scope = &env->parameters;
-			}
 
 			type = parse_function_declarator(scope);
 			break;
@@ -3558,19 +3531,16 @@ static type_t *semantic_parameter(const position_t *pos, type_t *type,
 	 *             returning type'', as in 6.3.2.1. */
 	type = automatic_type_conversion(type);
 
-	if (specifiers->is_inline && is_type_valid(type)) {
+	if (specifiers->is_inline && is_type_valid(type))
 		errorf(pos, "'%N' declared 'inline'", param);
-	}
 
 	/* §6.9.1:6  The declarations in the declaration list shall contain
 	 *           no storage-class specifier other than register and no
 	 *           initializations. */
-	if (specifiers->thread_local || (
-			specifiers->storage_class != STORAGE_CLASS_NONE   &&
-			specifiers->storage_class != STORAGE_CLASS_REGISTER)
-	   ) {
+	if (specifiers->thread_local
+	    || (specifiers->storage_class != STORAGE_CLASS_NONE
+	     && specifiers->storage_class != STORAGE_CLASS_REGISTER))
 		errorf(pos, "invalid storage class for '%N'", param);
-	}
 
 	/* delay test for incomplete type, because we might have (void)
 	 * which is legal but incomplete... */
@@ -3590,9 +3560,8 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		construct_declarator_type(construct_type, specifiers->type);
 	type_t           *type           = skip_typeref(orig_type);
 
-	if (construct_type != NULL) {
+	if (construct_type != NULL)
 		obstack_free(&temp_obst, construct_type);
-	}
 
 	attribute_t *attributes = parse_attributes(env.attributes);
 	/* append (shared) specifier attribute behind attributes of this
@@ -3630,14 +3599,12 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			                              NAMESPACE_NORMAL, env.symbol, pos);
 
 			if (env.symbol != NULL) {
-				if (specifiers->is_inline && is_type_valid(type)) {
+				if (specifiers->is_inline && is_type_valid(type))
 					errorf(&env.pos, "'%N' declared 'inline'", entity);
-				}
 
-				if (specifiers->thread_local ||
-						specifiers->storage_class != STORAGE_CLASS_NONE) {
+				if (specifiers->thread_local
+				    || specifiers->storage_class != STORAGE_CLASS_NONE)
 					errorf(&env.pos, "'%N' must have no storage class", entity);
-				}
 			}
 
 			entity->declaration.alignment = get_type_alignment_compound(orig_type);
@@ -3659,9 +3626,8 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 					      specifiers->storage_class != STORAGE_CLASS_EXTERN &&
 					      specifiers->storage_class != STORAGE_CLASS_NONE   &&
 					      (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
-					    )) {
+					    ))
 						errorf(&env.pos, "invalid storage class for '%N'", entity);
-					}
 				}
 			} else {
 				entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
@@ -3669,24 +3635,17 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				entity->variable.thread_local   = specifiers->thread_local;
 
 				if (env.symbol != NULL) {
-					if (specifiers->is_inline && is_type_valid(type)) {
+					if (specifiers->is_inline && is_type_valid(type))
 						errorf(&env.pos, "'%N' declared 'inline'", entity);
-					}
 
-					bool invalid_storage_class = false;
 					if (current_scope == file_scope) {
 						if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
 								specifiers->storage_class != STORAGE_CLASS_NONE   &&
-								specifiers->storage_class != STORAGE_CLASS_STATIC) {
-							invalid_storage_class = true;
-						}
-					} else {
-						if (specifiers->thread_local &&
-								specifiers->storage_class == STORAGE_CLASS_NONE) {
-							invalid_storage_class = true;
-						}
-					}
-					if (invalid_storage_class) {
+								specifiers->storage_class != STORAGE_CLASS_STATIC)
+							goto invalid_storage_class;
+					} else if (specifiers->thread_local
+					       && specifiers->storage_class == STORAGE_CLASS_NONE) {
+invalid_storage_class:
 						errorf(&env.pos, "invalid storage class for '%N'", entity);
 					}
 				}
@@ -3707,13 +3666,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		entity->declaration.storage_class = storage_class;
 	}
 
-	if (attributes != NULL) {
+	if (attributes != NULL)
 		handle_entity_attributes(attributes, entity);
-	}
 
-	if (entity->kind == ENTITY_FUNCTION && !dialect.freestanding) {
+	if (entity->kind == ENTITY_FUNCTION && !dialect.freestanding)
 		adapt_special_functions(&entity->function);
-	}
 
 	return entity;
 }
@@ -3728,9 +3685,8 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 	construct_type_t *construct_type = parse_inner_declarator(&env);
 
 	type_t *result = construct_declarator_type(construct_type, base_type);
-	if (construct_type != NULL) {
+	if (construct_type != NULL)
 		obstack_free(&temp_obst, construct_type);
-	}
 	result = handle_type_attributes(env.attributes, result);
 
 	return result;
@@ -3754,28 +3710,26 @@ static void check_main(const entity_t *entity)
 		return;
 	}
 
-	if (entity->declaration.storage_class == STORAGE_CLASS_STATIC) {
+	if (entity->declaration.storage_class == STORAGE_CLASS_STATIC)
 		warningf(WARN_MAIN, pos, "'main' is normally a non-static function");
-	}
 
 	type_t *type = skip_typeref(entity->declaration.type);
 	assert(is_type_function(type));
 
 	function_type_t const *const func_type = &type->function;
 	type_t                *const ret_type  = func_type->return_type;
-	if (!types_compatible(skip_typeref(ret_type), type_int)) {
+	if (!types_compatible(skip_typeref(ret_type), type_int))
 		warningf(WARN_MAIN, pos,
 		         "return type of 'main' should be 'int', but is '%T'",
 		         ret_type);
-	}
 	const function_parameter_t *parm = func_type->parameters;
 	if (parm != NULL) {
 		type_t *const first_type = skip_typeref(parm->type);
-		if (!types_compatible_ignore_qualifiers(first_type, type_int)) {
+		if (!types_compatible_ignore_qualifiers(first_type, type_int))
 			warningf(WARN_MAIN, pos,
 			         "first argument of 'main' should be 'int', but is '%T'",
 			         parm->type);
-		}
+
 		parm = parm->next;
 		if (parm != NULL) {
 			type_t *const second_type = skip_typeref(parm->type);
@@ -3928,10 +3882,9 @@ void merge_into_decl(entity_t *decl, const entity_t *other)
 		if (other->function.btk != BUILTIN_NONE) {
 			decl->function.btk            = other->function.btk;
 			decl->function.builtin_in_lib = other->function.builtin_in_lib;
-			if (other->function.btk == BUILTIN_FIRM) {
+			if (other->function.btk == BUILTIN_FIRM)
 				decl->function.b.firm_builtin_kind =
 					other->function.b.firm_builtin_kind;
-			}
 		}
 	} else if (decl->kind == ENTITY_VARIABLE) {
 		if (other->variable.alias.symbol != NULL) {
@@ -3964,14 +3917,12 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		assert(is_type_function(type));
 		if (type->function.unspecified_parameters && previous == NULL
-		 && !entity->declaration.implicit) {
+		 && !entity->declaration.implicit)
 			warningf(WARN_STRICT_PROTOTYPES, pos,
 			         "function declaration '%#N' is not a prototype", entity);
-		}
 
-		if (is_main(entity)) {
+		if (is_main(entity))
 			check_main(entity);
-		}
 	}
 
 	if (is_declaration(entity)                                    &&
@@ -3994,9 +3945,8 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		if (previous->base.parent_scope == current_scope) {
 			if (previous->kind != kind) {
-				if (is_entity_valid(previous) && is_entity_valid(entity)) {
+				if (is_entity_valid(previous) && is_entity_valid(entity))
 					error_redefined_as_different_kind(pos, previous, kind);
-				}
 				goto finish;
 			}
 			if (is_definition
@@ -4167,11 +4117,10 @@ static void parse_init_declarator_rest(entity_t *entity)
 	}
 
 	if (entity->kind == ENTITY_VARIABLE
-		&& entity->variable.alias.symbol != NULL) {
+		&& entity->variable.alias.symbol != NULL)
 		errorf(&entity->base.pos,
 		       "'%N' has an initializer but is declared as an alias for '%Y'",
 		       entity, entity->variable.alias.symbol);
-	}
 
 	type_t *type = skip_typeref(orig_type);
 	eat('=');
@@ -4221,9 +4170,8 @@ static void parse_anonymous_declaration_rest(
 
 	position_t const *const pos = &specifiers->pos;
 	if (specifiers->storage_class != STORAGE_CLASS_NONE
-	    || specifiers->thread_local) {
+	    || specifiers->thread_local)
 		warningf(WARN_OTHER, pos, "useless storage class in empty declaration");
-	}
 
 	type_t *type = specifiers->type;
 	switch (type->kind) {
@@ -4373,9 +4321,8 @@ static void parse_static_assert(void)
 	expect(')');
 
 	/* semantic */
-	if (expr->base.type != type_error_type && !fold_expression_to_bool(expr)) {
+	if (expr->base.type != type_error_type && !fold_expression_to_bool(expr))
 		errorf(&pos, "assertion '%E' failed: \"%S\"", expr, message);
-	}
 
 	rem_anchor_token(';');
 	expect(';');
@@ -4622,9 +4569,8 @@ static void check_declarations(void)
 		const scope_t *scope = &current_function->parameters;
 		warn_unused_entity(WARN_UNUSED_PARAMETER, scope->entities, NULL);
 	}
-	if (is_warn_on(WARN_UNUSED_VARIABLE)) {
+	if (is_warn_on(WARN_UNUSED_VARIABLE))
 		walk_statements(current_function->body, check_unused_variables, NULL);
-	}
 }
 
 static int determine_truth(expression_t const* const cond)
@@ -5225,32 +5171,28 @@ static void parse_external_declaration(void)
 	type_t *const type      = skip_typeref(orig_type);
 
 	if (!is_type_function(type)) {
-		if (is_type_valid(type)) {
+		if (is_type_valid(type))
 			errorf(HERE,
 			       "declarator '%#N' has a body but is not a function type",
 			       ndeclaration);
-		}
 		eat_block();
 		return;
 	}
 	symbol_t *const alias = ndeclaration->function.alias.symbol;
-	if (alias != NULL) {
+	if (alias != NULL)
 		errorf(HERE,
 		       "'%#N' has a body but is declared as an alias for '%Y'",
 		       ndeclaration, alias);
-	}
 
 	position_t const *const pos = &ndeclaration->base.pos;
-	if (is_typeref(orig_type)) {
+	if (is_typeref(orig_type))
 		/* §6.9.1:2 */
 		errorf(pos, "type of function definition '%#N' is a typedef",
 		       ndeclaration);
-	}
 
-	if (is_type_compound(skip_typeref(type->function.return_type))) {
+	if (is_type_compound(skip_typeref(type->function.return_type)))
 		warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate",
 		         ndeclaration);
-	}
 	if (type->function.unspecified_parameters) {
 		warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of '%N'",
 		         ndeclaration);
@@ -5274,17 +5216,16 @@ static void parse_external_declaration(void)
 	assert(ndeclaration->kind == ENTITY_FUNCTION);
 
 	function_t *const function = &entity->function;
-	if (ndeclaration != entity) {
+	if (ndeclaration != entity)
 		function->parameters = ndeclaration->function.parameters;
-	}
 
 	PUSH_SCOPE(&function->parameters);
 
 	entity_t *parameter = function->parameters.entities;
 	for (; parameter != NULL; parameter = parameter->base.next) {
-		if (parameter->base.parent_scope == &ndeclaration->function.parameters) {
+		if (parameter->base.parent_scope == &ndeclaration->function.parameters)
 			parameter->base.parent_scope = current_scope;
-		}
+
 		assert(parameter->base.parent_scope == NULL
 				|| parameter->base.parent_scope == current_scope);
 		parameter->base.parent_scope = current_scope;
@@ -5413,9 +5354,8 @@ static expression_t *create_select(const position_t *pos, expression_t *addr,
 	if (entry->compound_member.bitfield) {
 		unsigned bit_size = entry->compound_member.bit_size;
 		/* if fewer bits than an int, convert to int (see §6.3.1.1) */
-		if (bit_size < get_atomic_type_size(ATOMIC_TYPE_INT) * BITS_PER_BYTE) {
+		if (bit_size < get_atomic_type_size(ATOMIC_TYPE_INT) * BITS_PER_BYTE)
 			res_type = type_int;
-		}
 	}
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
@@ -5456,9 +5396,8 @@ static expression_t *find_create_select(const position_t *pos,
 			                          symbol);
 		}
 
-		if (iter_symbol == symbol) {
+		if (iter_symbol == symbol)
 			return create_select(pos, addr, qualifiers, iter);
-		}
 	}
 
 	return NULL;
@@ -5473,9 +5412,8 @@ static void parse_bitfield_member(entity_t *entity)
 
 	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 	type_t *type = entity->declaration.type;
-	if (!is_type_integer(skip_typeref(type))) {
+	if (!is_type_integer(skip_typeref(type)))
 		errorf(HERE, "bitfield base type '%T' is not an integer type", type);
-	}
 
 	if (size->base.type == type_error_type) {
 		/* just a dummy value */
@@ -5574,19 +5512,17 @@ static void parse_compound_type_entries(compound_t *compound)
 		switch (token.kind) {
 		case DECLARATION_SPECIFIERS:
 		case T___extension__:
-		case T_IDENTIFIER: {
+		case T_IDENTIFIER:
 			PUSH_EXTENSION();
 			declaration_specifiers_t specifiers;
 			parse_declaration_specifiers(&specifiers);
 			parse_compound_declarators(compound, &specifiers);
 			POP_EXTENSION();
 			break;
-		}
 
-		case T__Static_assert: {
+		case T__Static_assert:
 			parse_static_assert();
 			break;
-		}
 
 		default:
 			rem_anchor_token('}');
@@ -5603,12 +5539,10 @@ static type_t *parse_typename(void)
 	declaration_specifiers_t specifiers;
 	parse_declaration_specifiers(&specifiers);
 	if (specifiers.storage_class != STORAGE_CLASS_NONE
-	    || specifiers.thread_local) {
+	    || specifiers.thread_local)
 		/* TODO: improve error message, user does probably not know what a
-		 * storage class is...
-		 */
+		 * storage class is... */
 		errorf(&specifiers.pos, "type name must not have a storage class");
-	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
 	anonymous_entity = NULL;
@@ -5721,12 +5655,11 @@ error:
 		type = make_complex_type(get_arithmetic_akind(type), TYPE_QUALIFIER_NONE);
 
 	expr->base.type = type;
-	if (!is_float) {
+	if (!is_float)
 		/* Integer type depends on the size of the number and the size
 		 * representable by the types. The backend/codegeneration has to
 		 * determine that. */
 		determine_literal_type(&expr->literal);
-	}
 }
 
 static expression_t *parse_number_literal(void)
@@ -5878,9 +5811,8 @@ static expression_t *parse_character_constant(void)
 	case STRING_ENCODING_CHAR32: literal->base.type = type_char32_t; goto warn_multi;
 	case STRING_ENCODING_WIDE:   literal->base.type = type_wchar_t;  goto warn_multi;
 warn_multi:
-		if (size > 1) {
+		if (size > 1)
 			warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
-		}
 		break;
 	}
 
@@ -5925,9 +5857,8 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 		return make_pointer_type(element_type, qualifiers);
 	}
 
-	if (is_type_function(type)) {
+	if (is_type_function(type))
 		return make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
-	}
 
 	return orig_type;
 }
@@ -5939,9 +5870,8 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
                                entity_namespace_t namespc)
 {
-	if (scope == NULL) {
+	if (scope == NULL)
 		return get_entity(symbol, namespc);
-	}
 
 	/* we should optimize here, if scope grows above a certain size we should
 	   construct a hashmap here... */
@@ -6039,9 +5969,8 @@ static expression_t *parse_reference(void)
 	expression->reference.entity = entity;
 
 	/* this declaration is used */
-	if (is_declaration(entity)) {
+	if (is_declaration(entity))
 		entity->declaration.used = true;
-	}
 
 	if (entity->base.parent_scope != file_scope
 	 && (current_function != NULL
@@ -6098,11 +6027,10 @@ static bool semantic_cast(expression_t *cast)
 		type_t *dst = skip_typeref(dst_type->pointer.points_to);
 		unsigned missing_qualifiers =
 			src->base.qualifiers & ~dst->base.qualifiers;
-		if (missing_qualifiers != 0) {
+		if (missing_qualifiers != 0)
 			warningf(WARN_CAST_QUAL, pos,
 			         "cast discards qualifiers '%Q' in pointer target type of '%T'",
 			         missing_qualifiers, orig_type_right);
-		}
 	}
 	return true;
 }
@@ -6139,9 +6067,8 @@ static expression_t *parse_compound_literal(position_t const *const pos,
                                             type_t *type)
 {
 	type_t *skipped = skip_typeref(type);
-	if (!is_initializable_type(skipped) && is_type_valid(skipped)) {
+	if (!is_initializable_type(skipped) && is_type_valid(skipped))
 		errorf(pos, "type '%T' invalid for compound literals", type);
-	}
 
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 	expression->base.pos = *pos;
@@ -6177,9 +6104,8 @@ static expression_t *parse_cast(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	if (token.kind == '{') {
+	if (token.kind == '{')
 		return parse_compound_literal(&pos, type);
-	}
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->base.pos     = pos;
@@ -6188,10 +6114,8 @@ static expression_t *parse_cast(void)
 	cast->base.type   = type;
 	cast->unary.value = value;
 
-	if (!semantic_cast(cast)) {
+	if (!semantic_cast(cast))
 		cast->base.type = type_error_type;
-	}
-
 	return cast;
 }
 
@@ -6280,9 +6204,8 @@ static expression_t *parse_parenthesized_expression(void)
 
 static expression_t *parse_function_keyword(funcname_kind_t const kind)
 {
-	if (current_function == NULL) {
+	if (current_function == NULL)
 		errorf(HERE, "%K used outside of a function", &token);
-	}
 
 	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
 	expression->base.type     = type_char_ptr;
@@ -6563,11 +6486,10 @@ static expression_t *parse_compare_builtin(void)
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
 	if (!is_type_float(type_left) && !is_type_float(type_right)) {
-		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+		if (is_type_valid(type_left) && is_type_valid(type_right))
 			type_error_incompatible("invalid operands in comparison",
 			                        &expression->base.pos, orig_type_left,
 			                        orig_type_right);
-		}
 	} else {
 		semantic_comparison(&expression->binary, true);
 	}
@@ -6783,11 +6705,10 @@ check_idx:
 			         "array subscript has char type");
 		}
 	} else {
-		if (is_type_valid(type_left) && is_type_valid(type_inside)) {
+		if (is_type_valid(type_left) && is_type_valid(type_inside))
 			errorf(&expr->base.pos,
 			       "invalid types '%T[%T]' for array access", orig_type_left,
 			       orig_type_inside);
-		}
 		res_type = type_error_type;
 		ref      = left;
 		idx      = inside;
@@ -7016,11 +6937,10 @@ static void handle_builtin_argument_restrictions(call_expression_t *const call,
 			/* argument must be constant */
 			call_argument_t *argument = call->arguments;
 
-			if (is_constant_expression(argument->expression) == EXPR_CLASS_VARIABLE) {
+			if (is_constant_expression(argument->expression) == EXPR_CLASS_VARIABLE)
 				errorf(&call->base.pos,
 				       "argument of '%Y' must be a constant expression",
 				       call->function->reference.entity->base.symbol);
-			}
 			break;
 		}
 		case ir_bk_prefetch:
@@ -7031,19 +6951,17 @@ static void handle_builtin_argument_restrictions(call_expression_t *const call,
 			call_argument_t *locality = NULL;
 
 			if (rw != NULL) {
-				if (is_constant_expression(rw->expression) == EXPR_CLASS_VARIABLE) {
+				if (is_constant_expression(rw->expression) == EXPR_CLASS_VARIABLE)
 					errorf(&call->base.pos,
 					       "second argument of '%Y' must be a constant expression",
 					       call->function->reference.entity->base.symbol);
-				}
 				locality = rw->next;
 			}
 			if (locality != NULL
-			    && is_constant_expression(locality->expression) == EXPR_CLASS_VARIABLE) {
+			    && is_constant_expression(locality->expression) == EXPR_CLASS_VARIABLE)
 				errorf(&call->base.pos,
 				       "third argument of '%Y' must be a constant expression",
 				       call->function->reference.entity->base.symbol);
-			}
 			break;
 		default:
 			break;
@@ -7056,11 +6974,10 @@ static void handle_builtin_argument_restrictions(call_expression_t *const call,
 
 		call_argument_t *arg = call->arguments->next;
 		if (arg != NULL
-		    && is_constant_expression(arg->expression) == EXPR_CLASS_VARIABLE) {
+		    && is_constant_expression(arg->expression) == EXPR_CLASS_VARIABLE)
 			errorf(&call->base.pos,
 			       "second argument of '%Y' must be a constant expression",
 			       call->function->reference.entity->base.symbol);
-		}
 		break;
 	default:
 		break;
@@ -7084,19 +7001,17 @@ static type_t *check_generic_parameter(type_t **const replacement_ref,
 		type_t *argument_points_to = NULL;
 		if (argument_type != NULL) {
 			type_t *skipped = skip_typeref(argument_type);
-			if (argument_type->kind != TYPE_POINTER) {
+			if (argument_type->kind != TYPE_POINTER)
 				/* TODO: error message */
 				return NULL;
-			}
 			argument_points_to = skipped->pointer.points_to;
 		}
 		type_t *old_points_to = parameter_type->pointer.points_to;
 		type_t *new_points_to = check_generic_parameter(replacement_ref,
 			old_points_to, argument_points_to);
-		if (old_points_to != new_points_to) {
+		if (old_points_to != new_points_to)
 			return make_pointer_type(new_points_to,
 			                         parameter_type->base.qualifiers);
-		}
 	}
 
 	return parameter_type;
@@ -7167,11 +7082,10 @@ static void semantic_call(call_expression_t *call)
 	}
 
 	if (function_type == NULL) {
-		if (is_type_valid(type)) {
+		if (is_type_valid(type))
 			errorf(&call->base.pos,
 			       "called object '%E' (type '%T') is not a function or function pointer",
 			       function, orig_type);
-		}
 		goto error;
 	}
 
@@ -7218,10 +7132,9 @@ static void semantic_call(call_expression_t *call)
 
 	check_format(call);
 
-	if (is_type_compound(skip_typeref(function_type->return_type))) {
+	if (is_type_compound(skip_typeref(function_type->return_type)))
 		warningf(WARN_AGGREGATE_RETURN, &call->base.pos,
 		         "function call has aggregate value");
-	}
 
 	if (function->kind == EXPR_REFERENCE) {
 		entity_t *entity = function->reference.entity;
@@ -7301,9 +7214,8 @@ static expression_t const *get_reference_address(expression_t const *expr)
 	/* special case for functions which are automatically converted to a
 	 * pointer to function without an extra TAKE_ADDRESS operation */
 	if (!regular_take_address
-	    && expr->reference.entity->kind != ENTITY_FUNCTION) {
+	    && expr->reference.entity->kind != ENTITY_FUNCTION)
 		return NULL;
-	}
 
 	return expr;
 }
@@ -7387,10 +7299,9 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 		} else if (false_expression->kind == EXPR_UNARY_THROW) {
 			result_type = true_type;
 		} else {
-			if (!is_type_void(true_type) || !is_type_void(false_type)) {
+			if (!is_type_void(true_type) || !is_type_void(false_type))
 				warningf(WARN_OTHER, pos,
 				         "ISO C forbids conditional expression with only one void side");
-			}
 			result_type = type_void;
 		}
 	} else if (is_type_arithmetic(true_type)
@@ -7446,10 +7357,9 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 		}
 	} else {
 types_incompatible:
-		if (is_type_valid(true_type) && is_type_valid(false_type)) {
+		if (is_type_valid(true_type) && is_type_valid(false_type))
 			type_error_incompatible("while parsing conditional", pos,
 			                        true_type, false_type);
-		}
 		result_type = type_error_type;
 	}
 
@@ -7513,10 +7423,9 @@ static expression_t *parse_delete(void)
 
 	type_t *const type = skip_typeref(value->base.type);
 	if (!is_type_pointer(type)) {
-		if (is_type_valid(type)) {
+		if (is_type_valid(type))
 			errorf(&value->base.pos,
 			       "operand of delete must have pointer type");
-		}
 	} else if (is_type_void(skip_typeref(type->pointer.points_to))) {
 		position_t const *const pos = &value->base.pos;
 		warningf(WARN_OTHER, pos, "deleting 'void*' is undefined");
@@ -7548,11 +7457,10 @@ static expression_t *parse_throw(void)
 			       "cannot throw object of incomplete type '%T'", orig_type);
 		} else if (is_type_pointer(type)) {
 			type_t *const points_to = skip_typeref(type->pointer.points_to);
-			if (!is_type_complete(points_to) && !is_type_void(points_to)) {
+			if (!is_type_complete(points_to) && !is_type_void(points_to))
 				errorf(&value->base.pos,
 				       "cannot throw pointer to incomplete type '%T'",
 				       orig_type);
-			}
 		}
 	}
 
@@ -7636,10 +7544,9 @@ static void semantic_incdec(unary_expression_t *expression)
 		       "operation needs an arithmetic or pointer type, but got '%T'", type);
 		orig_type = type = type_error_type;
 	}
-	if (!is_lvalue(expression->value)) {
+	if (!is_lvalue(expression->value))
 		/* TODO: improve error message */
 		errorf(&expression->base.pos, "lvalue required as operand");
-	}
 	expression->base.type = orig_type;
 }
 
@@ -7698,10 +7605,9 @@ static void semantic_complement(unary_expression_t *expression)
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_integer(type) && (!GNU_MODE || !is_type_complex(type))) {
-		if (is_type_valid(type)) {
+		if (is_type_valid(type))
 			errorf(&expression->base.pos,
 			       "operand of ~ must be of integer type");
-		}
 		return;
 	}
 
@@ -7717,11 +7623,10 @@ static void semantic_dereference(unary_expression_t *expression)
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_pointer(type)) {
-		if (is_type_valid(type)) {
+		if (is_type_valid(type))
 			errorf(&expression->base.pos,
 			       "Unary '*' needs pointer or array type, but type '%T' given",
 			       orig_type);
-		}
 		return;
 	}
 
@@ -7769,12 +7674,10 @@ static void semantic_take_addr(unary_expression_t *expression)
 		return;
 
 	/* §6.5.3.2 */
-	if (!is_lvalue(value)) {
+	if (!is_lvalue(value))
 		errorf(&expression->base.pos, "'&' requires an lvalue");
-	}
-	if (is_bitfield(value)) {
+	if (is_bitfield(value))
 		errorf(&expression->base.pos, "'&' not allowed on bitfield");
-	}
 
 	set_address_taken(value, false);
 
@@ -7900,9 +7803,8 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	atomic_type_kind_t kind_right = get_arithmetic_akind(type_right);
 	atomic_type_kind_t kind_res   = semantic_arithmetic_(kind_left, kind_right);
 
-	if (type_left->kind == TYPE_COMPLEX || type_right->kind == TYPE_COMPLEX) {
+	if (type_left->kind == TYPE_COMPLEX || type_right->kind == TYPE_COMPLEX)
 		return make_complex_type(kind_res, TYPE_QUALIFIER_NONE);
-	}
 	return make_atomic_type(kind_res, TYPE_QUALIFIER_NONE);
 }
 
@@ -8267,25 +8169,22 @@ static void semantic_comparison(binary_expression_t *expression,
 			bool const signed_right = is_type_signed(type_right);
 			if (signed_left != signed_right
 			    && ((signed_left && maybe_negative(left))
-				    || (signed_right && maybe_negative(right)))) {
+				    || (signed_right && maybe_negative(right))))
 				warningf(WARN_SIGN_COMPARE, pos,
 						 "comparison between signed and unsigned");
-			}
 		}
 
 		expression->left      = create_implicit_cast(left, arithmetic_type);
 		expression->right     = create_implicit_cast(right, arithmetic_type);
 		expression->base.type = arithmetic_type;
-		if (!is_relational && is_type_float(arithmetic_type)) {
+		if (!is_relational && is_type_float(arithmetic_type))
 			warningf(WARN_FLOAT_EQUAL, pos,
 			         "comparing floating point with == or != is unsafe");
-		}
 		/* for relational ops we need real types, not just arithmetic */
 		if (is_relational
-		    && (!is_type_real(type_left) || !is_type_real(type_right))) {
+		    && (!is_type_real(type_left) || !is_type_real(type_right)))
 			type_error_incompatible("invalid operands for relational operator",
 			                        pos, type_left, type_right);
-		}
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		type_t *points_to_left  = type_left->pointer.points_to;
 		type_t *points_to_right = type_right->pointer.points_to;
@@ -8293,11 +8192,10 @@ static void semantic_comparison(binary_expression_t *expression,
 		type_t *skipped_pt_right = skip_typeref(points_to_right);
 		if (!is_type_void(skipped_pt_left) && !is_type_void(skipped_pt_right)
 		    && !types_compatible_ignore_qualifiers(skipped_pt_left,
-		                                           skipped_pt_right)) {
+		                                           skipped_pt_right))
 			warningf(WARN_DISTINCT_POINTER_TYPES, pos,
 			         "comparison of distinct pointer types: '%T' and '%T'",
 			         orig_type_left, orig_type_right);
-		}
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->right = create_implicit_cast(right, type_left);
 		if (is_relational || !is_null_pointer_constant(right))
@@ -8405,9 +8303,8 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 
 	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
-		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+		if (is_type_valid(type_left) && is_type_valid(type_right))
 			errorf(&expression->base.pos, "operation needs arithmetic types");
-		}
 		return;
 	}
 
@@ -8472,9 +8369,8 @@ static void semantic_integer_assign(binary_expression_t *expression)
 
 	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
 		/* TODO: improve error message */
-		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+		if (is_type_valid(type_left) && is_type_valid(type_right))
 			errorf(&expression->base.pos, "operation needs integer types");
-		}
 		return;
 	}
 
@@ -8571,11 +8467,10 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	   then it was probably intended to be a compound assignment */
 	if (expression->base.kind == EXPR_BINARY_ASSIGN &&
 	    is_ambiguous_unary_expression_kind(expression->right->kind)) {
-		if (are_positions_contiguous(&expression->base.pos, &expression->right->base.pos)) {
+		if (are_positions_contiguous(&expression->base.pos, &expression->right->base.pos))
 			warningf(WARN_NOT_COMPOUND_ASSIGN, &expression->base.pos,
 			         "use of unary operator that may be intended as compound assignment (%hs%E)",
 			         "=", expression->right);
-		}
 	}
 
 	expression_t *left = expression->left;
@@ -8940,11 +8835,10 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 	}
 
 	if (is_out) {
-		if ((asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) == 0) {
+		if ((asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) == 0)
 			errorf(&argument->base.pos,
 			       "constraints '%s' for output operand do not indicate write",
 			       constraints);
-		}
 
 		/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do
 		 * not change size or type representation (e.g. int -> long is
@@ -8990,16 +8884,13 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 			}
 		}
 
-		if (!is_lvalue(expression)) {
+		if (!is_lvalue(expression))
 			errorf(&expression->base.pos,
 			       "asm output argument is not an lvalue");
-		}
-	} else {
-		if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
-			errorf(&argument->base.pos,
-				   "constraints '%s' for input operand indicate write",
-				   constraints);
-		}
+	} else if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
+		errorf(&argument->base.pos,
+			   "constraints '%s' for input operand indicate write",
+			   constraints);
 	}
 
 	if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
@@ -9009,9 +8900,8 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 		} else {
 			mark_vars_read(expression, NULL);
 		}
-		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
+		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP)
 			argument->indirect_write = true;
-		}
 	}
 	if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_READ) {
 		mark_vars_read(expression, NULL);
@@ -9021,16 +8911,14 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 		} else {
 			mark_vars_read(expression, NULL);
 		}
-		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
+		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP)
 			argument->indirect_read = true;
-		}
 	}
 	/* in case of only indirect accesses we are forced to use an address
 	 * as argument, and therefore must mark the value as address taken */
 	if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP
-	    && (argument->direct_write | argument->direct_read) == 0) {
+	    && (argument->direct_write | argument->direct_read) == 0)
 		set_address_taken(expression, true);
-	}
 }
 
 /**
@@ -9092,10 +8980,9 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 			clobber->clobber         = parse_string_literals(NULL);
 
 			const char *const clobber_string = clobber->clobber->begin;
-			if (!be_is_valid_clobber(clobber_string)) {
+			if (!be_is_valid_clobber(clobber_string))
 				errorf(&pos, "invalid register '%s' specified in clobbers",
 				       clobber_string);
-			}
 
 			*anchor = clobber;
 			anchor  = &clobber->next;
@@ -9217,16 +9104,14 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	for (entity_t *input = asm_statement->inputs; input != NULL;
 	     input = input->base.next) {
 		symbol_t *symbol = input->base.symbol;
-		if (symbol != NULL) {
+		if (symbol != NULL)
 			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
-		}
 	}
 	for (entity_t *output = asm_statement->outputs; output != NULL;
 	     output = output->base.next) {
 		symbol_t *symbol = output->base.symbol;
-		if (symbol != NULL) {
+		if (symbol != NULL)
 			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
-		}
 	}
 }
 
@@ -9282,11 +9167,10 @@ static statement_t *parse_asm_statement(void)
 	expect(')');
 	expect(';');
 
-	if (asm_statement->outputs == NULL) {
+	if (asm_statement->outputs == NULL)
 		/* GCC: An 'asm' instruction without any output operands will be treated
 		 * identically to a volatile 'asm' instruction. */
 		asm_statement->is_volatile = true;
-	}
 
 	normalize_asm_text(asm_statement);
 
@@ -9318,9 +9202,8 @@ static statement_t *parse_label_inner_statement(statement_t const *const label,
 		inner_stmt = parse_statement();
 		/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
 		/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
-		if (inner_stmt->kind == STATEMENT_DECLARATION && !dialect.cpp) {
+		if (inner_stmt->kind == STATEMENT_DECLARATION && !dialect.cpp)
 			errorf(&inner_stmt->base.pos, "declaration after %s", label_kind);
-		}
 		break;
 	}
 	return inner_stmt;
@@ -9484,9 +9367,8 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
-	if (token.kind == T___attribute__ && !dialect.cpp) {
+	if (token.kind == T___attribute__ && !dialect.cpp)
 		parse_attributes(NULL); // TODO process attributes
-	}
 
 	statement->label.statement = parse_label_inner_statement(statement, "label");
 
@@ -9525,9 +9407,9 @@ static expression_t *parse_condition(void)
 
 static void warn_empty_body(statement_t const *const stmt)
 {
-	if (stmt->kind == STATEMENT_EMPTY) {
-		warningf(WARN_EMPTY_BODY, &stmt->base.pos, "suggest braces around empty body in ‘if’ statement");
-	}
+	if (stmt->kind == STATEMENT_EMPTY)
+		warningf(WARN_EMPTY_BODY, &stmt->base.pos,
+		         "suggest braces around empty body in ‘if’ statement");
 }
 
 /**
@@ -9651,10 +9533,9 @@ static statement_t *parse_switch(void)
 	statement->switchs.body = parse_inner_statement();
 	current_switch          = rem;
 
-	if (statement->switchs.default_label == NULL) {
+	if (statement->switchs.default_label == NULL)
 		warningf(WARN_SWITCH_DEFAULT, &statement->base.pos,
 		         "switch has no default case");
-	}
 	check_enum_cases(&statement->switchs);
 
 	POP_SCOPE();
@@ -9849,9 +9730,8 @@ static statement_t *parse_goto(void)
  */
 static statement_t *parse_continue(void)
 {
-	if (current_loop == NULL) {
+	if (current_loop == NULL)
 		errorf(HERE, "continue statement not within loop");
-	}
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_CONTINUE);
 
@@ -9865,9 +9745,8 @@ static statement_t *parse_continue(void)
  */
 static statement_t *parse_break(void)
 {
-	if (current_switch == NULL && current_loop == NULL) {
+	if (current_switch == NULL && current_loop == NULL)
 		errorf(HERE, "break statement not within loop or switch");
-	}
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_BREAK);
 
@@ -9904,9 +9783,8 @@ static bool is_local_variable(const entity_t *entity)
  */
 static bool expression_is_local_variable(const expression_t *expression)
 {
-	if (expression->base.kind != EXPR_REFERENCE) {
+	if (expression->base.kind != EXPR_REFERENCE)
 		return false;
-	}
 	const entity_t *entity = expression->reference.entity;
 	return is_local_variable(entity);
 }
@@ -9962,10 +9840,9 @@ static statement_t *parse_return(void)
 		/* check for returning address of a local var */
 		if (return_value != NULL && return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
-			if (expression_is_local_variable(expression)) {
+			if (expression_is_local_variable(expression))
 				warningf(WARN_OTHER, pos,
 				         "function returns address of local variable");
-			}
 		}
 	} else if (!is_type_void(return_type)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
@@ -10089,10 +9966,9 @@ static void parse_namespace_definition(void)
 		entity->base.parent_scope = current_scope;
 	}
 
-	if (token.kind == '=') {
+	if (token.kind == '=')
 		/* TODO: parse namespace alias */
 		panic("namespace alias definition not supported yet");
-	}
 
 	environment_push(entity);
 	append_entity(current_scope, entity);
@@ -10203,10 +10079,9 @@ static statement_t *parse_statement(void)
 
 	if (statement->kind == STATEMENT_EXPRESSION) {
 		expression_t *expression = statement->expression.expression;
-		if (!expression_has_effect(expression)) {
+		if (!expression_has_effect(expression))
 			warningf(WARN_UNUSED_VALUE, &expression->base.pos,
 			         "statement has no effect");
-		}
 	}
 
 	return statement;
@@ -10314,9 +10189,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	bool          only_decls_so_far = true;
 	while (token.kind != '}' && token.kind != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
-		if (sub_statement->kind == STATEMENT_ERROR) {
+		if (sub_statement->kind == STATEMENT_ERROR)
 			break;
-		}
 
 		if (sub_statement->kind != STATEMENT_DECLARATION) {
 			only_decls_so_far = false;
@@ -10511,9 +10385,8 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 		if (entity->kind != ENTITY_VARIABLE && entity->kind != ENTITY_PARAMETER)
 			return;
 
-		if (lhs_ent != entity && lhs_ent != ENT_ANY) {
+		if (lhs_ent != entity && lhs_ent != ENT_ANY)
 			entity->variable.read = true;
-		}
 		return;
 	}
 
@@ -10656,9 +10529,8 @@ binary:
 
 	case EXPR_STATEMENT: {
 		expression_t *last = get_statement_expression_last(&expr->statement);
-		if (last != NULL) {
+		if (last != NULL)
 			mark_vars_read(last, lhs_ent);
-		}
 		return;
 	}
 
@@ -10838,10 +10710,9 @@ static void parse_externals(void)
 				panic("Leaked anchor token");
 			}
 		}
-		if (in_gcc_extension) {
+		if (in_gcc_extension)
 			/* an gcc extension scope was not closed */
 			panic("Leaked __extension__");
-		}
 #endif
 
 		parse_external();
