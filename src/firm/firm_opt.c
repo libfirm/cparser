@@ -28,7 +28,6 @@ struct a_firm_opt {
 	bool     muls;            /**< enable architecture dependent mul optimization */
 	bool     divs;            /**< enable architecture dependent div optimization */
 	bool     mods;            /**< enable architecture dependent mod optimization */
-	bool     alias_analysis;  /**< enable Alias Analysis */
 	bool     strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
 	bool     no_alias;        /**< no aliasing possible. */
 	bool     verify;          /**< Firm verifier setting */
@@ -70,7 +69,6 @@ static struct a_firm_opt firm_opt = {
 	.muls             =  true,
 	.divs             =  true,
 	.mods             =  true,
-	.alias_analysis   =  true,
 	.strict_alias     =  false,
 	.no_alias         =  false,
 #ifdef NO_DEFAULT_VERIFY
@@ -119,8 +117,6 @@ static const struct params {
   { X("no-opt-div"),             &firm_opt.divs,             0, "disable division optimization" },
   { X("opt-mod"),                &firm_opt.mods,             0, "enable remainder optimization" },
   { X("no-opt-mod"),             &firm_opt.mods,             0, "disable remainder optimization" },
-  { X("opt-alias"),              &firm_opt.alias_analysis,   1, "enable alias analysis" },
-  { X("no-opt-alias"),           &firm_opt.alias_analysis,   0, "disable alias analysis" },
   { X("alias"),                  &firm_opt.no_alias,         0, "aliasing occurs" },
   { X("no-alias"),               &firm_opt.no_alias,         1, "no aliasing occurs" },
   { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "strict alias rules" },
@@ -536,9 +532,8 @@ static void enable_safe_defaults(void)
 static void do_firm_optimizations(const char *input_filename)
 {
 	be_set_after_transform_func(after_transform);
-	set_opt_alias_analysis(firm_opt.alias_analysis);
 
-	unsigned aa_opt = aa_opt_no_opt;
+	unsigned aa_opt = aa_opt_none;
 	if (firm_opt.strict_alias)
 		aa_opt |= aa_opt_type_based | aa_opt_byte_type_may_alias;
 	if (firm_opt.no_alias)
@@ -818,7 +813,6 @@ static void disable_all_opts(void)
 	firm_opt.muls            = false;
 	firm_opt.divs            = false;
 	firm_opt.mods            = false;
-	firm_opt.alias_analysis  = false;
 	firm_opt.strict_alias    = false;
 	firm_opt.no_alias        = false;
 	firm_opt.const_folding   = false;
