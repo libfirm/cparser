@@ -5524,6 +5524,12 @@ static void parse_compound_type_entries(compound_t *compound)
 			parse_static_assert();
 			break;
 
+		case ';':
+			warningf(WARN_PEDANTIC, HERE, "extra ';' in %N",
+			         (entity_t*)compound);
+			eat(';');
+			break;
+
 		default:
 			rem_anchor_token('}');
 			expect('}');
