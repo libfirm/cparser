@@ -872,37 +872,42 @@ static bool is_null_pointer_constant(const expression_t *expression)
 }
 
 /**
- * Attempts to get a more exact type for an expression, for example
- * get the enum type instead of "int".
+ * Try to get an enum type for an expression (instead of "int" and similar).
  */
-static type_t *get_more_exact_type(expression_t *expression)
+static enum_t *determine_enum(expression_t *expression)
 {
 	if (expression->kind == EXPR_ENUM_CONSTANT) {
 		const entity_t *enume = expression->reference.entity;
-		type_t         *enumt = enume->enum_value.enum_type;
-		return enumt;
-	} else if (expression->kind == EXPR_SELECT) {
+		return enume->enum_value.enume;
+	}
+	type_t *type;
+	if (expression->kind == EXPR_SELECT) {
 		const entity_t *member = expression->select.compound_entry;
 		assert(member->kind == ENTITY_COMPOUND_MEMBER);
 		/* in case of bitfields, this will get us the base type */
-		return member->declaration.type;
+		type = member->declaration.type;
 	} else {
-		return expression->base.type;
+		type = expression->base.type;
 	}
+	type = skip_typeref(type);
+	if (is_type_enum(type))
+		return type->enumt.enume;
+	return NULL;
 }
 
 static void warn_enum_conversion(type_t *dest_type, expression_t *expression)
 {
+	const enum_t *const expression_enum = determine_enum(expression);
+	if (expression_enum == NULL)
+		return;
+
 	const type_t *skipped_dest = skip_typeref(dest_type);
 	assert(is_type_enum(skipped_dest));
-
-	type_t       *const exact         = get_more_exact_type(expression);
-	const type_t *const exact_skipped = skip_typeref(exact);
-	if (is_type_enum(exact_skipped)
-	    && exact_skipped->enumt.enume != skipped_dest->enumt.enume) {
+	const enum_t *const dest_enum = skipped_dest->enumt.enume;
+	if (expression_enum != dest_enum) {
 		warningf(WARN_ENUM_CONVERSION, &expression->base.pos,
-				 "implicit conversion from enumeration type '%T' to different enumeration type '%T'",
-				 exact, dest_type);
+				 "implicit conversion from '%N' to different enumeration type '%T'",
+				 expression_enum, dest_type);
 	}
 }
 
@@ -2191,7 +2196,7 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 	return type;
 }
 
-static void parse_enum_entries(type_t *const enum_type)
+static void parse_enum_entries(enum_t *const enume)
 {
 	eat('{');
 
@@ -2208,7 +2213,9 @@ static void parse_enum_entries(type_t *const enum_type)
 		position_t pos;
 		symbol_t *const symbol = expect_identifier("while parsing enum entry", &pos);
 		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol, &pos);
-		entity->enum_value.enum_type = enum_type;
+		entity->enum_value.enume = enume;
+		if (enume->first_value == NULL)
+			enume->first_value = entity;
 		rem_anchor_token('=');
 
 		if (accept('=')) {
@@ -2223,7 +2230,6 @@ static void parse_enum_entries(type_t *const enum_type)
 	} while (accept(',') && token.kind != '}');
 	rem_anchor_token(',');
 	rem_anchor_token('}');
-
 	expect('}');
 }
 
@@ -2267,19 +2273,16 @@ static type_t *parse_enum_specifier(void)
 	if (entity == NULL) {
 		entity = allocate_entity_zero(ENTITY_ENUM, NAMESPACE_TAG, symbol, &pos);
 		entity->base.parent_scope = current_scope;
-	}
-
-	type_t *const type     = allocate_type_zero(TYPE_ENUM);
-	type->enumt.enume      = &entity->enume;
-	type->enumt.base.akind = ATOMIC_TYPE_INT;
-
-	if (token.kind == '{') {
+		entity->enume.akind       = ATOMIC_TYPE_INT;
+		append_entity(current_scope, entity);
 		if (symbol != NULL)
 			environment_push(entity);
-		append_entity(current_scope, entity);
+	}
+
+	if (token.kind == '{') {
 		entity->enume.complete = true;
 
-		parse_enum_entries(type);
+		parse_enum_entries(&entity->enume);
 		parse_attributes(NULL);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
@@ -2287,29 +2290,33 @@ static type_t *parse_enum_specifier(void)
 			assert(anonymous_entity == NULL);
 			anonymous_entity = entity;
 		}
+
+		/* choose base kind */
+		bool has_negative_value = false;
+		for (const entity_t *entry = entity->enume.first_value;
+		     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+			 entry = entry->base.next) {
+			ir_tarval *val = get_enum_value(&entry->enum_value);
+			/* in error cases val may be NULL */
+			if (val == NULL)
+				continue;
+			if (tarval_is_negative(val)) {
+				has_negative_value = true;
+				break;
+			}
+		}
+		if (!has_negative_value) {
+			entity->enume.akind = ATOMIC_TYPE_UINT;
+		}
 	} else if (!entity->enume.complete && !dialect.gnu) {
 		errorf(&pos,
-		       "'%T' used before definition (incomplete enums are a GNU extension)",
-		       type);
+			   "'%N' used before definition (incomplete enums are a GNU extension)",
+			   entity);
 	}
 
-	/* choose base kind */
-	bool has_negative_value = false;
-	for (const entity_t *entry = entity->base.next;
-	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
-	     entry = entry->base.next) {
-		ir_tarval *val = get_enum_value(&entry->enum_value);
-		/* in error cases val may be NULL */
-		if (val == NULL)
-			continue;
-		if (tarval_is_negative(val)) {
-			has_negative_value = true;
-			break;
-		}
-	}
-	if (!has_negative_value)
-		type->enumt.base.akind = ATOMIC_TYPE_UINT;
-
+	type_t *type = allocate_type_zero(TYPE_ENUM);
+	type->enumt.enume      = &entity->enume;
+	type->enumt.base.akind = entity->enume.akind;
 	return type;
 }
 
@@ -9479,8 +9486,8 @@ static void check_enum_cases(const switch_statement_t *statement)
 
 	/* FIXME: calculation of value should be done while parsing */
 	/* TODO: quadratic algorithm here. Change to an n log n one */
-	const entity_t *entry = enumt->enume->base.next;
-	for (; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	for (const entity_t *entry = enumt->enume->first_value;
+		 entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
 		ir_mode   *mode  = get_ir_mode_arithmetic(type);
 		ir_tarval *value = get_enum_value(&entry->enum_value);

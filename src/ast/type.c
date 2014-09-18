@@ -468,9 +468,9 @@ void print_enum_definition(const enum_t *enume)
 	change_indent(1);
 
 	entity_t *entry = enume->base.next;
-	for ( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
-	       entry = entry->base.next) {
-
+	for (const entity_t *entry = enume->first_value;
+	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	     entry = entry->base.next) {
 		print_indent();
 		print_string(entry->base.symbol->string);
 		if (entry->enum_value.value != NULL) {

@@ -15,7 +15,7 @@ complex_constant fold_complex(const expression_t *expression);
 ir_tarval *fold_builtin_inf(call_expression_t const *call, type_t const *type);
 ir_tarval *fold_builtin_nan(call_expression_t const *call, type_t const *type);
 
-void determine_enum_values(enum_type_t *type);
+void determine_enum_values(enum_t *enume);
 
 ir_relation get_relation(expression_kind_t kind);
 

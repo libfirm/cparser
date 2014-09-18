@@ -116,15 +116,17 @@ struct compound_t {
 };
 
 struct enum_t {
-	entity_base_t  base;
-	entity_t      *alias; /* used for name mangling of anonymous types */
-	bool           complete : 1;
+	entity_base_t      base;
+	entity_t          *alias; /* used for name mangling of anonymous types */
+	atomic_type_kind_t akind;
+	entity_t          *first_value;
+	bool               complete : 1;
 };
 
 struct enum_value_t {
 	entity_base_t  base;
 	expression_t  *value;
-	type_t        *enum_type;
+	enum_t        *enume;
 
 	/* ast2firm info */
 	ir_tarval     *tv;

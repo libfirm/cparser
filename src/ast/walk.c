@@ -246,10 +246,10 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 		walk_scope(&entity->namespacee.members, env);
 		return;
 	case ENTITY_ENUM:
-		for (entity = entity->base.next;
-		     entity != NULL && entity->kind == ENTITY_ENUM_VALUE;
-			 entity = entity->base.next) {
-			walk_entity(entity, env);
+		for (entity_t *entry = entity->enume.first_value;
+		     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+		     entry = entry->base.next) {
+			walk_entity(entry, env);
 		}
 		return;
 	case ENTITY_LABEL:

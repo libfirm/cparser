@@ -319,18 +319,15 @@ static ir_tarval *char_literal_to_tarval(string_literal_expression_t const *lite
 	}
 }
 
-void determine_enum_values(enum_type_t *const type)
+void determine_enum_values(enum_t *const enume)
 {
-	ir_mode   *const mode    = atomic_modes[type->base.akind];
+	ir_mode   *const mode    = atomic_modes[enume->akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);
 
-	enum_t   *enume = type->enume;
-	entity_t *entry = enume->base.next;
-	for (; entry != NULL; entry = entry->base.next) {
-		if (entry->kind != ENTITY_ENUM_VALUE)
-			break;
-
+	for (entity_t *entry = enume->first_value;
+	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	     entry = entry->base.next) {
 		expression_t *const init = entry->enum_value.value;
 		if (init != NULL) {
 			type_t *const init_type = skip_typeref(init->base.type);
@@ -347,7 +344,7 @@ void determine_enum_values(enum_type_t *const type)
 ir_tarval *get_enum_value(const enum_value_t *enum_value)
 {
 	if (enum_value->tv == NULL)
-		determine_enum_values(&enum_value->enum_type->enumt);
+		determine_enum_values(enum_value->enume);
 	return enum_value->tv;
 }
 

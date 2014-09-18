@@ -138,16 +138,17 @@ static void write_compound_type(const compound_type_t *type)
 	fputs("/* TODO anonymous struct */byte", out);
 }
 
-static void write_enum_name(const enum_type_t *type)
+static void write_enum_name(const enum_t *enume)
 {
-	entity_t *entity = find_typedef((const type_t*) type);
+	/* Is there a typedef for this enum? */
+	entity_t *entity = find_enum_typedef(enume);
 	if (entity != NULL) {
 		fputs(entity->base.symbol->string, out);
 		return;
 	}
 
 	/* does the enum have a name? */
-	symbol_t *symbol = type->enume->base.symbol;
+	symbol_t *symbol = enume->base.symbol;
 	if (symbol != NULL) {
 		/* TODO: make sure we create an enum for it... */
 		fputs(symbol->string, out);
@@ -295,7 +296,7 @@ static void write_expression(const expression_t *expression)
 	case EXPR_ENUM_CONSTANT: {
 		/* UHOH... hacking */
 		entity_t *entity = expression->reference.entity;
-		write_enum_name(& entity->enum_value.enum_type->enumt);
+		write_enum_name(entity->enum_value.enume);
 		fprintf(out, ".%s.val", entity->base.symbol->string);
 		break;
 	}
@@ -325,9 +326,9 @@ static void write_enum(const symbol_t *symbol, const enum_t *entity)
 
 	fprintf(out, "\tpublic static enum %s {\n", name);
 
-	entity_t *entry = entity->base.next;
-	for ( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
-			entry = entry->base.next) {
+	for (const entity_t *entry = entity->first_value;
+	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	     entry = entry->base.next) {
 		fprintf(out, "\t\t%s", entry->base.symbol->string);
 		fprintf(out, "(");
 		if(entry->enum_value.value != NULL) {
