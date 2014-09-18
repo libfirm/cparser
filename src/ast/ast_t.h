@@ -550,7 +550,7 @@ struct case_label_statement_t {
 	statement_t            *statement;
 	ir_tarval              *first_case;
 	ir_tarval              *last_case;
-	long                   pn;
+	unsigned                pn;
 	/** If set marked as bad to suppress warnings. */
 	bool                   is_bad         : 1;
 	/** If set marked this as an empty range. */

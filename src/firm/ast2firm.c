@@ -4554,7 +4554,7 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 			continue;
 		ir_tarval *min = l->first_case;
 		ir_tarval *max = l->last_case;
-		long       pn  = (long) i+1;
+		unsigned   pn  = i+1;
 		ir_switch_table_set(res, i++, min, max, pn);
 		l->pn = pn;
 	}
@@ -4809,9 +4809,8 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	for (size_t i = 0; i < out_size; ++i) {
 		const expression_t *out_expr = out_exprs[i];
-		long                pn       = i;
 		ir_mode            *mode     = get_ir_mode_storage(out_expr->base.type);
-		ir_node            *proj     = new_Proj(node, mode, pn);
+		ir_node            *proj     = new_Proj(node, mode, i);
 		ir_node            *addr     = out_addrs[i];
 
 		set_value_for_expression_addr(out_expr, proj, addr);
@@ -4921,7 +4920,7 @@ static void initialize_function_parameters(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	ir_graph *irg             = current_ir_graph;
 	ir_node  *args            = get_irg_args(irg);
-	int       n               = 0;
+	unsigned  n               = 0;
 	ir_type  *function_irtype;
 
 	if (entity->function.need_closure) {
@@ -4973,8 +4972,7 @@ static void initialize_function_parameters(entity_t *entity)
 			next_value_number_function += 2;
 		} else {
 			ir_mode *param_mode = get_type_mode(param_irtype);
-			long     pn         = n;
-			ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
+			ir_node *value      = new_rd_Proj(dbgi, args, param_mode, n);
 			value = conv_to_storage_type(dbgi, value, type);
 
 			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
