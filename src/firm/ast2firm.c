@@ -1302,12 +1302,12 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_cons_flags flags = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 		? cons_volatile : cons_none;
 
+	ir_type *irtype = get_ir_type(type);
 	if (is_type_scalar(type) && !is_type_complex(type)) {
-		ir_node  *store     = new_d_Store(dbgi, memory, addr, value, flags);
-		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+		ir_node *store     = new_d_Store(dbgi, memory, addr, value, irtype, flags);
+		ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
 	} else {
-		ir_type *irtype = get_ir_type(type);
 		ir_node *copyb  = new_d_CopyB(dbgi, memory, addr, value, irtype, flags);
 		set_store(copyb);
 	}
@@ -1372,7 +1372,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 
 	/* construct new value and store */
 	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, shiftr, mode);
-	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val,
+	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val, base_type,
 	                                 set_volatile ? cons_volatile : cons_none);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
@@ -2584,12 +2584,12 @@ static void store_complex(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_mode   *const mode   = get_complex_mode_storage(type);
 	ir_node   *const real   = create_conv(dbgi, value.real, mode);
 	ir_node   *const imag   = create_conv(dbgi, value.imag, mode);
-	ir_node   *const storer = new_d_Store(dbgi, mem, addr, real, cons_floats);
+	ir_node   *const storer = new_d_Store(dbgi, mem, addr, real, irtype, cons_floats);
 	ir_node   *const memr   = new_Proj(storer, mode_M, pn_Store_M);
 	ir_mode   *const muint  = atomic_modes[ATOMIC_TYPE_UINT];
 	ir_node   *const one    = new_Const(get_mode_one(muint));
 	ir_node   *const addri  = new_d_Sel(dbgi, addr, one, irtype);
-	ir_node   *const storei = new_d_Store(dbgi, memr, addri, imag, cons_floats);
+	ir_node   *const storei = new_d_Store(dbgi, memr, addri, imag, irtype, cons_floats);
 	ir_node   *const memi   = new_Proj(storei, mode_M, pn_Store_M);
 	set_store(memi);
 }
@@ -3704,7 +3704,7 @@ static void create_dynamic_initializer_sub(dbg_info *dbgi,
 		node = new_d_Const(dbgi, tv);
 store:;
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, addr, node, cons_none);
+		ir_node *store  = new_d_Store(dbgi, mem, addr, node, type, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
