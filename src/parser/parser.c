@@ -5192,6 +5192,12 @@ static void parse_external_declaration(void)
 		       ndeclaration, alias);
 
 	position_t const *const pos = &ndeclaration->base.pos;
+	if (current_scope != file_scope) {
+		warningf(WARN_PEDANTIC, pos,
+		         "nested functions are a GNU extension (at '%N')",
+		         ndeclaration);
+	}
+
 	if (is_typeref(orig_type))
 		/* §6.9.1:2 */
 		errorf(pos, "type of function definition '%#N' is a typedef",

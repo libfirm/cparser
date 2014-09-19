@@ -233,9 +233,7 @@ struct function_t {
 		ir_builtin_kind firm_builtin_kind;
 		unsigned        chk_arg_pos;
 	} b;
-	ir_entity      *irentity;
-	ir_node        *static_link;        /**< if need_closure is set, the node
-	                                         representing the static link. */
+	ir_entity *irentity;
 };
 
 struct asm_argument_t {

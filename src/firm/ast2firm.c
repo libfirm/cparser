@@ -38,12 +38,6 @@
 #include "mangle.h"
 #include "parser/parser.h"
 
-typedef struct trampoline_region trampoline_region;
-struct trampoline_region {
-	ir_entity *function; /**< The function that is called by this trampoline */
-	ir_entity *region;   /**< created region for the trampoline */
-};
-
 typedef struct complex_value {
 	ir_node *real;
 	ir_node *imag;
@@ -54,7 +48,6 @@ static jump_target continue_target;
 static jump_target break_target;
 static ir_node    *current_switch;
 static bool        saw_default_label;
-static entity_t  **inner_functions;
 static jump_target ijmp_target;
 static ir_node   **ijmp_ops;
 static ir_node   **ijmp_blocks;
@@ -84,9 +77,6 @@ static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
 static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
-static trampoline_region  *current_trampolines;
-static ir_type            *current_outer_frame;
-static ir_node            *current_static_link;
 static ir_entity          *current_vararg_entity;
 static entitymap_t         entitymap;
 
@@ -104,13 +94,6 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_COMPOUND_MEMBER,
 	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
-
-static void enqueue_inner_function(entity_t *entity)
-{
-	if (inner_functions == NULL)
-		inner_functions = NEW_ARR_F(entity_t *, 0);
-	ARR_APP1(entity_t*, inner_functions, entity);
-}
 
 static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
@@ -691,10 +674,8 @@ static bool is_main(entity_t *entity)
  * Creates an entity representing a function.
  *
  * @param entity       the function declaration/definition
- * @param owner_type   the owner type of this function, NULL
- *                     for global functions
  */
-static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
+static ir_entity *get_function_entity(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
 	if (entity->function.irentity != NULL)
@@ -714,55 +695,38 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		goto entity_created;
 	}
 
-	ir_type *ir_type_method;
-	if (entity->function.need_closure)
-		ir_type_method = create_method_type(&entity->declaration.type->function, true);
-	else
-		ir_type_method = get_ir_type(entity->declaration.type);
+	assert(!entity->function.need_closure);
+	ir_type *ir_type_method = get_ir_type(entity->declaration.type);
 
-	bool nested_function = false;
-	if (owner_type == NULL)
-		owner_type = get_glob_type();
-	else
-		nested_function = true;
-
+	ir_type *owner = get_glob_type();
 	if (entity->function.alias.entity != NULL) {
 		/* create alias entity but do not resolve alias just yet, phase 2 of
 		 * the main loop will do so. */
-		irentity = new_alias_entity(owner_type, id, NULL, ir_type_method);
+		irentity = new_alias_entity(owner, id, NULL, ir_type_method);
 	} else {
-		irentity = new_entity(owner_type, id, ir_type_method);
+		irentity = new_entity(owner, id, ir_type_method);
 	}
 	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 	set_entity_dbg_info(irentity, dbgi);
 
-	ident *ld_id;
-	if (nested_function)
-		ld_id = id_unique("inner.%u");
-	else
-		ld_id = create_ld_ident(entity);
+	ident *ld_id = create_ld_ident(entity);
 	set_entity_ld_ident(irentity, ld_id);
 
 	handle_decl_modifiers(irentity, entity);
 
-	if (!nested_function) {
-		storage_class_t const storage_class = entity->declaration.storage_class;
-		if (storage_class == STORAGE_CLASS_STATIC) {
-		    set_entity_visibility(irentity, ir_visibility_local);
-		} else {
-		    set_entity_visibility(irentity, ir_visibility_external);
-		}
-
-		bool const is_inline = entity->function.is_inline;
-		if (is_inline && has_body) {
-			if ((dialect.c99 && storage_class == STORAGE_CLASS_NONE)
-			    || (!dialect.c99 && storage_class == STORAGE_CLASS_EXTERN)) {
-				add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
-			}
-		}
-	} else {
-		/* nested functions are always local */
+	storage_class_t const storage_class = entity->declaration.storage_class;
+	if (storage_class == STORAGE_CLASS_STATIC) {
 		set_entity_visibility(irentity, ir_visibility_local);
+	} else {
+		set_entity_visibility(irentity, ir_visibility_external);
+	}
+
+	bool const is_inline = entity->function.is_inline;
+	if (is_inline && has_body) {
+		if ((dialect.c99 && storage_class == STORAGE_CLASS_NONE)
+			|| (!dialect.c99 && storage_class == STORAGE_CLASS_EXTERN)) {
+			add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
+		}
 	}
 
 	/* We should check for file scope here, but as long as we compile C only
@@ -951,100 +915,6 @@ finished:
 	tarval_set_integer_overflow_mode(old_mode);
 }
 
-/*
- * Allocate an area of size bytes aligned at alignment
- * at a frame type.
- */
-static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned alignment)
-{
-	static unsigned area_cnt = 0;
-	char buf[32];
-
-	ir_type *ir_type_char = get_ir_type(type_char);
-	ir_type *tp           = new_type_array(ir_type_char);
-	set_array_size_int(tp, size);
-	set_type_alignment_bytes(tp, alignment);
-
-	snprintf(buf, sizeof(buf), "trampolin%u", area_cnt++);
-	ident *name = new_id_from_str(buf);
-	ir_entity *area = new_entity(frame_type, name, tp);
-
-	/* mark this entity as compiler generated */
-	set_entity_compiler_generated(area, 1);
-	return area;
-}
-
-/**
- * Return a node representing a trampoline region
- * for a given function entity.
- *
- * @param dbgi    debug info
- * @param entity  the function entity
- */
-static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
-{
-	ir_entity *region = NULL;
-	if (current_trampolines != NULL) {
-		for (int i = ARR_LEN(current_trampolines); i-- > 0; ) {
-			if (current_trampolines[i].function == entity) {
-				region = current_trampolines[i].region;
-				break;
-			}
-		}
-	} else {
-		current_trampolines = NEW_ARR_F(trampoline_region, 0);
-	}
-	ir_graph *irg = current_ir_graph;
-	if (region == NULL) {
-		/* create a new region */
-		const backend_params *be_params = be_get_backend_param();
-		ir_type              *frame_tp  = get_irg_frame_type(irg);
-
-		trampoline_region reg;
-		reg.function = entity;
-		reg.region   = alloc_trampoline(frame_tp,
-		                                be_params->trampoline_size,
-		                                be_params->trampoline_align);
-		ARR_APP1(trampoline_region, current_trampolines, reg);
-		region = reg.region;
-	}
-	return new_d_Member(dbgi, get_irg_frame(irg), region);
-}
-
-static bool backend_supports_trampolines(void)
-{
-	const backend_params *be_params = be_get_backend_param();
-	return be_params->trampoline_size > 0;
-}
-
-/**
- * Creates a trampoline for a function represented by an entity.
- *
- * @param dbgi    debug info
- * @param mode    the (reference) mode for the function address
- * @param entity  the function entity
- */
-static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
-                                  entity_t *entity)
-{
-	if (!backend_supports_trampolines()) {
-		errorf(&entity->base.pos,
-		       "code generator does not support trampolines/pointers to inner functions");
-		return new_Bad(mode);
-	}
-
-	ir_entity *irentity = entity->function.irentity;
-	assert(irentity != NULL);
-	ir_node *in[3];
-	in[0] = get_trampoline_region(dbgi, irentity);
-	in[1] = new_d_Address(dbgi, irentity);
-	in[2] = get_irg_frame(current_ir_graph);
-
-	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
-	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-	return new_Proj(irn, mode, pn_Builtin_max+1);
-}
-
 /**
  * Dereference an address.
  *
@@ -1079,22 +949,6 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 }
 
 /**
- * Returns the correct base address depending on whether it is a parameter or a
- * normal local variable.
- */
-static ir_node *get_local_frame(ir_entity *const ent)
-{
-	ir_graph      *const irg   = current_ir_graph;
-	const ir_type *const owner = get_entity_owner(ent);
-	if (owner == current_outer_frame) {
-		assert(current_static_link != NULL);
-		return current_static_link;
-	} else {
-		return get_irg_frame(irg);
-	}
-}
-
-/**
  * Keep the current block and memory.
  * This is necessary for all loops, because they could become infinite.
  */
@@ -1112,7 +966,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 
 	if (entity->kind == ENTITY_FUNCTION
 	    && entity->function.btk != BUILTIN_NONE) {
-		ir_entity *irentity = get_function_entity(entity, NULL);
+		ir_entity *irentity = get_function_entity(entity);
 		/* for gcc compatibility we have to produce (dummy) addresses for some
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
@@ -1141,7 +995,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_KIND_PARAMETER_ENTITY: {
 		ir_entity *irentity = entity->variable.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
+		ir_node   *frame    = get_irg_frame(current_ir_graph);
 		ir_node   *sel      = new_d_Member(dbgi, frame, irentity);
 		return sel;
 	}
@@ -1154,15 +1008,9 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 
 	case DECLARATION_KIND_INNER_FUNCTION: {
-		type_t  *const type = skip_typeref(entity->declaration.type);
-		ir_mode *const mode = get_ir_mode_storage(type);
-		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
-			/* inner function not using the closure */
-			return new_d_Address(dbgi, entity->function.irentity);
-		} else {
-			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity);
-		}
+		/* nested functions not supported (error is reported when
+		 * declaration is created */
+		return new_Bad(mode_P);
 	}
 
 	case DECLARATION_KIND_COMPOUND_MEMBER:
@@ -4303,7 +4151,7 @@ static void create_local_declaration(entity_t *entity)
 	switch (entity->declaration.storage_class) {
 	case STORAGE_CLASS_STATIC:
 		if (entity->kind == ENTITY_FUNCTION) {
-			(void)get_function_entity(entity, NULL);
+			(void)get_function_entity(entity);
 		} else {
 			create_local_static_variable(entity);
 		}
@@ -4311,7 +4159,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_EXTERN:
 		if (entity->kind == ENTITY_FUNCTION) {
 			assert(entity->function.body == NULL);
-			(void)get_function_entity(entity, NULL);
+			(void)get_function_entity(entity);
 		} else {
 			create_global_variable(entity);
 			create_variable_initializer(entity);
@@ -4322,13 +4170,12 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_REGISTER:
 		if (entity->kind == ENTITY_FUNCTION) {
 			if (entity->function.body != NULL) {
-				ir_type *owner = get_irg_frame_type(current_ir_graph);
-				(void)get_function_entity(entity, owner);
 				entity->declaration.kind = DECLARATION_KIND_INNER_FUNCTION;
-				enqueue_inner_function(entity);
-			} else {
-				(void)get_function_entity(entity, NULL);
+				errorf(&entity->base.pos,
+					   "code generation does not support nested functions (at '%N')", entity);
+				return;
 			}
+			(void)get_function_entity(entity);
 		} else {
 			create_local_variable(entity);
 		}
@@ -4339,9 +4186,9 @@ static void create_local_declaration(entity_t *entity)
 	panic("invalid storage class");
 }
 
-static void create_local_declarations(entity_t *e)
+static void create_local_declarations(entity_t *first)
 {
-	for (; e; e = e->base.next) {
+	for (entity_t *e = first; e != NULL; e = e->base.next) {
 		if (is_declaration(e))
 			create_local_declaration(e);
 	}
@@ -4918,22 +4765,11 @@ static int get_function_n_local_vars(entity_t *entity)
 static void initialize_function_parameters(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
+	assert(!entity->function.need_closure);
 	ir_graph *irg             = current_ir_graph;
 	ir_node  *args            = get_irg_args(irg);
 	unsigned  n               = 0;
-	ir_type  *function_irtype;
-
-	if (entity->function.need_closure) {
-		/* add an extra parameter for the static link */
-		entity->function.static_link = new_r_Proj(args, mode_P, 0);
-		++n;
-
-		/* Matze: IMO this is wrong, nested functions should have an own
-		 * type and not rely on strange parameters... */
-		function_irtype = create_method_type(&entity->declaration.type->function, true);
-	} else {
-		function_irtype = get_ir_type(entity->declaration.type);
-	}
+	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
 
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
@@ -5009,20 +4845,16 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 }
 
 /**
- * Create code for a function and all inner functions.
+ * Create code for a function
  *
  * @param entity  the function entity
  */
 static void create_function(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
-	ir_entity *function_entity = get_function_entity(entity, current_outer_frame);
-
+	ir_entity *function_entity = get_function_entity(entity);
 	if (entity->function.body == NULL)
 		return;
-
-	inner_functions     = NULL;
-	current_trampolines = NULL;
 
 	if (entity->declaration.modifiers & DM_CONSTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_CONSTRUCTORS);
@@ -5058,7 +4890,6 @@ static void create_function(entity_t *entity)
 
 	next_value_number_function = 0;
 	initialize_function_parameters(entity);
-	current_static_link = entity->function.static_link;
 
 	statement_to_firm(entity->function.body);
 
@@ -5109,24 +4940,6 @@ static void create_function(entity_t *entity)
 
 	current_vararg_entity = old_current_vararg_entity;
 	current_function      = old_current_function;
-
-	if (current_trampolines != NULL) {
-		DEL_ARR_F(current_trampolines);
-		current_trampolines = NULL;
-	}
-
-	/* create inner functions if any */
-	entity_t **inner = inner_functions;
-	if (inner != NULL) {
-		ir_type *rem_outer_frame      = current_outer_frame;
-		current_outer_frame           = get_irg_frame_type(current_ir_graph);
-		for (int i = ARR_LEN(inner) - 1; i >= 0; --i) {
-			create_function(inner[i]);
-		}
-		DEL_ARR_F(inner);
-
-		current_outer_frame      = rem_outer_frame;
-	}
 }
 
 static ir_entity *get_irentity(entity_t *entity)
@@ -5165,7 +4978,7 @@ static void scope_to_firm(scope_t *scope)
 				/* builtins have no representation */
 				continue;
 			}
-			(void)get_function_entity(entity, NULL);
+			(void)get_function_entity(entity);
 			break;
 		case ENTITY_VARIABLE:
 			create_global_variable(entity);
