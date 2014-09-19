@@ -464,10 +464,8 @@ static void print_array_type_post(const array_type_t *type)
 void print_enum_definition(const enum_t *enume)
 {
 	print_string("{\n");
-
 	change_indent(1);
 
-	entity_t *entry = enume->base.next;
 	for (const entity_t *entry = enume->first_value;
 	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {

@@ -216,7 +216,6 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	entity_t *entry = type->enume->base.next;
 	for (const entity_t *entry = type->enume->first_value;
 	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
