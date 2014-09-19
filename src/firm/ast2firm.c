@@ -940,7 +940,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	ir_type *const irtype   = get_ir_type(skipped);
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
-	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
+	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, irtype, flags);
 	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
 
@@ -1361,7 +1361,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 
 	/* load current value */
 	ir_node   *mem             = get_store();
-	ir_node   *load            = new_d_Load(dbgi, mem, addr, mode,
+	ir_node   *load            = new_d_Load(dbgi, mem, addr, mode, base_type,
 	                                  set_volatile ? cons_volatile : cons_none);
 	ir_node   *load_mem        = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node   *load_res        = new_d_Proj(dbgi, load, mode, pn_Load_res);
@@ -1396,9 +1396,10 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	dbg_info *dbgi      = get_dbg_info(&expression->base.pos);
 	entity_t *entity    = expression->compound_entry;
 	type_t   *base_type = entity->declaration.type;
+	ir_type  *irtype    = get_ir_type(base_type);
 	ir_mode  *mode      = get_ir_mode_storage(base_type);
 	ir_node  *mem       = get_store();
-	ir_node  *load      = new_d_Load(dbgi, mem, addr, mode, cons_none);
+	ir_node  *load      = new_d_Load(dbgi, mem, addr, mode, irtype, cons_none);
 	ir_node  *load_mem  = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res  = new_d_Proj(dbgi, load, mode, pn_Load_res);
 	ir_mode  *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
@@ -2632,17 +2633,17 @@ static complex_value complex_deref_address(dbg_info *const dbgi,
 
 	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
 		flags |= cons_volatile;
+	ir_type   *const irtype    = get_ir_type(type);
 	ir_mode   *const mode      = get_complex_mode_storage(type);
 	ir_node   *const memory    = get_store();
-	ir_node   *const load      = new_d_Load(dbgi, memory, addr, mode, flags);
+	ir_node   *const load      = new_d_Load(dbgi, memory, addr, mode, irtype, flags);
 	ir_node   *const load_mem  = new_Proj(load, mode_M, pn_Load_M);
 	ir_node   *const load_res  = new_Proj(load, mode,   pn_Load_res);
 
-	ir_type   *const irtype    = get_ir_type(type);
 	ir_mode   *const mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 	ir_node   *const one       = new_Const(get_mode_one(mode_uint));
 	ir_node   *const addr2     = new_Sel(addr, one, irtype);
-	ir_node   *const load2     = new_d_Load(dbgi, load_mem, addr2, mode, flags);
+	ir_node   *const load2     = new_d_Load(dbgi, load_mem, addr2, mode, irtype, flags);
 	ir_node   *const load_mem2 = new_Proj(load2, mode_M, pn_Load_M);
 	ir_node   *const load_res2 = new_Proj(load2, mode, pn_Load_res);
 	set_store(load_mem2);
