@@ -1,5 +1,10 @@
-#ifndef _LIMITS_H____
-#define _LIMITS_H____
+#ifndef _CPARSER_LIMITS_H____
+#define _CPARSER_LIMITS_H____
+
+/* for gcc compatibility */
+#define _GCC_LIMITS_H_
+
+#include_next <limits.h>
 
 /* note: we do not define MB_LEN_MAX */
 #define CHAR_BIT   __CHAR_BIT__
@@ -38,5 +43,9 @@
 #define LLONG_MIN  (-LLONG_MAX - 1LL)
 #define LLONG_MAX  __LONG_LONG_MAX__
 #define ULLONG_MAX (LLONG_MAX * 2ULL + 1ULL)
+
+#else
+
+#include_next <limits.h>
 
 #endif
