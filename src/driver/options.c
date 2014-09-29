@@ -401,8 +401,11 @@ bool options_parse_codegen(options_state_t *s)
 		if ((arg = equals_arg("bisa=", s)) != NULL) {
 			snprintf(firm_isa, sizeof(firm_isa), "%s", arg);
 		}
-		if (!be_parse_arg(&option[1]))
-			return false;
+		if (!be_parse_arg(&option[1])) {
+			errorf(NULL, "invalid backend option '%s' (unknown option or invalid argument)",
+			       full_option);
+			s->argument_errors = true;
+		}
 	} else if (streq(option, "-unroll-loops")) {
 		/* ignore (gcc compatibility) */
 	} else if (streq(option, "fexcess-precision=standard")) {
