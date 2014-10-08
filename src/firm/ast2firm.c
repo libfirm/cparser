@@ -145,6 +145,15 @@ static void set_unreachable_now(void)
 	set_cur_block(NULL);
 }
 
+/** A "softer" form of set_unreachable_now() where current_block is not NULL
+ * afterwards but still a valid block */
+static void set_soft_unreachable(void)
+{
+	ir_node *in[] = { new_Bad(mode_X) };
+	ir_node *block = new_Block(ARRAY_SIZE(in), in);
+	set_cur_block(block);
+}
+
 static ir_node *expression_to_control_flow(expression_t const *expr, jump_target *true_target, jump_target *false_target);
 static ir_node *expression_to_value(expression_t const *expr);
 static complex_value expression_to_complex(const expression_t *expression);
@@ -1282,8 +1291,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		 * nodes into a new and unreachable block. */
 		keep_alive(node);
 		keep_alive(get_cur_block());
-		ir_node *block = new_Block(0, NULL);
-		set_cur_block(block);
+		set_soft_unreachable();
 	}
 
 	return result;
@@ -1681,7 +1689,7 @@ static ir_node *control_flow_to_1_0(expression_t const *const expr,
 	}
 
 	if (!enter_jump_target(&exit_target)) {
-		set_cur_block(new_Block(0, NULL));
+		set_soft_unreachable();
 		val = new_d_Bad(dbgi, mode);
 	}
 	return val;
@@ -2148,7 +2156,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	}
 
 	if (!enter_jump_target(&exit_target)) {
-		set_cur_block(new_Block(0, NULL));
+		set_unreachable_now();
 		if (!is_type_void(type))
 			val = new_Bad(mode);
 	}
@@ -3050,7 +3058,7 @@ static complex_value complex_conditional_to_firm(
 	}
 
 	if (!enter_jump_target(&exit_target)) {
-		set_cur_block(new_Block(0, NULL));
+		set_soft_unreachable();
 		assert(!is_type_void(type));
 		val.real = val.imag = new_Bad(mode);
 	}
