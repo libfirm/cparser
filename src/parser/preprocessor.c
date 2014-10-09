@@ -156,7 +156,6 @@ static bool                  stop_at_newline;
 static FILE                 *out;
 static struct obstack        pp_obstack;
 static struct obstack        config_obstack;
-static const char           *printed_input_name;
 static position_t            expansion_pos;
 static pp_expansion_state_t *current_expansion;
 static macro_call_t          current_call;
@@ -2275,8 +2274,7 @@ static void print_line_directive(const position_t *pos, const char *add)
 		fputs(" 3", out);
 	}
 
-	printed_input_name = pos->input_name;
-	input.output_line  = pos->lineno-1;
+	input.output_line = pos->lineno - 1;
 }
 
 static bool emit_newlines(void)
