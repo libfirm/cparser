@@ -20,6 +20,7 @@ static warning_switch_t warning[] = {
 	[WARN_BUILTIN_MACRO_REDEFINED]       = { WARN_STATE_ON,   "builtin-macro-redefined"       },
 	[WARN_CAST_QUAL]                     = { WARN_STATE_NONE, "cast-qual"                     },
 	[WARN_CHAR_SUBSCRIPTS]               = { WARN_STATE_ON,   "char-subscripts"               },
+	[WARN_CHAR_CTYPE]                    = { WARN_STATE_NONE, "char-ctype"                    },
 	[WARN_COMMENT]                       = { WARN_STATE_NONE, "comment"                       },
 	[WARN_COMPAT_OPTION]                 = { WARN_STATE_ON,   "compat-option"                 },
 	[WARN_CONVERSION]                    = { WARN_STATE_NONE, "conversion"                    },
@@ -140,6 +141,7 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_ADDRESS);
 		SET(WARN_ATTRIBUTE);
 		SET(WARN_CHAR_SUBSCRIPTS);
+		SET(WARN_CHAR_CTYPE);
 		SET(WARN_COMMENT);
 		SET(WARN_EMPTY_STATEMENT);
 		SET(WARN_FORMAT);

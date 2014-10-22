@@ -7084,6 +7084,65 @@ static function_type_t *handle_builtin_overload(call_expression_t *const call,
 	return &identified->function;
 }
 
+static void check_library_call_ctype(const call_expression_t *call)
+{
+	if (dialect.freestanding || !is_warn_on(WARN_CHAR_CTYPE))
+		return;
+	expression_t *const function = call->function;
+	if (function->kind != EXPR_REFERENCE)
+		return;
+	const entity_t *entity = function->reference.entity;
+	if (entity->kind != ENTITY_FUNCTION)
+		return;
+	symbol_t *symbol = entity->base.symbol;
+	/* we need an isXXX or toXXX function */
+	const char *string = symbol->string;
+	if ((string[0] != 'i' || string[1] != 's')
+	 && (string[0] != 't' || string[1] != 'o'))
+		return;
+	const char *const ctype_funcs[] = { "isalnum", "isalpha", "isblank",
+	    "iscntrl", "isdigit", "isgraph", "islower", "isprint", "ispunct",
+	    "isspace", "isupper", "isxdigit", "tolower", "toupper" };
+	bool is_a_ctype_func = false;
+	for (size_t i = 0; i < ARRAY_SIZE(ctype_funcs); ++i) {
+		if (streq(string, ctype_funcs[i])) {
+			is_a_ctype_func = true;
+			break;
+		}
+	}
+	if (!is_a_ctype_func)
+		return;
+	/* we should have exactly 1 argument otherwise something else is broken */
+	call_argument_t *argument = call->arguments;
+	if (argument == NULL || argument->next != NULL)
+		return;
+	/* skip implicit casts */
+	expression_t *expression = argument->expression;
+	if (expression->kind == EXPR_UNARY_CAST && expression->base.implicit)
+		expression = expression->unary.value;
+	/* Note that casting a char to an int does not solve anything here
+	 * (casting to unsigned char would be the proper solution), so still
+	 * warn people that try to silence the warning by casting to int. */
+	if (expression->kind == EXPR_UNARY_CAST) {
+		type_t *dest = skip_typeref(expression->base.type);
+		if (is_type_atomic(dest, ATOMIC_TYPE_INT))
+			expression = expression->unary.value;
+	}
+
+	type_t *orig_type = expression->base.type;
+	type_t *type      = skip_typeref(orig_type);
+	/* In case of char or signed char, chances are pretty good that something
+	 * is wrong: EOF can't be encoded in char and all other negative values
+	 * will result in undefined behaviour as they are not "representable
+	 * as a unsigned char" as required by the C standard. */
+	if (is_type_atomic(type, ATOMIC_TYPE_CHAR)
+	    || is_type_atomic(type, ATOMIC_TYPE_SCHAR)) {
+		warningf(WARN_CHAR_CTYPE, &expression->base.pos,
+		         "Argument of type %T to %Y gives undefined behaviour on negative values != EOF",
+		         orig_type, symbol);
+	}
+}
+
 static void semantic_call(call_expression_t *call)
 {
 	expression_t *const function  = call->function;
@@ -7150,6 +7209,7 @@ static void semantic_call(call_expression_t *call)
 	}
 
 	check_format(call);
+	check_library_call_ctype(call);
 
 	if (is_type_compound(skip_typeref(function_type->return_type)))
 		warningf(WARN_AGGREGATE_RETURN, &call->base.pos,

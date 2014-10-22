@@ -20,6 +20,7 @@ typedef enum warning_t {
 	WARN_BUILTIN_MACRO_REDEFINED,       /**< warn when undefining/redefining builtin macros */
 	WARN_CAST_QUAL,                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
 	WARN_CHAR_SUBSCRIPTS,               /**< Warn if an array subscript has the type 'char' */
+	WARN_CHAR_CTYPE,                    /**< Warn if arguments to functions from the ctype.h header have type 'char' */
 	WARN_COMMENT,                       /**< Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment. */
 	WARN_COMPAT_OPTION,                 /**< Warn when gcc switches are specified which cparser ignores. */
 	WARN_CONVERSION,                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
