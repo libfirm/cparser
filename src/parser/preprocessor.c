@@ -2248,7 +2248,7 @@ static void print_quoted_string(const char *const string)
 		case '\v': fputs("\\v", out);  break;
 		case '\?': fputs("\\?", out);  break;
 		default:
-			if (!isprint(*c)) {
+			if (!isprint((unsigned char)*c)) {
 				fprintf(out, "\\%03o", (unsigned)*c);
 				break;
 			}

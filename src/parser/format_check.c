@@ -140,10 +140,10 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 		}
 
 		/* argument selector or minimum field width */
-		if (isdigit(fmt)) {
+		if (isdigit((unsigned char)fmt)) {
 			do {
 				fmt = *(++c);
-			} while (isdigit(fmt));
+			} while (isdigit((unsigned char)fmt));
 
 			/* digit string was ... */
 			if (fmt == '$') {
@@ -201,7 +201,7 @@ break_fmt_flags:
 				}
 				arg = arg->next;
 			} else {
-				while (isdigit(fmt)) {
+				while (isdigit((unsigned char)fmt)) {
 					fmt = *(++c);
 				}
 			}
@@ -228,7 +228,7 @@ break_fmt_flags:
 				arg = arg->next;
 			} else {
 				/* digit string may be omitted */
-				while (isdigit(fmt)) {
+				while (isdigit((unsigned char)fmt)) {
 					fmt = *(++c);
 				}
 			}

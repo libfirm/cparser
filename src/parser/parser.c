@@ -5766,10 +5766,10 @@ parse_exponent:
 			if (*i == '-' || *i == '+')
 				++i;
 
-			if (isdigit(*i)) {
+			if (isdigit((unsigned char)*i)) {
 				do {
 					++i;
-				} while (isdigit(*i));
+				} while (isdigit((unsigned char)*i));
 			} else {
 				errorf(HERE, "exponent of %K has no digits", &token);
 			}
