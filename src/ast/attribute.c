@@ -86,8 +86,9 @@ static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_VISIBILITY]             = "visibility",
 	[ATTRIBUTE_GNU_VOLATILE]               = "volatile",
 	[ATTRIBUTE_GNU_WARN_UNUSED_RESULT]     = "warn_unused_result",
-	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
 	[ATTRIBUTE_GNU_WEAK]                   = "weak",
+	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
+	[ATTRIBUTE_GNU_WEAK_IMPORT]            = "weak_import",
 	[ATTRIBUTE_MS_ALIGN]                   = "align",
 	[ATTRIBUTE_MS_ALLOCATE]                = "allocate",
 	[ATTRIBUTE_MS_DEPRECATED]              = "deprecated",
@@ -346,6 +347,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_GNU_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
+		case ATTRIBUTE_GNU_WEAK_IMPORT:   modifiers |= DM_WEAK; break;
 		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
