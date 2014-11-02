@@ -27,4 +27,9 @@ static inline char const* strstart(char const* str, char const* start)
  */
 bool streq_underscore(const char *s1, const char *s2);
 
+/**
+ * Search for start of extension and optionally start of filename.
+ */
+char const *find_extension(char const *path, char const **name_out);
+
 #endif

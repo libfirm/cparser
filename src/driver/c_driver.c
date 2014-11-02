@@ -306,19 +306,9 @@ static const char *get_dependency_filename(compilation_env_t *env,
 
 	dont_escape_target = false;
 	const char *outname = env->outname;
-	if (outname != 0) {
+	if (outname) {
+		char const *const ext_begin = find_extension(outname, NULL);
 		assert(obstack_object_size(&file_obst) == 0);
-		size_t len = strlen(outname);
-		/* search for extension dot */
-		const char *ext_begin = outname + len;
-		for (size_t i = len; i-- > 0; ) {
-			if (outname[i] == '.') {
-				ext_begin = &outname[i];
-				break;
-			}
-			if (outname[i] == '/')
-				break;
-		}
 		obstack_grow(&file_obst, outname, ext_begin - outname);
 		obstack_grow0(&file_obst, ".d", 2);
 		return obstack_finish(&file_obst);

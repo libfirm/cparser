@@ -84,12 +84,8 @@ const char *get_output_name(const char *inputname, const char *newext)
 	if (inputname == NULL)
 		inputname = "a";
 
-	char const *const last_slash = strrchr(inputname, '/');
-	char const *const filename   =
-		last_slash != NULL ? last_slash + 1 : inputname;
-	char const *const last_dot   = strrchr(filename, '.');
-	char const *const name_end   =
-		last_dot != NULL ? last_dot : strchr(filename, '\0');
+	char const       *filename;
+	char const *const name_end = find_extension(inputname, &filename);
 
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_grow(&file_obst, filename, name_end-filename);
