@@ -3146,6 +3146,9 @@ finish_headername:
 static bool do_include(bool const bracket_include, bool const include_next,
                        char const *const headername)
 {
+	/* A file included from a system header is a system header, too. */
+	bool const is_system_header = input.pos.is_system_header;
+
 	size_t const headername_len = strlen(headername);
 	/* is it an absolute path? */
 	if (headername[0] == '/') {
@@ -3156,7 +3159,6 @@ static bool do_include(bool const bracket_include, bool const include_next,
 		FILE *file = fopen(full_name, "r");
 		if (file == NULL)
 			return false;
-		bool is_system_header = false;
 		switch_input_file(file, full_name, NULL, is_system_header);
 		return true;
 	}
@@ -3187,7 +3189,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 
 		FILE *file = fopen(full_name, "r");
 		if (file != NULL) {
-			switch_input_file(file, full_name, NULL, false);
+			switch_input_file(file, full_name, NULL, is_system_header);
 			return true;
 		}
 		entry = quote_searchpath.first;
