@@ -542,7 +542,6 @@ static bool start_preprocessing(compilation_env_t *env,
 	add_predefined_macros();
 	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
-	unit->input_decoder = decoder;
 
 	switch (unit->type) {
 	case COMPILATION_UNIT_C:
@@ -596,7 +595,6 @@ static bool finish_preprocessing(compilation_env_t *env,
                                  compilation_unit_t *unit)
 {
 	close_pp_input();
-	input_free(unit->input_decoder);
 	set_preprocessor_output(NULL);
 	bool res = close_input(unit);
 	if (!res || error_count > 0)

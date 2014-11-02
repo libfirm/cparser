@@ -14,7 +14,6 @@
 struct compilation_unit_t {
 	const char             *name;  /**< filename or "-" for stdin */
 	FILE                   *input; /**< input (NULL if not opened yet) */
-	input_t                *input_decoder;
 	bool                    input_is_pipe;
 	const char             *original_name;
 	compilation_unit_type_t type;

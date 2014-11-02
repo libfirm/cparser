@@ -292,13 +292,13 @@ static void switch_input_file(FILE *file, char const *const filename,
 void close_pp_input(void)
 {
 	free(input.buf);
+	input_free(input.input);
 }
 
 static void close_pp_input_file(void)
 {
 	close_pp_input();
 	fclose(input.file);
-	input_free(input.input);
 }
 
 void print_pp_header(void)
@@ -2514,7 +2514,6 @@ void add_define(char const *const name, char const *const val,
 	}
 
 	close_pp_input();
-	input_free(decoder);
 
 	def->list_len   = obstack_object_size(&pp_obstack) / sizeof(def->token_list[0]);
 	def->token_list = obstack_finish(&pp_obstack);
@@ -2594,7 +2593,6 @@ void add_define_macro(char const *const name, char const *const macro_arg,
 	}
 
 	close_pp_input();
-	input_free(decoder);
 
 	def->has_parameters = true;
 	def->n_parameters   = 1;
