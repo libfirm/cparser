@@ -276,16 +276,14 @@ void switch_pp_input(FILE *const stream, char const *const input_name, searchpat
 	switch_input(input, string->begin, path, is_system_header);
 }
 
-/**
- * Switch pp input file to a new file. Assume filename is already identified.
- */
-static void switch_input_file(FILE *file, char const *const filename,
-                              searchpath_entry_t *const path,
-                              bool const is_system_header)
+static bool try_switch_input(char const* const name, searchpath_entry_t *const path, bool const is_system_header)
 {
-	input_t *decoder = input_from_stream(file, input_decoder);
-	switch_input(decoder, filename, path, is_system_header);
+	FILE *const file = fopen(name, "r");
+	if (!file)
+		return false;
+	switch_pp_input(file, name, path, is_system_header);
 	input.file = file;
+	return true;
 }
 
 void close_pp_input(void)
@@ -3146,19 +3144,11 @@ static bool do_include(bool const bracket_include, bool const include_next,
 	/* A file included from a system header is a system header, too. */
 	bool const is_system_header = input.pos.is_system_header;
 
-	size_t const headername_len = strlen(headername);
 	/* is it an absolute path? */
-	if (headername[0] == '/') {
-		begin_string_construction();
-		obstack_grow(&string_obst, headername, headername_len+1);
-		const string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
-		const char *full_name = string->begin;
-		FILE *file = fopen(full_name, "r");
-		if (file == NULL)
-			return false;
-		switch_input_file(file, full_name, NULL, is_system_header);
-		return true;
-	}
+	if (headername[0] == '/')
+		return try_switch_input(headername, NULL, is_system_header);
+
+	size_t const headername_size = strlen(headername) + 1;
 
 	searchpath_entry_t *entry;
 	if (include_next) {
@@ -3169,53 +3159,35 @@ static bool do_include(bool const bracket_include, bool const include_next,
 		entry = bracket_searchpath.first;
 	} else {
 		/* put dirname of current input on obstack */
-		const char *filename   = input.pos.input_name;
-		const char *last_slash = strrchr(filename, '/');
-		const char *full_name;
-		begin_string_construction();
-		if (last_slash != NULL) {
-			size_t len = last_slash - filename;
-			obstack_grow(&string_obst, filename, len + 1);
-			obstack_grow(&string_obst, headername, headername_len);
-		} else {
-			obstack_grow(&string_obst, headername, headername_len);
-		}
-		const string_t *string
-			= finish_string_construction(STRING_ENCODING_CHAR);
-		full_name = string->begin;
+		char const *const filename   = input.pos.input_name;
+		char const *const last_slash = strrchr(filename, '/');
+		if (last_slash)
+			obstack_grow(&symbol_obstack, filename, last_slash - filename + 1);
+		obstack_grow(&symbol_obstack, headername, headername_size);
 
-		FILE *file = fopen(full_name, "r");
-		if (file != NULL) {
-			switch_input_file(file, full_name, NULL, is_system_header);
+		char *const name    = obstack_finish(&symbol_obstack);
+		bool  const success = try_switch_input(name, NULL, is_system_header);
+		obstack_free(&symbol_obstack, name);
+		if (success)
 			return true;
-		}
 		entry = quote_searchpath.first;
 	}
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
 	for (; entry != NULL; entry = entry->next) {
-		const char *path = entry->path;
-		size_t      len  = strlen(path);
+		char const *const path = entry->path;
+		size_t      const len  = strlen(path);
 		obstack_grow(&symbol_obstack, path, len);
-		if (path[len-1] != '/')
+		if (path[len - 1] != '/')
 			obstack_1grow(&symbol_obstack, '/');
-		obstack_grow(&symbol_obstack, headername, headername_len+1);
+		obstack_grow(&symbol_obstack, headername, headername_size);
 
-		size_t complete_len  = obstack_object_size(&symbol_obstack);
-		char  *complete_path = obstack_finish(&symbol_obstack);
-		FILE  *file          = fopen(complete_path, "r");
-		if (file != NULL) {
-			begin_string_construction();
-			obstack_grow(&string_obst, complete_path, complete_len-1);
-			obstack_free(&symbol_obstack, complete_path);
-			const string_t *string
-				= finish_string_construction(STRING_ENCODING_CHAR);
-			const char *filename = string->begin;
-			switch_input_file(file, filename, entry, entry->is_system_path);
+		char *const name    = obstack_finish(&symbol_obstack);
+		bool  const success = try_switch_input(name, entry, entry->is_system_path);
+		obstack_free(&symbol_obstack, name);
+		if (success)
 			return true;
-		}
-		obstack_free(&symbol_obstack, complete_path);
 	}
 
 	return false;
