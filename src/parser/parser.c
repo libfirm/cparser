@@ -5965,31 +5965,25 @@ static expression_t *parse_reference(void)
 	position_t const pos    = *HERE;
 	entity_t  *const entity = parse_qualified_identifier();
 
-	type_t *orig_type;
+	expression_kind_t kind;
+	type_t           *orig_type;
 	if (is_declaration(entity)) {
+		entity->declaration.used = true;
+		kind      = EXPR_REFERENCE;
 		orig_type = entity->declaration.type;
 	} else if (entity->kind == ENTITY_ENUM_VALUE) {
+		kind      = EXPR_ENUM_CONSTANT;
 		orig_type = type_int;
 	} else {
 		panic("expected declaration or enum value in reference");
 	}
 
-	/* we always do the auto-type conversions; the & and sizeof parser contains
-	 * code to revert this! */
-	type_t *type = automatic_type_conversion(orig_type);
-
-	expression_kind_t kind = EXPR_REFERENCE;
-	if (entity->kind == ENTITY_ENUM_VALUE)
-		kind = EXPR_ENUM_CONSTANT;
-
 	expression_t *expression     = allocate_expression_zero(kind);
 	expression->base.pos         = pos;
-	expression->base.type        = type;
+	/* We always do the auto-type conversions; the & and sizeof parser contains
+	 * code to revert this! */
+	expression->base.type        = automatic_type_conversion(orig_type);
 	expression->reference.entity = entity;
-
-	/* this declaration is used */
-	if (is_declaration(entity))
-		entity->declaration.used = true;
 
 	if (entity->base.parent_scope != file_scope
 	 && (current_function != NULL
