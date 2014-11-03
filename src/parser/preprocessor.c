@@ -108,7 +108,6 @@ struct pp_input_t {
 	input_t            *input;
 	pp_input_t         *parent;
 	searchpath_entry_t *path;
-	FILE               *file;
 	position_t          pos;
 	unsigned            output_line;
 };
@@ -282,7 +281,6 @@ static bool try_switch_input(char const* const name, searchpath_entry_t *const p
 	if (!file)
 		return false;
 	switch_pp_input(file, name, path, is_system_header);
-	input.file = file;
 	return true;
 }
 
@@ -294,8 +292,10 @@ void close_pp_input(void)
 
 static void close_pp_input_file(void)
 {
+	FILE* const file = input_get_file(input.input);
+	assert(file);
 	close_pp_input();
-	fclose(input.file);
+	fclose(file);
 }
 
 void print_pp_header(void)
