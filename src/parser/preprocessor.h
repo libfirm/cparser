@@ -19,9 +19,8 @@ void exit_preprocessor(void);
 
 typedef struct searchpath_entry_t searchpath_entry_t;
 
-/** Switch input to another file. The current token is not changed. */
-void switch_pp_input(input_t *decoder, char const *input_name,
-                     searchpath_entry_t *entry, bool is_system_header);
+/** Switch input to another stream. The current token is not changed. */
+void switch_pp_input(FILE *stream, char const *input_name, searchpath_entry_t *entry, bool is_system_header);
 void close_pp_input(void);
 
 /** print the header displayed by gcc when writing preprocessing tokens */

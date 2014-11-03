@@ -7,7 +7,6 @@
 
 #include "adt/obst.h"
 #include "ast/ast.h"
-#include "parser/input.h"
 #include "tempfile.h"
 
 typedef enum compilation_unit_type_t {

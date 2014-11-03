@@ -540,8 +540,7 @@ static bool start_preprocessing(compilation_env_t *env,
 		print_include_paths();
 
 	add_predefined_macros();
-	input_t *decoder = input_from_stream(unit->input, input_decoder);
-	switch_pp_input(decoder, unit->name, NULL, false);
+	switch_pp_input(unit->input, unit->name, NULL, false);
 
 	switch (unit->type) {
 	case COMPILATION_UNIT_C:
