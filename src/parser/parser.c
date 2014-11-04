@@ -606,11 +606,13 @@ __attribute__((sentinel))
 #endif
 void parse_error_expected(const char *message, ...)
 {
-	if (message != NULL)
-		errorf(HERE, "while parsing %s", message);
 	va_list ap;
 	va_start(ap, message);
-	errorf(HERE, "expected %#k, got %K", &ap, ", ", &token);
+	if (message) {
+		errorf(HERE, "expected %#k while parsing %s, got %K", &ap, ", ", message, &token);
+	} else {
+		errorf(HERE, "expected %#k, got %K", &ap, ", ", &token);
+	}
 	va_end(ap);
 }
 
