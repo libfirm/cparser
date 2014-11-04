@@ -227,7 +227,7 @@ static void setup_arm(void)
 void warn_experimental_target(void)
 {
 	if (experimental_backend != NULL)
-		warningf(WARN_EXPERIMENTAL, NULL, experimental_backend);
+		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental_backend);
 }
 
 static void setup_ia32(const char *firm_arch)
