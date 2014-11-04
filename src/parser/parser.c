@@ -607,7 +607,7 @@ __attribute__((sentinel))
 void parse_error_expected(const char *message, ...)
 {
 	if (message != NULL)
-		errorf(HERE, "%s", message);
+		errorf(HERE, "while parsing %s", message);
 	va_list ap;
 	va_start(ap, message);
 	errorf(HERE, "expected %#k, got %K", &ap, ", ", &token);
@@ -1238,7 +1238,7 @@ static attribute_t *parse_attribute_gnu_single(void)
 	/* parse "any-word" */
 	symbol_t *const symbol = token.base.symbol;
 	if (symbol == NULL) {
-		parse_error_expected("while parsing attribute((", T_IDENTIFIER, NULL);
+		parse_error_expected("attribute((", T_IDENTIFIER, NULL);
 		return NULL;
 	}
 
@@ -1391,8 +1391,7 @@ static designator_t *parse_designation(void)
 			designator      = allocate_ast_zero(sizeof(designator[0]));
 			designator->pos = *HERE;
 			eat('.');
-			designator->symbol
-				= expect_identifier("while parsing designator", NULL);
+			designator->symbol = expect_identifier("designator", NULL);
 			if (designator->symbol == sym_anonymous)
 				return NULL;
 			break;
@@ -2157,8 +2156,8 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 		}
 	} else if (token.kind != '{') {
 		char const *const msg =
-			is_struct ? "while parsing struct type specifier" :
-			            "while parsing union type specifier";
+			is_struct ? "struct type specifier" :
+			            "union type specifier";
 		parse_error_expected(msg, T_IDENTIFIER, '{', NULL);
 
 		return NULL;
@@ -2211,7 +2210,7 @@ static void parse_enum_entries(enum_t *const enume)
 	do {
 		add_anchor_token('=');
 		position_t pos;
-		symbol_t *const symbol = expect_identifier("while parsing enum entry", &pos);
+		symbol_t *const symbol = expect_identifier("enum entry", &pos);
 		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol, &pos);
 		entity->enum_value.enume = enume;
 		if (enume->first_value == NULL)
@@ -2265,8 +2264,7 @@ static type_t *parse_enum_specifier(void)
 		break;
 
 	default:
-		parse_error_expected("while parsing enum type specifier",
-				T_IDENTIFIER, '{', NULL);
+		parse_error_expected("enum type specifier", T_IDENTIFIER, '{', NULL);
 		return NULL;
 	}
 
@@ -2482,11 +2480,11 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 	add_anchor_token(',');
 	expect('(');
 
+	char const *const context = "property declspec";
 	do {
 		add_anchor_token('=');
 		position_t pos;
-		symbol_t *const prop_sym
-			= expect_identifier("while parsing property declspec", &pos);
+		symbol_t *const prop_sym = expect_identifier(context, &pos);
 		rem_anchor_token('=');
 
 		symbol_t **prop = NULL;
@@ -2504,7 +2502,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		expect('=');
 		rem_anchor_token(T_IDENTIFIER);
 
-		*prop = expect_identifier("while parsing property declspec", NULL);
+		*prop = expect_identifier(context, NULL);
 	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(')');
@@ -2520,7 +2518,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	/* parse "any-word" */
 	symbol_t const *const symbol = token.base.symbol;
 	if (!symbol) {
-		parse_error_expected("while parsing __declspec", T_IDENTIFIER, NULL);
+		parse_error_expected("__declspec", T_IDENTIFIER, NULL);
 		return NULL;
 	}
 
@@ -3364,7 +3362,7 @@ ptr_operator_end: ;
 	default:
 		if (env->may_be_abstract)
 			break;
-		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
+		parse_error_expected("declarator", T_IDENTIFIER, '(', NULL);
 		env->symbol = sym_anonymous;
 		env->pos    = *HERE;
 		eat_until_anchor();
@@ -5168,7 +5166,7 @@ static void parse_external_declaration(void)
 	parse_kr_declaration_list(ndeclaration);
 
 	if (token.kind != '{') {
-		parse_error_expected("while parsing function definition", '{', NULL);
+		parse_error_expected("function definition", '{', NULL);
 		eat_until_matching_token(';');
 		return;
 	}
@@ -5915,7 +5913,7 @@ static entity_t *parse_qualified_identifier(void)
 
 	entity_t *entity;
 	while (true) {
-		symbol = expect_identifier("while parsing identifier", &pos);
+		symbol = expect_identifier("identifier", &pos);
 		if (symbol == sym_anonymous)
 			return create_error_entity(symbol, ENTITY_VARIABLE);
 
@@ -6231,9 +6229,9 @@ static expression_t *parse_function_keyword(funcname_kind_t const kind)
 
 static designator_t *parse_designator(void)
 {
-	designator_t *const result = allocate_ast_zero(sizeof(result[0]));
-	result->symbol = expect_identifier("while parsing member designator",
-	                                   &result->pos);
+	char   const *const context = "member designator";
+	designator_t *const result  = allocate_ast_zero(sizeof(result[0]));
+	result->symbol = expect_identifier(context, &result->pos);
 	if (result->symbol == sym_anonymous)
 		return NULL;
 
@@ -6241,9 +6239,7 @@ static designator_t *parse_designator(void)
 	while (true) {
 		if (accept('.')) {
 			designator_t *const designator = allocate_ast_zero(sizeof(result[0]));
-			designator->symbol
-				= expect_identifier("while parsing member designator",
-				                    &designator->pos);
+			designator->symbol = expect_identifier(context, &designator->pos);
 			if (designator->symbol == sym_anonymous)
 				return NULL;
 
@@ -6566,7 +6562,7 @@ static expression_t *parse_label_address(void)
 	position_t const pos = *HERE;
 	eat(T_ANDAND);
 
-	label_t *const label = get_label("while parsing label address");
+	label_t *const label = get_label("label address");
 	if (!label)
 		return create_error_expression();
 
@@ -6827,7 +6823,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 	position_t const pos = *HERE;
 	next_token();
 
-	symbol_t *const symbol = expect_identifier("while parsing select", NULL);
+	symbol_t *const symbol = expect_identifier("select", NULL);
 	if (symbol == sym_anonymous)
 		return create_error_expression();
 
@@ -8999,6 +8995,8 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
  */
 static entity_t *parse_asm_arguments(bool const is_out)
 {
+	char const *const context = "asm argument";
+
 	entity_t  *result = NULL;
 	entity_t **anchor = &result;
 	if (token.kind == T_STRING_LITERAL || token.kind == '[') {
@@ -9013,7 +9011,7 @@ static entity_t *parse_asm_arguments(bool const is_out)
 			symbol_t *symbol = NULL;
 			if (accept('[')) {
 				add_anchor_token(']');
-				symbol = expect_identifier("while parsing asm argument", NULL);
+				symbol = expect_identifier(context, NULL);
 				rem_anchor_token(']');
 				expect(']');
 			}
@@ -9023,7 +9021,7 @@ static entity_t *parse_asm_arguments(bool const is_out)
 				                       NAMESPACE_ASM_ARGUMENT, symbol, &pos);
 
 			rem_anchor_token(T_STRING_LITERAL);
-			argument->asm_argument.constraints = parse_string_literals("asm argument");
+			argument->asm_argument.constraints = parse_string_literals(context);
 			rem_anchor_token('(');
 			expect('(');
 			argument->asm_argument.expression = parse_expression();
@@ -9069,7 +9067,7 @@ static void parse_asm_labels(asm_label_t **anchor)
 	if (token.kind == T_IDENTIFIER) {
 		add_anchor_token(',');
 		do {
-			label_t *const label = get_label("while parsing 'asm goto' labels");
+			label_t *const label = get_label("'asm goto' labels");
 			if (label) {
 				asm_label_t *const asm_label = allocate_ast_zero(sizeof(*asm_label));
 				asm_label->label = label;
@@ -9780,7 +9778,7 @@ static statement_t *parse_goto(void)
 		statement = allocate_statement_zero(STATEMENT_GOTO);
 		eat(T_goto);
 
-		label_t *const label = get_label("while parsing goto");
+		label_t *const label = get_label("goto");
 		if (label) {
 			label->n_users        += 1;
 			label->used            = true;
@@ -9987,8 +9985,7 @@ static statement_t *parse_local_label_declaration(void)
 	add_anchor_token(',');
 	do {
 		position_t pos;
-		symbol_t *const symbol
-			= expect_identifier("while parsing local label declaration", &pos);
+		symbol_t *const symbol = expect_identifier("local label declaration", &pos);
 		if (symbol != sym_anonymous) {
 			entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 			if (entity != NULL && entity->base.parent_scope == current_scope) {
