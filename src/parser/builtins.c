@@ -146,34 +146,34 @@ void create_gnu_builtins(void)
 	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
 	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));
 	l("abs",     make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
+	l("exit",    make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
 	l("fabs",    make_function_type(type_double, 1, (type_t *[]) { type_double }, DM_CONST));
 	l("fabsf",   make_function_type(type_float, 1, (type_t *[]) { type_float }, DM_CONST));
 	l("fabsl",   make_function_type(type_long_double, 1, (type_t *[]) { type_long_double }, DM_CONST));
 	l("labs",    make_function_type(type_long, 1, (type_t *[]) { type_long }, DM_CONST));
 	l("llabs",   make_function_type(type_long_long, 1, (type_t *[]) { type_long_long }, DM_CONST));
-	l("memcpy",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	l("malloc",  make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
 	l("memcmp",  make_function_type(type_int, 3, (type_t *[]) { type_const_void_ptr, type_const_void_ptr, type_size_t }, DM_PURE));
-	l("memset",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
+	l("memcpy",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
 	l("memmove", make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	l("memset",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
+	l("stpcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
 	l("strcat",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	l("strncat", make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	l("strlen",  make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
 	l("strcmp",  make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
 	l("strcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	l("stpcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	l("strlen",  make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
+	l("strncat", make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
 	l("strncpy", make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	l("exit",    make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
-	l("malloc",  make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
 
 	entity_t *(*c)(const char*,unsigned,type_t*) = create_gnu_builtin_chk;
 	c("memcpy",  3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t}, DM_NONE));
-	c("memset",  3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr, type_int, type_size_t, type_size_t }, DM_NONE));
 	c("memmove", 3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
-	c("strcat",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	c("strncat", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
-	c("strcpy",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("memset",  3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr, type_int, type_size_t, type_size_t }, DM_NONE));
 	c("stpcpy",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
 	c("stpncpy", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
+	c("strcat",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("strcpy",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("strncat", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
 	c("strncpy", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
 
 	/* TODO: gcc has a LONG list of builtin functions (nearly everything from
