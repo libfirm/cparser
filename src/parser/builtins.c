@@ -159,6 +159,7 @@ void create_gnu_builtins(void)
 	l("memset",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
 	l("stpcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
 	l("strcat",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	l("strchr",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_const_char_ptr, type_int }, DM_NONE));
 	l("strcmp",  make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
 	l("strcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
 	l("strlen",  make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
