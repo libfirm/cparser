@@ -447,7 +447,7 @@ bool options_parse_codegen(options_state_t *s)
 				/* ignore for gcc compatibility: we don't have any unsafe
 				 * optimizations in that area */
 			} else if (streq(fopt, "verbose-asm")) {
-				/* ignore: we always print verbose assembler */
+				set_be_option(truth_value ? "verboseasm" : "verboseasm=no");
 			} else if (streq(fopt, "jump-tables")             ||
 					   streq(fopt, "expensive-optimizations") ||
 					   streq(fopt, "common")                  ||
