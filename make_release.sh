@@ -10,14 +10,14 @@ VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}"
 RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
-SOURCEDIRS="adt driver win32 wrappergen ."
-ADDFILES="README.md NEWS.md AUTHOR COPYING cparser.1"
+SOURCEDIRS="src src/adt src/ast src/driver src/firm src/parser src/wrappergen win32"
+ADDFILES="AUTHOR config.default.mak COPYING cparser.1 NEWS.md README.md"
 
 # test if versions match
 echo "Checking for version mismatch"
-egrep -q "#define CPARSER_MAJOR\\s*\"$VERSION_MAJOR\"" main.c
-egrep -q "#define CPARSER_MINOR\\s*\"$VERSION_MINOR\"" main.c
-egrep -q "#define CPARSER_PATCHLEVEL\\s*\"$VERSION_PATCHLEVEL\"" main.c
+egrep -q "#define CPARSER_MAJOR\\s*\"$VERSION_MAJOR\"" src/driver/version.h
+egrep -q "#define CPARSER_MINOR\\s*\"$VERSION_MINOR\"" src/driver/version.h
+egrep -q "#define CPARSER_PATCHLEVEL\\s*\"$VERSION_PATCHLEVEL\"" src/driver/version.h
 
 rm -rf "$FULLRELEASEDIR"
 
