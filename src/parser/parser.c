@@ -8176,6 +8176,21 @@ static bool maybe_negative(expression_t const *const expr)
 			return value_expr != NULL ? maybe_negative(value_expr) : false;
 		}
 
+		/* bitfield select from unsigned enum type smaller than int can't
+		 * become negative */
+		case EXPR_SELECT: {
+			const entity_t *member = expr->select.compound_entry;
+			assert(member->kind == ENTITY_COMPOUND_MEMBER);
+			if (member->compound_member.bitfield) {
+				const type_t *skipped = skip_typeref(member->declaration.type);
+				if (!is_type_signed(skipped)
+				    && member->compound_member.bit_size
+				        < get_atomic_type_size(ATOMIC_TYPE_INT) * BITS_PER_BYTE)
+				    return false;
+			}
+			/* FALLTHROUGH */
+		}
+
 		default:
 			return true;
 		}
