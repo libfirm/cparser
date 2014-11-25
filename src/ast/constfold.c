@@ -961,6 +961,33 @@ static unsigned decide_modulo_shift(unsigned type_size)
 	return MAX(type_size, target.modulo_shift);
 }
 
+bool enum_bitfield_big_enough(enum_t *enume, type_t *base_type,
+                              unsigned bitfield_size)
+{
+	ir_mode    *mode        = get_ir_mode_storage(base_type);
+	ir_tarval  *max         = get_mode_max(mode);
+	ir_tarval  *min         = get_mode_min(mode);
+	bool       is_signed    = is_type_signed(base_type);
+	unsigned   shr_amount   = get_mode_size_bits(mode)-bitfield_size+is_signed;
+	ir_tarval *adjusted_max = tarval_shr_unsigned(max, shr_amount);
+	ir_tarval *adjusted_min = is_type_signed(base_type)
+	                        ? tarval_shrs_unsigned(min, shr_amount) : min;
+
+	for (entity_t *entry = enume->first_value;
+	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	     entry = entry->base.next) {
+		ir_tarval *tv = get_enum_value(&entry->enum_value);
+		if (tv == NULL)
+			continue;
+		ir_tarval *tvc = tarval_convert_to(tv, mode);
+		if (tarval_cmp(tvc, adjusted_min) == ir_relation_less
+		 || tarval_cmp(tvc, adjusted_max) == ir_relation_greater) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);

@@ -32,6 +32,9 @@ ir_mode *get_ir_mode_arithmetic(type_t *type);
 ir_mode *get_complex_mode_arithmetic(type_t *type);
 ir_mode *get_complex_mode_storage(type_t *type);
 
+bool enum_bitfield_big_enough(enum_t *enumt, type_t *base_type,
+                              unsigned bitfield_size);
+
 /** list of expression kinds that never return a complex result */
 #define NEVER_COMPLEX_CASES  \
 	     EXPR_ALIGNOF:                    \

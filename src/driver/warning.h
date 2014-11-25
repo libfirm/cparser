@@ -17,6 +17,7 @@ typedef enum warning_t {
 	WARN_ADDRESS,                       /**< Warn about suspicious uses of memory addresses */
 	WARN_AGGREGATE_RETURN,              /**< Warn if any functions that return structures or unions are defined or called */
 	WARN_ATTRIBUTE,                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
+	WARN_BITFIELD_SIZE,                 /**< warn if enum bitfield size is too small for all entries */
 	WARN_BUILTIN_MACRO_REDEFINED,       /**< warn when undefining/redefining builtin macros */
 	WARN_CAST_QUAL,                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
 	WARN_CHAR_SUBSCRIPTS,               /**< Warn if an array subscript has the type 'char' */

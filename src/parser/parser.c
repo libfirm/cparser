@@ -5454,6 +5454,15 @@ static void parse_bitfield_member(entity_t *entity)
 			 * than our struct can hold */
 			assert(size_long <
 				   (1 << sizeof(entity->compound_member.bit_size)*8));
+			if (is_type_enum(skipped) && is_warn_on(WARN_BITFIELD_SIZE)) {
+				enum_t *enume = skipped->enumt.enume;
+				if (!enum_bitfield_big_enough(enume, skipped,
+				                              (unsigned)size_long)) {
+					warningf(WARN_BITFIELD_SIZE, HERE,
+					         "bitfield '%Y' is too small for enum '%T'",
+					         user_symbol, type);
+				}
+			}
 		}
 	}
 

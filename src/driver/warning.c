@@ -17,6 +17,7 @@ static warning_switch_t warning[] = {
 	[WARN_ADDRESS]                       = { WARN_STATE_ON,   "address"                       },
 	[WARN_AGGREGATE_RETURN]              = { WARN_STATE_NONE, "aggregate-return"              },
 	[WARN_ATTRIBUTE]                     = { WARN_STATE_ON,   "attribute"                     },
+	[WARN_BITFIELD_SIZE]                 = { WARN_STATE_ON,   "bitfield-size"                 },
 	[WARN_BUILTIN_MACRO_REDEFINED]       = { WARN_STATE_ON,   "builtin-macro-redefined"       },
 	[WARN_CAST_QUAL]                     = { WARN_STATE_NONE, "cast-qual"                     },
 	[WARN_CHAR_SUBSCRIPTS]               = { WARN_STATE_ON,   "char-subscripts"               },
