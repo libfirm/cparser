@@ -5424,9 +5424,13 @@ static void parse_bitfield_member(entity_t *entity)
 	long          size_long;
 
 	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-	type_t *type = entity->declaration.type;
-	if (!is_type_integer(skip_typeref(type)))
+	type_t *type    = entity->declaration.type;
+	type_t *skipped = skip_typeref(type);
+	if (!is_type_integer(skip_typeref(skipped)))
 		errorf(HERE, "bitfield base type '%T' is not an integer type", type);
+	if (!GNU_MODE && is_type_enum(skipped))
+		errorf(HERE, "enum type '%T' as bitfield base is a GCC extension",
+		       type);
 
 	if (size->base.type == type_error_type) {
 		/* just a dummy value */
