@@ -968,12 +968,21 @@ bool enum_bitfield_big_enough(enum_t *enume, type_t *base_type,
 	ir_tarval  *max         = get_mode_max(mode);
 	ir_tarval  *min         = get_mode_min(mode);
 	bool       is_signed    = is_type_signed(base_type);
-	unsigned   shr_amount   = get_mode_size_bits(mode)-bitfield_size+is_signed;
-	ir_tarval *adjusted_max = shr_amount >= 32
-	                        ? get_mode_null(mode)
-	                        : tarval_shr_unsigned(max, shr_amount);
-	ir_tarval *adjusted_min = is_type_signed(base_type)
-	                        ? tarval_shrs_unsigned(min, shr_amount) : min;
+	unsigned   mode_size    = get_mode_size_bits(mode);
+	unsigned   shift_amount = mode_size - bitfield_size + is_signed;
+	ir_tarval *adjusted_max;
+	ir_tarval *adjusted_min;
+	/* corner case: signed mode with just sign bit results in shift_amount
+	 * being as big as mode_size triggering "modulo shift" which is not what
+	 * we want here. */
+	if (shift_amount >= mode_size) {
+		assert(bitfield_size == 1 && mode_is_signed(mode));
+		adjusted_max = get_mode_null(mode);
+		adjusted_min = get_mode_all_one(mode);
+	} else {
+		adjusted_max = tarval_shr_unsigned(max, shift_amount);
+		adjusted_min = tarval_shrs_unsigned(min, shift_amount);
+	}
 
 	for (entity_t *entry = enume->first_value;
 	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
