@@ -139,6 +139,7 @@ struct label_t {
 	/* Reference counter to mature the label block as early as possible. */
 	unsigned       n_users;
 	statement_t   *statement;
+	label_t       *next; /**< Links all labels of a function. */
 
 	/* ast2firm info */
 	jump_target    target;

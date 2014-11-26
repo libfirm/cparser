@@ -82,10 +82,8 @@ static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
 static linkage_kind_t       current_linkage;
-static goto_statement_t    *goto_first        = NULL;
-static goto_statement_t   **goto_anchor       = NULL;
-static label_statement_t   *label_first       = NULL;
-static label_statement_t  **label_anchor      = NULL;
+static label_t             *label_first       = NULL;
+static label_t            **label_anchor      = NULL;
 /** current translation unit. */
 static translation_unit_t  *unit              = NULL;
 /** true if we are in an __extension__ context. */
@@ -4498,28 +4496,15 @@ static void print_in_function(void)
  */
 static void check_labels(void)
 {
-	for (const goto_statement_t *goto_statement = goto_first;
-	    goto_statement != NULL;
-	    goto_statement = goto_statement->next) {
-		label_t *label = goto_statement->label;
-		if (label->base.pos.input_name == NULL) {
+	for (label_t const *label = label_first; label; label = label->next) {
+		if (!label->statement) {
 			print_in_function();
-			position_t const *const pos = &goto_statement->base.pos;
+			position_t const *const pos = &label->base.pos;
 			errorf(pos, "'%N' used but not defined", (entity_t const*)label);
-		 }
-	}
-
-	if (is_warn_on(WARN_UNUSED_LABEL)) {
-		for (const label_statement_t *label_statement = label_first;
-			 label_statement != NULL;
-			 label_statement = label_statement->next) {
-			label_t *label = label_statement->label;
-
-			if (!label->used) {
-				print_in_function();
-				position_t const *const pos = &label_statement->base.pos;
-				warningf(WARN_UNUSED_LABEL, pos, "'%N' defined but not used", (entity_t const*)label);
-			}
+		} else if (!label->used && is_warn_on(WARN_UNUSED_LABEL)) {
+			print_in_function();
+			position_t const *const pos = &label->base.pos;
+			warningf(WARN_UNUSED_LABEL, pos, "'%N' defined but not used", (entity_t const*)label);
 		}
 	}
 }
@@ -5260,8 +5245,6 @@ static void parse_external_declaration(void)
 	PUSH_CURRENT_ENTITY(entity);
 	PUSH_PARENT(NULL);
 
-	goto_first   = NULL;
-	goto_anchor  = &goto_first;
 	label_first  = NULL;
 	label_anchor = &label_first;
 
@@ -6543,7 +6526,8 @@ static label_t *get_label(char const *const context)
 {
 	assert(current_function != NULL);
 
-	symbol_t *const sym = expect_identifier(context, NULL);
+	position_t      pos;
+	symbol_t *const sym = expect_identifier(context, &pos);
 	if (sym == sym_anonymous)
 		return NULL;
 
@@ -6557,9 +6541,12 @@ static label_t *get_label(char const *const context)
 	} else if (label == NULL
 	           || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
-		position_t const nowhere = { NULL, 0, 0, false };
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym, &nowhere);
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym, &pos);
 		label_push(label);
+
+		/* Remember the labels in a list for later checking. */
+		*label_anchor = &label->label;
+		label_anchor  = &label->label.next;
 	}
 
 	return &label->label;
@@ -9464,10 +9451,6 @@ static statement_t *parse_label_statement(void)
 
 	statement->label.statement = parse_label_inner_statement(statement, "label");
 
-	/* remember the labels in a list for later checking */
-	*label_anchor = &statement->label;
-	label_anchor  = &statement->label.next;
-
 	POP_PARENT();
 	return statement;
 }
@@ -9804,10 +9787,6 @@ static statement_t *parse_goto(void)
 			label->n_users        += 1;
 			label->used            = true;
 			statement->gotos.label = label;
-
-			/* remember the goto's in a list for later checking */
-			*goto_anchor = &statement->gotos;
-			goto_anchor  = &statement->gotos.next;
 		} else {
 			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous, &builtin_position)->label;
 		}

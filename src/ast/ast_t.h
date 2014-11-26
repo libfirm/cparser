@@ -531,7 +531,6 @@ struct switch_statement_t {
 struct goto_statement_t {
 	statement_base_t  base;
 	label_t          *label;  /**< The destination label. */
-	goto_statement_t *next;   /**< links all goto statements of a function */
 };
 
 struct computed_goto_statement_t {
@@ -558,10 +557,9 @@ struct case_label_statement_t {
 };
 
 struct label_statement_t {
-	statement_base_t   base;
-	label_t           *label;
-	statement_t       *statement;
-	label_statement_t *next;    /**< links all label statements of a function */
+	statement_base_t  base;
+	label_t          *label;
+	statement_t      *statement;
 };
 
 struct expression_statement_t {
