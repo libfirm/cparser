@@ -1851,6 +1851,8 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			goto finish_designator;
 		} else if (token.kind == T_IDENTIFIER && look_ahead(1)->kind == ':') {
 			/* GNU-style designator ("identifier: value") */
+			if (!GNU_MODE)
+				errorf(HERE, "designator with ':' is a GCC extension");
 			designator         = allocate_ast_zero(sizeof(designator[0]));
 			designator->pos    = *HERE;
 			designator->symbol = token.base.symbol;
@@ -5178,9 +5180,11 @@ static void parse_external_declaration(void)
 
 	position_t const *const pos = &ndeclaration->base.pos;
 	if (current_scope != file_scope) {
-		warningf(WARN_PEDANTIC, pos,
-		         "nested functions are a GNU extension (at '%N')",
-		         ndeclaration);
+		if (GNU_MODE) {
+			warningf(WARN_PEDANTIC, pos, "nested function '%N' is a GCC extension", ndeclaration);
+		} else {
+			errorf(pos, "nested function '%N' is a GCC extension", ndeclaration);
+		}
 	}
 
 	if (is_typeref(orig_type))
@@ -6557,6 +6561,9 @@ static label_t *get_label(char const *const context)
  */
 static expression_t *parse_label_address(void)
 {
+	if (!GNU_MODE)
+		errorf(HERE, "taking address of a label is a GCC extension");
+
 	position_t const pos = *HERE;
 	eat(T_ANDAND);
 
@@ -6634,11 +6641,7 @@ static expression_t *parse_primary_expression(void)
 	case T___builtin_constant_p:         return parse_builtin_constant();
 	case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
 	case T__assume:                      return parse_assume();
-	case T_ANDAND:
-		if (GNU_MODE)
-			return parse_label_address();
-		break;
-
+	case T_ANDAND:                       return parse_label_address();
 	case '(':                            return parse_parenthesized_expression();
 	case T___noop:                       return parse_noop_expression();
 	case T___imag__:                     return parse_complex_extract_expression(EXPR_UNARY_IMAG);
@@ -7341,7 +7344,9 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 
 	expression_t *true_expression = expression;
 	bool          gnu_cond = false;
-	if (GNU_MODE && token.kind == ':') {
+	if (token.kind == ':') {
+		if (!GNU_MODE)
+			errorf(HERE, "omitting consequence of conditional expression is a GCC extension");
 		gnu_cond = true;
 	} else {
 		true_expression = parse_expression();
@@ -7607,9 +7612,13 @@ static void semantic_incdec(unary_expression_t *expression)
 	} else if (!is_type_real(type) &&
 	           (!GNU_MODE || !is_type_complex(type)) && is_type_valid(type)) {
 		/* TODO: improve error message */
-		errorf(&expression->base.pos,
-		       "operation needs an arithmetic or pointer type, but got '%T'", type);
-		orig_type = type = type_error_type;
+		position_t const *const pos = &expression->base.pos;
+		if (!is_type_complex(type)) {
+			errorf(pos, "operation needs an arithmetic or pointer type, but got '%T'", type);
+			orig_type = type = type_error_type;
+		} else if (!GNU_MODE) {
+			errorf(pos, "operation on '%T' is a GCC extension", type);
+		}
 	}
 	if (!is_lvalue(expression->value))
 		/* TODO: improve error message */
@@ -9318,24 +9327,24 @@ static statement_t *parse_case_statement(void)
 	}
 	statement->case_label.expression = expression;
 
-	if (GNU_MODE) {
-		if (accept(T_DOTDOTDOT)) {
-			expression_t *end_range
-				= parse_integer_constant_expression("case range end");
-			if (end_range->base.type == type_error_type) {
-				statement->case_label.is_bad = true;
-			} else {
-				end_range = create_implicit_cast(end_range, type);
-				ir_tarval *val = fold_expression(end_range);
-				statement->case_label.last_case = val;
-				if (tarval_cmp(val, statement->case_label.first_case)
-				    == ir_relation_less) {
-					statement->case_label.is_empty_range = true;
-					warningf(WARN_OTHER, pos, "empty range specified");
-				}
+	if (accept(T_DOTDOTDOT)) {
+		if (!GNU_MODE)
+			errorf(pos, "case ranges are a GCC extension");
+		expression_t *end_range
+			= parse_integer_constant_expression("case range end");
+		if (end_range->base.type == type_error_type) {
+			statement->case_label.is_bad = true;
+		} else {
+			end_range = create_implicit_cast(end_range, type);
+			ir_tarval *val = fold_expression(end_range);
+			statement->case_label.last_case = val;
+			if (tarval_cmp(val, statement->case_label.first_case)
+					== ir_relation_less) {
+				statement->case_label.is_empty_range = true;
+				warningf(WARN_OTHER, pos, "empty range specified");
 			}
-			statement->case_label.end_range = end_range;
 		}
+		statement->case_label.end_range = end_range;
 	}
 
 	PUSH_PARENT(statement);
@@ -9753,7 +9762,9 @@ static statement_t *parse_for(void)
 static statement_t *parse_goto(void)
 {
 	statement_t *statement;
-	if (GNU_MODE && look_ahead(1)->kind == '*') {
+	if (look_ahead(1)->kind == '*') {
+		if (!GNU_MODE)
+			errorf(HERE, "computed goto is a GCC extension");
 		statement = allocate_statement_zero(STATEMENT_COMPUTED_GOTO);
 		eat(T_goto);
 		eat('*');
@@ -9934,11 +9945,7 @@ static statement_t *parse_declaration_statement(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
 
 	entity_t *before = current_scope->last_entity;
-	if (GNU_MODE) {
-		parse_external_declaration();
-	} else {
-		parse_declaration(record_entity, DECL_FLAGS_NONE);
-	}
+	parse_external_declaration();
 
 	declaration_statement_t *const decl  = &statement->declaration;
 	entity_t                *const begin

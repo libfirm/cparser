@@ -755,9 +755,9 @@ static utf32 parse_escape_sequence(void)
 	 * to §6.11.4, whereas \e is not. */
 	case 'E':
 	case 'e':
-		if (dialect.gnu)
-			return 27;   /* hopefully 27 is ALWAYS the code for ESCAPE */
-		break;
+		if (!dialect.gnu)
+			errorf(&pp_token.base.pos, "'%hc%hlc' is a GCC extension", '\\', ec);
+		return 27; /* hopefully 27 is ALWAYS the code for ESCAPE */
 
 	case 'U': return parse_universal_char(8);
 	case 'u': return parse_universal_char(4);
