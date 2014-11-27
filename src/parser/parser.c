@@ -5438,17 +5438,16 @@ static void parse_bitfield_member(entity_t *entity)
 	} else {
 		size_long = fold_expression_to_int(size);
 
-		const symbol_t *symbol = entity->base.symbol;
-		const symbol_t *user_symbol
-			= symbol == NULL ? sym_anonymous : symbol;
-		unsigned bit_size = get_type_size(type) * 8;
+		symbol_t   const *const symbol      = entity->base.symbol;
+		symbol_t   const *const user_symbol = symbol ? symbol : sym_anonymous;
+		unsigned          const bit_size    = get_type_size(type) * 8;
+		position_t const *const pos         = &size->base.pos;
 		if (size_long < 0) {
-			errorf(HERE, "negative width in bit-field '%Y'", user_symbol);
+			errorf(pos, "negative width in bit-field '%Y'", user_symbol);
 		} else if (size_long == 0 && symbol != NULL) {
-			errorf(HERE, "zero width for bit-field '%Y'", user_symbol);
+			errorf(pos, "zero width for bit-field '%Y'", user_symbol);
 		} else if (bit_size > 0 && (unsigned)size_long > bit_size) {
-			errorf(HERE, "width of bitfield '%Y' exceeds its type",
-				   user_symbol);
+			errorf(pos, "width of bitfield '%Y' exceeds its type", user_symbol);
 		} else {
 			/* hope that people don't invent crazy types with more bits
 			 * than our struct can hold */
@@ -5456,12 +5455,8 @@ static void parse_bitfield_member(entity_t *entity)
 				   (1 << sizeof(entity->compound_member.bit_size)*8));
 			if (is_type_enum(skipped) && is_warn_on(WARN_BITFIELD_SIZE)) {
 				enum_t *enume = skipped->enumt.enume;
-				if (!enum_bitfield_big_enough(enume, skipped,
-				                              (unsigned)size_long)) {
-					warningf(WARN_BITFIELD_SIZE, HERE,
-					         "bitfield '%Y' is too small for enum '%T'",
-					         user_symbol, type);
-				}
+				if (!enum_bitfield_big_enough(enume, skipped, (unsigned)size_long))
+					warningf(WARN_BITFIELD_SIZE, pos, "bitfield '%Y' is too small for enum '%T'", user_symbol, type);
 			}
 		}
 	}
