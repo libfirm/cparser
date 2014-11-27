@@ -5446,7 +5446,7 @@ static void parse_bitfield_member(entity_t *entity)
 			errorf(pos, "negative width in bit-field '%Y'", user_symbol);
 		} else if (size_long == 0 && symbol != NULL) {
 			errorf(pos, "zero width for bit-field '%Y'", user_symbol);
-		} else if (bit_size > 0 && (unsigned)size_long > bit_size) {
+		} else if (bit_size < (unsigned)size_long) {
 			errorf(pos, "width of bitfield '%Y' exceeds its type", user_symbol);
 		} else {
 			/* hope that people don't invent crazy types with more bits
