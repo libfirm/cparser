@@ -4478,20 +4478,6 @@ decl_list_end:
 	rem_anchor_token('{');
 }
 
-static bool first_err = true;
-
-/**
- * When called with first_err set, prints the name of the current function,
- * else does noting.
- */
-static void print_in_function(void)
-{
-	if (first_err) {
-		first_err = false;
-		notef(&current_function->base.base.pos, "in '%N'", (entity_t const*)current_function);
-	}
-}
-
 /**
  * Check if all labels are defined in the current function.
  * Check if all labels are used in the current function.
@@ -4500,11 +4486,9 @@ static void check_labels(void)
 {
 	for (label_t const *label = label_first; label; label = label->next) {
 		if (!label->statement) {
-			print_in_function();
 			position_t const *const pos = &label->base.pos;
 			errorf(pos, "'%N' used but not defined", (entity_t const*)label);
 		} else if (!label->used && is_warn_on(WARN_UNUSED_LABEL)) {
-			print_in_function();
 			position_t const *const pos = &label->base.pos;
 			warningf(WARN_UNUSED_LABEL, pos, "'%N' defined but not used", (entity_t const*)label);
 		}
@@ -4523,12 +4507,10 @@ static void warn_unused_entity(warning_t const why, entity_t *entity, entity_t *
 			continue;
 
 		if (!declaration->used) {
-			print_in_function();
 			warningf(why, &entity->base.pos, "'%N' is unused", entity);
 		} else if ((entity->kind == ENTITY_VARIABLE
 		            || entity->kind == ENTITY_PARAMETER)
 		           && !entity->variable.read) {
-			print_in_function();
 			warningf(why, &entity->base.pos, "'%N' is never read", entity);
 		}
 	}
@@ -5254,7 +5236,6 @@ static void parse_external_declaration(void)
 
 	statement_t *const body = parse_compound_statement(false);
 	function->body = body;
-	first_err = true;
 	check_labels();
 	check_declarations();
 	if (is_warn_on(WARN_RETURN_TYPE)      ||
