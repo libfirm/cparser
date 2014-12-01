@@ -484,11 +484,12 @@ bool options_parse_diagnostics(options_state_t *s)
 	if (streq(option, "w")) {
 		driver_add_flag(&cppflags_obst, "-w");
 		disable_all_warnings();
-	} else if (streq(option, "pedantic") || streq(option, "pedantic-errors")) {
-		/* TODO: pedantic-errors gives just warnings here, but we want it
-		 * for gcc compatibility */
+	} else if (streq(option, "pedantic")) {
 		dialect.strict = true;
 		set_warning_opt("pedantic");
+	} else if (streq(option, "pedantic-errors")) {
+		dialect.strict = true;
+		set_warning_opt("error=pedantic");
 	} else if (option[0] == 'W') {
 		if (streq(option+1, "init-self")) {
 			/* ignored (same as gcc does) */
