@@ -537,29 +537,27 @@ static void check_printf_format(call_argument_t const *arg,
                                 format_spec_t const *const spec)
 {
 	/* find format arg */
-	size_t idx = 0;
-	for (; idx < spec->fmt_idx; ++idx) {
-		if (arg == NULL)
-			return;
-		arg = arg->next;
-	}
+	for (size_t idx = 0; arg; ++idx, arg = arg->next) {
+		if (idx == spec->fmt_idx) {
+			expression_t const *const fmt_expr = arg->expression;
 
-	expression_t const *const fmt_expr = arg->expression;
+			/* find the real args */
+			for (; idx < spec->arg_idx && arg != NULL; ++idx)
+				arg = arg->next;
 
-	/* find the real args */
-	for (; idx < spec->arg_idx && arg != NULL; ++idx)
-		arg = arg->next;
+			int const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
+			if (num_fmt < 0)
+				return;
 
-	int const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
-	if (num_fmt < 0)
-		return;
-
-	size_t num_args = 0;
-	for (; arg != NULL; arg = arg->next)
-		++num_args;
-	if (num_args > (size_t)num_fmt) {
-		position_t const *const pos = &fmt_expr->base.pos;
-		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
+			size_t num_args = 0;
+			for (; arg != NULL; arg = arg->next)
+				++num_args;
+			if (num_args > (size_t)num_fmt) {
+				position_t const *const pos = &fmt_expr->base.pos;
+				warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
+			}
+			break;
+		}
 	}
 }
 
