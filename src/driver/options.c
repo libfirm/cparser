@@ -487,9 +487,11 @@ bool options_parse_diagnostics(options_state_t *s)
 	} else if (streq(option, "pedantic")) {
 		dialect.strict = true;
 		set_warning_opt("pedantic");
+		set_warning_opt("error=return-type");
 	} else if (streq(option, "pedantic-errors")) {
 		dialect.strict = true;
 		set_warning_opt("error=pedantic");
+		set_warning_opt("error=return-type");
 	} else if (option[0] == 'W') {
 		if (streq(option+1, "init-self")) {
 			/* ignored (same as gcc does) */

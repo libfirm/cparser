@@ -9836,15 +9836,6 @@ static bool expression_is_local_variable(const expression_t *expression)
 	return is_local_variable(entity);
 }
 
-static void err_or_warn(position_t const *const pos, char const *const msg)
-{
-	if (dialect.cpp || dialect.strict) {
-		errorf(pos, msg);
-	} else {
-		warningf(WARN_OTHER, pos, msg);
-	}
-}
-
 /**
  * Parse a return statement.
  */
@@ -9865,18 +9856,18 @@ static statement_t *parse_return(void)
 
 	position_t const *const pos = &statement->base.pos;
 	if (return_value != NULL) {
-		type_t *return_value_type = skip_typeref(return_value->base.type);
 
 		if (is_type_void(return_type)) {
-			if (!is_type_void(return_value_type)) {
+			type_t *return_value_type = skip_typeref(return_value->base.type);
+			if (is_type_void(return_value_type)) {
+				warningf(WARN_PEDANTIC, pos,
+				         "void function should not return void expression",
+				         current_function);
+			} else {
 				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
-				/* Only warn in C mode, because GCC does the same */
-				err_or_warn(pos,
-				            "'return' with a value, in function returning 'void'");
-			} else if (!dialect.cpp) { /* ISO/IEC 14882:1998(E) §6.6.3:3 */
-				/* Only warn in C mode, because GCC does the same */
-				err_or_warn(pos,
-				            "'return' with expression in function returning 'void'");
+				warningf(WARN_RETURN_TYPE, pos,
+						 "'return' with a value, in function returning 'void'",
+						 current_function);
 			}
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
@@ -9893,8 +9884,8 @@ static statement_t *parse_return(void)
 		}
 	} else if (!is_type_void(return_type)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
-		err_or_warn(pos,
-		            "'return' without value, in function returning non-void");
+		warningf(WARN_RETURN_TYPE, pos,
+		         "'return' without value, in function returning non-void");
 	}
 	statement->returns.value = return_value;
 
