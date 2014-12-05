@@ -7865,6 +7865,15 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	return make_atomic_type(kind_res, TYPE_QUALIFIER_NONE);
 }
 
+static type_t *set_arithmetic_bin_expr_type(binary_expression_t *const bin, type_t *const type_left, type_t *const type_right)
+{
+	type_t *const res_type = semantic_arithmetic(type_left, type_right);
+	bin->base.type = res_type;
+	bin->left      = create_implicit_cast(bin->left,  res_type);
+	bin->right     = create_implicit_cast(bin->right, res_type);
+	return res_type;
+}
+
 /**
  * Check the semantic restrictions for a binary expression.
  */
@@ -7877,18 +7886,12 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
-		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			position_t const *const pos = &expression->base.pos;
-			errorf(pos, "operands of binary expression must have arithmetic types, but are '%T' and '%T'", orig_type_left, orig_type_right);
-		}
-		return;
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		set_arithmetic_bin_expr_type(expression, type_left, type_right);
+	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
+		position_t const *const pos = &expression->base.pos;
+		errorf(pos, "operands of binary expression must have arithmetic types, but are '%T' and '%T'", orig_type_left, orig_type_right);
 	}
-
-	type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
-	expression->left      = create_implicit_cast(left, arithmetic_type);
-	expression->right     = create_implicit_cast(right, arithmetic_type);
-	expression->base.type = arithmetic_type;
 }
 
 static void semantic_binexpr_integer(binary_expression_t *const expression)
@@ -7900,19 +7903,15 @@ static void semantic_binexpr_integer(binary_expression_t *const expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	if (!is_type_integer(type_left) || !is_type_integer(type_right)
-	  || is_type_complex(type_left) || is_type_complex(type_right)) {
+	if (is_type_integer(type_left)  && !is_type_complex(type_left) &&
+	    is_type_integer(type_right) && !is_type_complex(type_right)) {
+		set_arithmetic_bin_expr_type(expression, type_left, type_right);
+	} else {
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			position_t const *const pos = &expression->base.pos;
 			errorf(pos, "operands of binary expression must have integer types, but are '%T' and '%T'", orig_type_left, orig_type_right);
 		}
-		return;
 	}
-
-	type_t *const result_type = semantic_arithmetic(type_left, type_right);
-	expression->left      = create_implicit_cast(left, result_type);
-	expression->right     = create_implicit_cast(right, result_type);
-	expression->base.type = result_type;
 }
 
 static void warn_div_by_zero(binary_expression_t const *const expression)
@@ -8034,10 +8033,7 @@ static void semantic_add(binary_expression_t *expression)
 
 	/* §6.5.6 */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
-		expression->left  = create_implicit_cast(left, arithmetic_type);
-		expression->right = create_implicit_cast(right, arithmetic_type);
-		expression->base.type = arithmetic_type;
+		set_arithmetic_bin_expr_type(expression, type_left, type_right);
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		check_pointer_arithmetic(&expression->base.pos, type_left,
 		                         orig_type_left);
@@ -8065,10 +8061,7 @@ static void semantic_sub(binary_expression_t *expression)
 
 	/* §5.6.5 */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
-		expression->left        = create_implicit_cast(left, arithmetic_type);
-		expression->right       = create_implicit_cast(right, arithmetic_type);
-		expression->base.type =  arithmetic_type;
+		set_arithmetic_bin_expr_type(expression, type_left, type_right);
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		check_pointer_arithmetic(&expression->base.pos, type_left,
 		                         orig_type_left);
@@ -8227,7 +8220,7 @@ static void semantic_comparison(binary_expression_t *expression,
 
 	/* TODO non-arithmetic types */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
+		type_t *const arithmetic_type = set_arithmetic_bin_expr_type(expression, type_left, type_right);
 
 		/* test for signed vs unsigned compares */
 		if (is_type_integer(arithmetic_type)
@@ -8241,9 +8234,6 @@ static void semantic_comparison(binary_expression_t *expression,
 						 "comparison between signed and unsigned");
 		}
 
-		expression->left      = create_implicit_cast(left, arithmetic_type);
-		expression->right     = create_implicit_cast(right, arithmetic_type);
-		expression->base.type = arithmetic_type;
 		if (!is_relational && is_type_float(arithmetic_type))
 			warningf(WARN_FLOAT_EQUAL, pos,
 			         "comparing floating point with == or != is unsafe");
