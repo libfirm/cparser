@@ -146,6 +146,7 @@ void create_gnu_builtins(void)
 	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
 	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));
 	l("abs",     make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
+	l("atan2l",  make_function_type(type_long_double, 2, (type_t*[]) { type_long_double, type_long_double }, DM_CONST));
 	l("exit",    make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
 	l("fabs",    make_function_type(type_double, 1, (type_t *[]) { type_double }, DM_CONST));
 	l("fabsf",   make_function_type(type_float, 1, (type_t *[]) { type_float }, DM_CONST));
