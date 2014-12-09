@@ -78,7 +78,7 @@ static inline __attribute__((const))
 unsigned nlz(unsigned x) {
 #ifdef USE_X86_ASSEMBLY
 	unsigned res;
-	if(x == 0)
+	if (x == 0)
 		return 32;
 
 	__asm__("bsrl %1,%0"
@@ -104,7 +104,7 @@ static inline __attribute__((const))
 unsigned ntz(unsigned x) {
 #ifdef USE_X86_ASSEMBLY
 	unsigned res;
-	if(x == 0)
+	if (x == 0)
 		return 32;
 
 	__asm__("bsfl %1,%0"
@@ -148,7 +148,7 @@ static inline __attribute__((const))
 unsigned floor_po2(unsigned x)
 {
 #ifdef USE_X86_ASSEMBLY // in this case nlz is fast
-	if(x == 0)
+	if (x == 0)
 		return 0;
 	// note that x != 0 here, so nlz(x) < 32!
 	return 0x80000000U >> nlz(x);
@@ -170,7 +170,7 @@ unsigned floor_po2(unsigned x)
 static inline __attribute__((const))
 unsigned ceil_po2(unsigned x)
 {
-	if(x == 0)
+	if (x == 0)
 		return 0;
 	assert(x < (1U << 31));
 

@@ -633,7 +633,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "control-flow");
 
-		if( do_irg_opt(irg, "vrp") ) { // if vrp is enabled
+		if (do_irg_opt(irg, "vrp")) { // if vrp is enabled
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "vrp");
 			do_irg_opt(irg, "local");

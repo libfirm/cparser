@@ -67,14 +67,14 @@ static entity_t *find_typedef(const type_t *type)
 static void write_compound_type(const compound_type_t *type)
 {
 	entity_t *entity = find_typedef((const type_t*) type);
-	if(entity != NULL) {
+	if (entity != NULL) {
 		fprintf(out, "%s", entity->base.symbol->string);
 		return;
 	}
 
 	/* does the struct have a name? */
 	symbol_t *symbol = type->compound->base.symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
 		fprintf(out, "%s", symbol->string);
 		return;
@@ -112,7 +112,7 @@ static void write_function_type(const function_type_t *type)
 		fputs(sep_next(&sep), out);
 
 #if 0
-		if(parameter->symbol != NULL) {
+		if (parameter->symbol != NULL) {
 			fprintf(out, "%s : ", parameter->symbol->string);
 		} else {
 			/* TODO make up some unused names (or allow _ in fluffy?) */
@@ -220,7 +220,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 	     entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
 		fprintf(out, "\t%s", entry->base.symbol->string);
-		if(entry->enum_value.value != NULL) {
+		if (entry->enum_value.value != NULL) {
 			fprintf(out, " <- ");
 			write_expression(entry->enum_value.value);
 		}
@@ -254,14 +254,14 @@ static void write_function(const entity_t *entity)
 	for( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->kind == ENTITY_PARAMETER);
 		fputs(sep_next(&sep), out);
-		if(parameter->base.symbol != NULL) {
+		if (parameter->base.symbol != NULL) {
 			fprintf(out, "%s : ", parameter->base.symbol->string);
 		} else {
 			fputs("_ : ", out);
 		}
 		write_type(parameter->declaration.type);
 	}
-	if(function_type->variadic) {
+	if (function_type->variadic) {
 		fputs(sep_next(&sep), out);
 		fputs("...", out);
 	}
@@ -292,7 +292,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 		type_t *type = entity->typedefe.type;
 		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
-		} else if(type->kind == TYPE_ENUM) {
+		} else if (type->kind == TYPE_ENUM) {
 			write_enum(entity->base.symbol, &type->enumt);
 		}
 	}

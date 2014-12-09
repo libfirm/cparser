@@ -122,14 +122,14 @@ static entity_t *find_enum_typedef(const enum_t *enume)
 static void write_compound_type(const compound_type_t *type)
 {
 	entity_t *entity = find_typedef((const type_t*) type);
-	if(entity != NULL) {
+	if (entity != NULL) {
 		fputs(entity->base.symbol->string, out);
 		return;
 	}
 
 	/* does the struct have a name? */
 	symbol_t *symbol = type->compound->base.symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
 		fputs(symbol->string, out);
 		return;
@@ -331,7 +331,7 @@ static void write_enum(const symbol_t *symbol, const enum_t *entity)
 	     entry = entry->base.next) {
 		fprintf(out, "\t\t%s", entry->base.symbol->string);
 		fprintf(out, "(");
-		if(entry->enum_value.value != NULL) {
+		if (entry->enum_value.value != NULL) {
 			write_expression(entry->enum_value.value);
 		}
 		fprintf(out, ")");
@@ -402,13 +402,13 @@ static void write_function(const entity_t *entity)
 		assert(parameter->kind == ENTITY_PARAMETER);
 		fputs(sep_next(&sep), out);
 		write_type(parameter->declaration.type);
-		if(parameter->base.symbol != NULL) {
+		if (parameter->base.symbol != NULL) {
 			fprintf(out, " %s", fix_builtin_names(parameter->base.symbol->string));
 		} else {
 			fprintf(out, " _%d", n++);
 		}
 	}
-	if(function_type->variadic) {
+	if (function_type->variadic) {
 		fputs(sep_next(&sep), out);
 		fputs("Object ... args", out);
 	}
