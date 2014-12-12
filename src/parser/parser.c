@@ -6443,18 +6443,8 @@ static expression_t *parse_builtin_types_compatible(void)
 /**
  * Parses a __builtin_is_*() compare expression.
  */
-static expression_t *parse_compare_builtin(void)
+static expression_t *parse_compare_builtin(expression_kind_t const kind)
 {
-	expression_kind_t kind;
-	switch (token.kind) {
-	case T___builtin_isgreater:      kind = EXPR_BINARY_ISGREATER;      break;
-	case T___builtin_isgreaterequal: kind = EXPR_BINARY_ISGREATEREQUAL; break;
-	case T___builtin_isless:         kind = EXPR_BINARY_ISLESS;         break;
-	case T___builtin_islessequal:    kind = EXPR_BINARY_ISLESSEQUAL;    break;
-	case T___builtin_islessgreater:  kind = EXPR_BINARY_ISLESSGREATER;  break;
-	case T___builtin_isunordered:    kind = EXPR_BINARY_ISUNORDERED;    break;
-	default: panic("invalid compare builtin found");
-	}
 	expression_t *const expression = allocate_expression_zero(kind);
 	next_token();
 
@@ -6609,16 +6599,16 @@ static expression_t *parse_primary_expression(void)
 	case T___PRETTY_FUNCTION__:          return parse_function_keyword(FUNCNAME_PRETTY_FUNCTION);
 	case T___FUNCSIG__:                  return parse_function_keyword(FUNCNAME_FUNCSIG);
 	case T___FUNCDNAME__:                return parse_function_keyword(FUNCNAME_FUNCDNAME);
+	case T___builtin_isgreater:          return parse_compare_builtin(EXPR_BINARY_ISGREATER);
+	case T___builtin_isgreaterequal:     return parse_compare_builtin(EXPR_BINARY_ISGREATEREQUAL);
+	case T___builtin_isless:             return parse_compare_builtin(EXPR_BINARY_ISLESS);
+	case T___builtin_islessequal:        return parse_compare_builtin(EXPR_BINARY_ISLESSEQUAL);
+	case T___builtin_islessgreater:      return parse_compare_builtin(EXPR_BINARY_ISLESSGREATER);
+	case T___builtin_isunordered:        return parse_compare_builtin(EXPR_BINARY_ISUNORDERED);
 	case T___builtin_offsetof:           return parse_offsetof();
 	case T___builtin_va_start:           return parse_va_start();
 	case T___builtin_va_arg:             return parse_va_arg();
 	case T___builtin_va_copy:            return parse_va_copy();
-	case T___builtin_isgreater:
-	case T___builtin_isgreaterequal:
-	case T___builtin_isless:
-	case T___builtin_islessequal:
-	case T___builtin_islessgreater:
-	case T___builtin_isunordered:        return parse_compare_builtin();
 	case T___builtin_constant_p:         return parse_builtin_constant();
 	case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
 	case T__assume:                      return parse_assume();
