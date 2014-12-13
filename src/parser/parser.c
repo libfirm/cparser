@@ -4488,7 +4488,7 @@ static void check_labels(void)
 		if (!label->statement) {
 			position_t const *const pos = &label->base.pos;
 			errorf(pos, "'%N' used but not defined", (entity_t const*)label);
-		} else if (!label->used && is_warn_on(WARN_UNUSED_LABEL)) {
+		} else if (!label->used) {
 			position_t const *const pos = &label->base.pos;
 			warningf(WARN_UNUSED_LABEL, pos, "'%N' defined but not used", (entity_t const*)label);
 		}
