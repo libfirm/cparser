@@ -3290,7 +3290,16 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 			break;
 
 		case T__based:
-			panic("based not supported anymore");
+			errorf(HERE, "%K not supported", &token);
+			eat(T__based);
+			add_anchor_token(')');
+			add_anchor_token(T_IDENTIFIER);
+			expect('(');
+			rem_anchor_token(T_IDENTIFIER);
+			expect_identifier("based pointer", NULL);
+			rem_anchor_token(')');
+			expect(')');
+			continue;
 
 		case '*':
 			type = parse_pointer_declarator();
