@@ -861,14 +861,9 @@ static bool is_null_pointer_constant(const expression_t *expression)
 		}
 	}
 
-	switch (is_constant_expression(expression)) {
-	case EXPR_CLASS_VARIABLE:         return false;
-	case EXPR_CLASS_ERROR:            return true;
-	case EXPR_CLASS_CONSTANT:         return false;
-	case EXPR_CLASS_INTEGER_CONSTANT:
-		return !fold_expression_to_bool(expression);
-	}
-	panic("invalid expression classification");
+	return
+		is_constant_expression(expression) == EXPR_CLASS_INTEGER_CONSTANT &&
+		!fold_expression_to_bool(expression);
 }
 
 /**
