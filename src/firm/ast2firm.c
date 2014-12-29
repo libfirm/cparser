@@ -894,8 +894,8 @@ void determine_literal_type(literal_expression_t *const literal)
 		literal->value->begin[0] == '0'     ? 0 :
 		-1; /* Decimal literals only try signed types. */
 
-	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
-	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
+	int old_wrap_on_overflow = tarval_get_wrap_on_overflow();
+	tarval_set_wrap_on_overflow(false);
 
 	if (try_create_integer(literal, literal->base.type))
 		goto finished;
@@ -909,19 +909,19 @@ void determine_literal_type(literal_expression_t *const literal)
 		goto finished;
 	/* last try? then we should not report tarval_bad */
 	if (sign < 0)
-		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+		tarval_set_wrap_on_overflow(true);
 	if (sign <= 0 && try_create_integer(literal, type_long_long))
 		goto finished;
 
 	/* last try */
 	assert(sign >= 0);
-	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+	tarval_set_wrap_on_overflow(true);
 	bool res = try_create_integer(literal, type_unsigned_long_long);
 	if (!res)
 		panic("internal error when parsing number literal");
 
 finished:
-	tarval_set_integer_overflow_mode(old_mode);
+	tarval_set_wrap_on_overflow(old_wrap_on_overflow);
 }
 
 /**

@@ -1041,5 +1041,5 @@ void init_constfold(void)
 		atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
 	}
 
-	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+	tarval_set_wrap_on_overflow(true);
 }
