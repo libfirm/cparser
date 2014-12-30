@@ -12,7 +12,7 @@ typedef struct complex_constant {
 
 complex_constant fold_complex(const expression_t *expression);
 
-ir_tarval *fold_builtin_inf(call_expression_t const *call, type_t const *type);
+ir_tarval *fold_builtin_inf(type_t const *type);
 ir_tarval *fold_builtin_nan(call_expression_t const *call, type_t const *type);
 
 void determine_enum_values(enum_t *enume);

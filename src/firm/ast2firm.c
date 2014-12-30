@@ -1081,7 +1081,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return res;
 	}
 	case BUILTIN_INF: {
-		ir_tarval *tv = fold_builtin_inf(call, function_type);
+		ir_tarval *tv = fold_builtin_inf(function_type);
 		return new_d_Const(dbgi, tv);
 	}
 	case BUILTIN_NAN: {

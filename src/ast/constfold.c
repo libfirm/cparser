@@ -58,11 +58,8 @@ ir_mode *get_ir_mode_arithmetic(type_t *type)
 	return mode;
 }
 
-ir_tarval *fold_builtin_inf(call_expression_t const *const call,
-                            type_t const *const function_type)
+ir_tarval *fold_builtin_inf(type_t const *const function_type)
 {
-	/* TODO: interpret string arg if provided */
-	(void)call;
 	type_t  *type = function_type->function.return_type;
 	ir_mode *mode = get_ir_mode_storage(type);
 	return get_mode_infinite(mode);
@@ -240,7 +237,7 @@ static ir_tarval *fold_call_builtin(call_expression_t const *const call)
 	assert(is_type_function(function_type));
 
 	switch (ref->entity->function.btk) {
-	case BUILTIN_INF: return fold_builtin_inf(call, function_type);
+	case BUILTIN_INF: return fold_builtin_inf(function_type);
 	case BUILTIN_NAN: return fold_builtin_nan(call, function_type);
 	default:
 		panic("builtin is no constant");
