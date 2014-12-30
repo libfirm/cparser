@@ -65,14 +65,54 @@ ir_tarval *fold_builtin_inf(type_t const *const function_type)
 	return get_mode_infinite(mode);
 }
 
+static bool is_valid_strold_input(const char *string)
+{
+	if (string[0] == '\0')
+		return false;
+	if (string[0] == '0') {
+		if (string[1] == 'x') {
+			if (string[2] == '\0')
+				return false;
+			/* hex number */
+			for (const char *c = string+2; *c != '\0'; ++c) {
+				if ((*c < '0' || *c > '9') && (*c < 'a' || *c > 'f')
+				    && (*c < 'A' || *c > 'F'))
+				    return false;
+			}
+		} else {
+			/* octal number or 0 */
+			for (const char *c = string+1; *c != '\0'; ++c) {
+				if (*c < '0' || *c > '7')
+					return false;
+			}
+		}
+	} else {
+		/* decimal number */
+		for (const char *c = string; *c != '\0'; ++c) {
+			if (*c < '0' || *c > '9')
+				return false;
+		}
+	}
+	return true;
+}
+
 ir_tarval *fold_builtin_nan(call_expression_t const *const call,
                             type_t const *const function_type)
 {
-	/* TODO: interpret string arg if provided */
-	(void)call;
+	ir_tarval *payload = NULL;
+	call_argument_t *const argument = call->arguments;
+	if (argument != NULL && argument->expression->kind == EXPR_STRING_LITERAL) {
+		const char *str = argument->expression->string_literal.value->begin;
+		/* sanity checking */
+		if (is_valid_strold_input(str)) {
+			ir_mode *payload_mode = atomic_modes[ATOMIC_TYPE_ULONGLONG];
+			payload = new_tarval_from_str(str, strlen(str), payload_mode);
+		}
+	}
+
 	type_t  *type = function_type->function.return_type;
 	ir_mode *mode = get_ir_mode_storage(type);
-	return get_mode_NAN(mode);
+	return new_tarval_nan(mode, false, payload);
 }
 
 static ir_tarval *get_type_size_tarval(type_t *const type, ir_mode *const mode)
