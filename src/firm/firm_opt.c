@@ -248,7 +248,6 @@ static ir_intrinsics_map *make_rts_map(void)
 		{ &rts_entities[rts_strcpy],  i_mapper_strcpy },
 		{ &rts_entities[rts_strlen],  i_mapper_strlen },
 		{ &rts_entities[rts_memcpy],  i_mapper_memcpy },
-		{ &rts_entities[rts_mempcpy], i_mapper_mempcpy },
 		{ &rts_entities[rts_memmove], i_mapper_memmove },
 		{ &rts_entities[rts_memset],  i_mapper_memset },
 		{ &rts_entities[rts_memcmp],  i_mapper_memcmp }
