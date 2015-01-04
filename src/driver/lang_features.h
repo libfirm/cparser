@@ -57,6 +57,9 @@ typedef struct target_t {
 	/** target triple as a string */
 	const char       *triple;
 	const char       *user_label_prefix;
+	/** position independent code generation mode */
+	int               pic_mode : 4;
+	bool              pic_no_plt : 1;
 } target_t;
 
 extern c_dialect_t dialect;

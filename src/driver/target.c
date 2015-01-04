@@ -18,7 +18,9 @@
 #include "target.h"
 #include "warning.h"
 
-target_t    target;
+target_t target = {
+	.pic_mode = -1,
+};
 const char *multilib_directory_target_triple;
 static const char *experimental_backend;
 
@@ -167,8 +169,9 @@ static void init_os_support(void)
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
 		set_be_option("x86_64-x64abi=no");
-		set_be_option("pic=true");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
+		if (target.pic_mode == -1)
+			target.pic_mode = 2;
 	} else if (is_windows_os(os)) {
 		const char *cpu = target.machine->cpu_type;
 		driver_default_exe_output = "a.exe";
@@ -190,6 +193,8 @@ static void init_os_support(void)
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
 		exit(EXIT_FAILURE);
 	}
+	if (target.pic_mode == -1)
+		target.pic_mode = 0;
 }
 
 static unsigned get_bitsize_codegen_opt(void)
@@ -326,6 +331,23 @@ static bool pass_options_to_firm_be(void)
 	if (profile_use) {
 		set_be_option("profileuse");
 	}
+	if (target.pic_mode > 0) {
+		set_be_option("pic=true");
+		if (streq(firm_isa, "ia32")) {
+			const char *option;
+			if (is_darwin_os(target.machine->operating_system)) {
+				option = "ia32-pic=mach-o";
+			} else {
+				option = target.pic_no_plt ? "ia32-pic=elf-noplt"
+					                       : "ia32-pic=elf";
+			}
+			set_be_option(option);
+		}
+	} else {
+		set_be_option("pic=false");
+		set_be_option("ia32-pic=none");
+	}
+
 	return res;
 }
 

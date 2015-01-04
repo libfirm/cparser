@@ -298,10 +298,9 @@ void add_predefined_macros(void)
 		add_define("__CONSTANT_CFSTRINGS__", "1", false);
 		add_define("__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050",
 		           false);
-		/* TODO: the following should depend on -fPIC and others... */
-		add_define("__PIC__",      "2", false);
-		add_define("__pic__",      "2", false);
+		/* TODO: may also be __STATIC__ */
 		add_define("__DYNAMIC__",  "1", false);
+		/* TODO: _REENTRANT for -pthreads */
 		if (!target.byte_order_big_endian) {
 			add_define("__LITTLE_ENDIAN__", "1", false);
 		}
@@ -377,6 +376,11 @@ void add_predefined_macros(void)
 		: get_mode_size_bytes(float_mode) == get_type_size(type_double) ? "1"
 		: "-1";
 	add_define("__FLT_EVAL_METHOD__", flt_eval_metod, false);
+
+	if (target.pic_mode != 0) {
+		add_define_int("__PIC__", target.pic_mode);
+		add_define_int("__pic__", target.pic_mode);
+	}
 
 	/* TODO: query from backend? */
 	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);

@@ -448,6 +448,12 @@ bool options_parse_codegen(options_state_t *s)
 				 * optimizations in that area */
 			} else if (streq(fopt, "verbose-asm")) {
 				set_be_option(truth_value ? "verboseasm" : "verboseasm=no");
+			} else if (streq(fopt, "PIC")) {
+				target.pic_mode = truth_value ? 2 : 0;
+			} else if (streq(fopt, "pic")) {
+				target.pic_mode = truth_value ? 1 : 0;
+			} else if (streq(fopt, "plt")) {
+				target.pic_no_plt = !truth_value;
 			} else if (streq(fopt, "jump-tables")             ||
 					   streq(fopt, "expensive-optimizations") ||
 					   streq(fopt, "common")                  ||
