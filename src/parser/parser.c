@@ -1907,12 +1907,6 @@ finish_designator:
 			expression_t *expression = parse_assignment_expression();
 			mark_vars_read(expression, NULL);
 
-			if (env->must_be_constant && !is_linker_constant(expression)) {
-				errorf(&expression->base.pos,
-				       "Initialisation expression '%E' is not constant",
-				       expression);
-			}
-
 			if (type == NULL) {
 				/* we are already outside, ... */
 				if (outer_type == NULL)
@@ -1934,6 +1928,9 @@ excess_elements:;
 				}
 				goto error_parse_next;
 			}
+
+			if (env->must_be_constant && !is_linker_constant(expression))
+				errorf(&expression->base.pos, "Initialisation expression '%E' is not constant", expression);
 
 			/* handle { "string" } special case */
 			if (expression->kind == EXPR_STRING_LITERAL && outer_type != NULL) {
