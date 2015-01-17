@@ -4419,6 +4419,8 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 
 static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	dbg_info *dbgi        = get_dbg_info(&statement->base.pos);
 	ir_node  *switch_node = NULL;
 
