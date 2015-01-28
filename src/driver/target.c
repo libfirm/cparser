@@ -140,7 +140,7 @@ static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
 static ident *compilerlib_name_mangle_underscore(ident *id, ir_type *mt)
 {
 	(void)mt;
-	return id_mangle3("_", id, "");
+	return new_id_fmt("_%s", id);
 }
 
 static void set_be_option(const char *arg)
