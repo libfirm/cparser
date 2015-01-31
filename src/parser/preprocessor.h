@@ -9,10 +9,17 @@
 #include "token_t.h"
 #include "ast/position.h"
 
-/** initialize just enough so we can use add_define(),add_define_string(),
+/**
+ * Initialize just enough so we can use add_define(),add_define_string(),
  * undefine(), append_include_path(), append_env_paths() for commandline
- * parsing */
+ * parsing.
+ */
 void init_preprocessor(void);
+
+/**
+ * Properly setup the preprocessor. This will also setup the preprocessor
+ * to honor the specified language dialect.
+ */
 void setup_preprocessor(void);
 
 void exit_preprocessor(void);
@@ -20,7 +27,8 @@ void exit_preprocessor(void);
 typedef struct searchpath_entry_t searchpath_entry_t;
 
 /** Switch input to another stream. The current token is not changed. */
-void switch_pp_input(FILE *stream, char const *input_name, searchpath_entry_t *entry, bool is_system_header);
+void switch_pp_input(FILE *stream, char const *input_name,
+                     searchpath_entry_t *entry, bool is_system_header);
 void close_pp_input(void);
 
 /** print the header displayed by gcc when writing preprocessing tokens */
@@ -59,7 +67,8 @@ extern searchpath_t bracket_searchpath; /**< paths for < > includes */
 extern searchpath_t quote_searchpath;   /**< paths for " " includes */
 extern searchpath_t system_searchpath;  /**< system searchpath (appended to
                                              quote searchpath) */
-extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also system paths) */
+extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also
+                                             system paths) */
 
 void append_include_path(searchpath_t *searchpath, const char *path);
 void append_env_paths(searchpath_t *paths, const char *envvar);
