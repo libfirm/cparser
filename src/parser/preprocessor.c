@@ -4211,10 +4211,9 @@ void init_preprocessor(void)
 {
 	init_string_hash();
 	init_symbol_table();
-	init_tokens();
+	init_symbols();
 	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
-	init_symbols();
 	input.pos.input_name = "<commandline>";
 	input.pos.lineno     = 0;
 	input.pos.colno      = 0;
@@ -4224,6 +4223,7 @@ void init_preprocessor(void)
 
 void setup_preprocessor(void)
 {
+	init_tokens();
 	obstack_init(&input_obstack);
 	expansion_stack  = NEW_ARR_F(pp_expansion_state_t, 0);
 	argument_stack   = NEW_ARR_F(pp_argument_t, 0);
