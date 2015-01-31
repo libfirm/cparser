@@ -3345,6 +3345,10 @@ ptr_operator_end: ;
 		case '(':
 		case '*':
 		case '[':
+		case T_cdecl:
+		case T__fastcall:
+		case T__stdcall:
+		case T___thiscall:
 		case T___attribute__: /* FIXME __attribute__ might also introduce a parameter of a function declarator. */
 				/* Paranthesized declarator. */
 				eat('(');
