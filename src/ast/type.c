@@ -999,6 +999,89 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	return types_compatible_ignore_qualifiers(type1, type2);
 }
 
+static bool type_base_same(const type_base_t *base1, const type_base_t *base2)
+{
+	return base1->kind == base2->kind && base1->qualifiers == base2->qualifiers;
+}
+
+static bool function_types_same(const function_type_t *func0,
+                                const function_type_t *func1)
+{
+	if (!types_same(func0->return_type, func1->return_type))
+		return false;
+	for (function_parameter_t *param0 = func0->parameters,
+	                          *param1 = func1->parameters;
+	     param0 != NULL && param1 != NULL;
+	     param0 = param0->next, param1 = param1->next) {
+	    if (param0 == NULL || param1 == NULL)
+			return false;
+		if (!types_same(param0->type, param1->type))
+			return false;
+	}
+	return func0->modifiers == func1->modifiers
+	    && func0->variadic == func1->variadic
+	    && func0->unspecified_parameters == func1->unspecified_parameters
+	    && func0->kr_style_parameters == func1->kr_style_parameters
+	    && func0->typegeneric == func1->typegeneric
+	    && func0->linkage == func1->linkage
+	    && func0->calling_convention == func1->calling_convention;
+}
+
+static bool array_types_same(const array_type_t *array0,
+                             const array_type_t *array1)
+{
+	if (!types_same(array0->element_type, array1->element_type))
+		return false;
+	return array0->size == array1->size
+	    && array0->is_static == array1->is_static
+	    && array0->is_variable == array1->is_variable
+	    && array0->has_implicit_size == array1->has_implicit_size
+	    && array0->size_constant == array1->size_constant
+	    && array0->is_vla == array1->is_vla;
+}
+
+bool types_same(type_t *type0, type_t *type1)
+{
+	if (type0 == type1)
+		return true;
+	type_t *skipped0 = skip_typeref(type0);
+	type_t *skipped1 = skip_typeref(type1);
+	if (skipped0 == skipped1)
+		return true;
+	if (!type_base_same(&skipped0->base, &skipped1->base))
+		return false;
+
+	switch (skipped0->kind) {
+	case TYPE_ERROR:
+	case TYPE_ATOMIC:
+	case TYPE_COMPLEX:
+	case TYPE_IMAGINARY:
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+	case TYPE_ENUM:
+	case TYPE_VOID:
+	case TYPE_BUILTIN_TEMPLATE:
+		/* if we are here, then the two types have different attributes or
+		 * type_hash would have unified them. */
+		return false;
+	case TYPE_POINTER:
+		return types_same(skipped0->pointer.points_to,
+		                  skipped1->pointer.points_to);
+	case TYPE_REFERENCE:
+		return types_same(skipped0->reference.refers_to,
+		                  skipped1->reference.refers_to);
+	case TYPE_ARRAY:
+		return array_types_same(&skipped0->array, &skipped1->array);
+	case TYPE_FUNCTION:
+		return function_types_same(&skipped0->function, &skipped1->function);
+	case TYPE_TYPEOF:
+	case TYPE_TYPEDEF:
+		/* should be skipped */
+		break;
+	}
+	panic("invalid type");
+}
+
 /**
  * Skip all typerefs and return the underlying type.
  */

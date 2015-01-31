@@ -3972,7 +3972,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				if (dialect.cpp) {
 					/* C++ allows double typedef if they are identical
 					 * (after skipping typedefs) */
-					if (type == prev_type)
+					if (types_same(type, prev_type))
 						goto finish;
 				} else {
 					/* GCC extension: redef in system headers is allowed */

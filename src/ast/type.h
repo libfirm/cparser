@@ -201,6 +201,11 @@ bool types_compatible_ignore_qualifiers(const type_t *type1,
                                         const type_t *type2);
 
 /**
+ * Check if two types are the same after resolving all typerefs.
+ */
+bool types_same(type_t *type0, type_t *type1);
+
+/**
  * Returns the unqualified type of a given type.
  *
  * @param type  The type.
