@@ -1336,8 +1336,6 @@ static attribute_t *parse_attributes(attribute_t *first)
 			break;
 
 		case T___thiscall:
-			/* TODO record modifier */
-			warningf(WARN_OTHER, HERE, "Ignoring declaration modifier %K", &token);
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_THISCALL);
 			eat(T___thiscall);
 			break;

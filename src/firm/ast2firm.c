@@ -336,7 +336,7 @@ is_cdecl:
 		break;
 
 	case CC_THISCALL:
-		/* Hmm, leave default, not accepted by the parser yet. */
+		/* TODO */
 		break;
 	}
 
