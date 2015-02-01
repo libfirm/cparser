@@ -1926,7 +1926,7 @@ check_type:
 		expression_t         const *const t    = expression->conditional.true_expression;
 		expression_classification_t const tcls = t == NULL ? ccls : is_constant_expression(t);
 		expression_classification_t const fcls = is_constant_expression(expression->conditional.false_expression);
-		if (ccls == EXPR_CLASS_INTEGER_CONSTANT &&
+		if (ccls >= EXPR_CLASS_CONSTANT &&
 		    tcls == EXPR_CLASS_INTEGER_CONSTANT &&
 		    fcls == EXPR_CLASS_INTEGER_CONSTANT)
 			return EXPR_CLASS_INTEGER_CONSTANT;
