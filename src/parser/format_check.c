@@ -569,11 +569,12 @@ static void check_scanf_format(const call_argument_t *arg,
 {
 	/* find format arg */
 	unsigned idx = 0;
-	for (; idx < spec->fmt_idx; ++idx) {
-		if (arg == NULL)
-			return;
-		arg = arg->next;
+	for (; arg != NULL; ++idx, arg = arg->next) {
+		if (idx == spec->fmt_idx)
+			break;
 	}
+	if (arg == NULL)
+		return;
 
 	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST) {
