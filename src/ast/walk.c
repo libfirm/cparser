@@ -226,7 +226,7 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 			walk_expression(entity->enum_value.value, env);
 		return;
 	case ENTITY_TYPEDEF:
-		walk_type(entity->typedefe.type, env);
+		walk_type(entity->declaration.type, env);
 		return;
 	case ENTITY_FUNCTION:
 		walk_type(entity->declaration.type, env);

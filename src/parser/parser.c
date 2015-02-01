@@ -2393,9 +2393,6 @@ static entity_t *create_error_entity(symbol_t *const symbol,
 	if (is_declaration(entity)) {
 		entity->declaration.type     = type_error_type;
 		entity->declaration.implicit = true;
-	} else if (kind == ENTITY_TYPEDEF) {
-		entity->typedefe.type    = type_error_type;
-		entity->typedefe.builtin = true;
 	}
 	if (kind != ENTITY_COMPOUND_MEMBER)
 		record_entity(entity, false);
@@ -2408,7 +2405,7 @@ static type_t *parse_typedef_name(void)
 	entity_t *const entity = get_entity(symbol, NAMESPACE_NORMAL);
 	if (entity && entity->kind == ENTITY_TYPEDEF) {
 		type_t *type            = allocate_type_zero(TYPE_TYPEDEF);
-		type->typedeft.typedefe = &entity->typedefe;
+		type->typedeft.typedefe = &entity->declaration;
 		return type;
 	}
 
@@ -2458,7 +2455,7 @@ static type_t *parse_typedef_name(void)
 		errorf(HERE, "'%Y' does not name a type", symbol);
 		entity_t *const errent = create_error_entity(symbol, ENTITY_TYPEDEF);
 		type_t   *const type   = allocate_type_zero(TYPE_TYPEDEF);
-		type->typedeft.typedefe = &errent->typedefe;
+		type->typedeft.typedefe = &errent->declaration;
 		return type;
 	}
 }
@@ -3028,7 +3025,7 @@ static bool has_parameters(void)
 			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
 			return true;
-		type_t const *const type = skip_typeref(entity->typedefe.type);
+		type_t const *const type = skip_typeref(entity->declaration.type);
 		if (!is_type_void(type))
 			return true;
 		if (dialect.cpp) {
@@ -3582,16 +3579,17 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	*anchor = specifiers->attributes;
 
 	entity_t *entity;
+	/* create a declaration type entity */
+	position_t const *const pos = env.symbol ? &env.pos : &specifiers->pos;
 	if (specifiers->storage_class == STORAGE_CLASS_TYPEDEF) {
 		entity = allocate_entity_zero(ENTITY_TYPEDEF, NAMESPACE_NORMAL,
-		                              env.symbol, &env.pos);
-		entity->typedefe.type = orig_type;
+									  env.symbol, &env.pos);
 
 		if (anonymous_entity != NULL) {
 			if (is_type_compound(type)) {
 				assert(anonymous_entity->compound.alias == NULL);
 				assert(anonymous_entity->kind == ENTITY_STRUCT ||
-				       anonymous_entity->kind == ENTITY_UNION);
+					   anonymous_entity->kind == ENTITY_UNION);
 				anonymous_entity->compound.alias = entity;
 				anonymous_entity = NULL;
 			} else if (is_type_enum(type)) {
@@ -3601,80 +3599,76 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				anonymous_entity = NULL;
 			}
 		}
+	} else if (flags & DECL_CREATE_COMPOUND_MEMBER) {
+		entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER,
+									  NAMESPACE_NORMAL, env.symbol, pos);
+
+		if (env.symbol != NULL) {
+			if (specifiers->is_inline && is_type_valid(type))
+				errorf(&env.pos, "'%N' declared 'inline'", entity);
+
+			if (specifiers->thread_local
+				|| specifiers->storage_class != STORAGE_CLASS_NONE)
+				errorf(&env.pos, "'%N' must have no storage class", entity);
+		}
+
+		entity->declaration.alignment = get_type_alignment_compound(orig_type);
 	} else {
-		/* create a declaration type entity */
-		position_t const *const pos = env.symbol ? &env.pos : &specifiers->pos;
-		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
-			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER,
-			                              NAMESPACE_NORMAL, env.symbol, pos);
+		if (flags & DECL_IS_PARAMETER) {
+			entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
+			orig_type = semantic_parameter(&env.pos, orig_type, specifiers, entity);
+		} else if (is_type_function(type)) {
+			entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
+			entity->function.is_inline      = specifiers->is_inline;
+			entity->function.elf_visibility = default_visibility;
+			entity->function.parameters     = env.parameters;
+
+			if (env.symbol != NULL) {
+				/* this needs fixes for C++ */
+				bool in_function_scope = current_function != NULL;
+
+				if (specifiers->thread_local || (
+					  specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+					  specifiers->storage_class != STORAGE_CLASS_NONE   &&
+					  (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
+					))
+					errorf(&env.pos, "invalid storage class for '%N'", entity);
+			}
+		} else {
+			entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
+			entity->variable.elf_visibility = default_visibility;
+			entity->variable.thread_local   = specifiers->thread_local;
 
 			if (env.symbol != NULL) {
 				if (specifiers->is_inline && is_type_valid(type))
 					errorf(&env.pos, "'%N' declared 'inline'", entity);
 
-				if (specifiers->thread_local
-				    || specifiers->storage_class != STORAGE_CLASS_NONE)
-					errorf(&env.pos, "'%N' must have no storage class", entity);
-			}
-
-			entity->declaration.alignment = get_type_alignment_compound(orig_type);
-		} else {
-			if (flags & DECL_IS_PARAMETER) {
-				entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
-				orig_type = semantic_parameter(&env.pos, orig_type, specifiers, entity);
-			} else if (is_type_function(type)) {
-				entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
-				entity->function.is_inline      = specifiers->is_inline;
-				entity->function.elf_visibility = default_visibility;
-				entity->function.parameters     = env.parameters;
-
-				if (env.symbol != NULL) {
-					/* this needs fixes for C++ */
-					bool in_function_scope = current_function != NULL;
-
-					if (specifiers->thread_local || (
-					      specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-					      specifiers->storage_class != STORAGE_CLASS_NONE   &&
-					      (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
-					    ))
-						errorf(&env.pos, "invalid storage class for '%N'", entity);
-				}
-			} else {
-				entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
-				entity->variable.elf_visibility = default_visibility;
-				entity->variable.thread_local   = specifiers->thread_local;
-
-				if (env.symbol != NULL) {
-					if (specifiers->is_inline && is_type_valid(type))
-						errorf(&env.pos, "'%N' declared 'inline'", entity);
-
-					if (current_scope == file_scope) {
-						if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-								specifiers->storage_class != STORAGE_CLASS_NONE   &&
-								specifiers->storage_class != STORAGE_CLASS_STATIC)
-							goto invalid_storage_class;
-					} else if (specifiers->thread_local
-					       && specifiers->storage_class == STORAGE_CLASS_NONE) {
+				if (current_scope == file_scope) {
+					if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+							specifiers->storage_class != STORAGE_CLASS_NONE   &&
+							specifiers->storage_class != STORAGE_CLASS_STATIC)
+						goto invalid_storage_class;
+				} else if (specifiers->thread_local
+					   && specifiers->storage_class == STORAGE_CLASS_NONE) {
 invalid_storage_class:
-						errorf(&env.pos, "invalid storage class for '%N'", entity);
-					}
+					errorf(&env.pos, "invalid storage class for '%N'", entity);
 				}
 			}
-
-			entity->declaration.alignment = get_type_alignment(orig_type);
 		}
 
-		entity->declaration.type       = orig_type;
-		entity->declaration.modifiers  = env.modifiers;
-		entity->declaration.attributes = attributes;
-
-		storage_class_t storage_class = specifiers->storage_class;
-		entity->declaration.declared_storage_class = storage_class;
-
-		if (storage_class == STORAGE_CLASS_NONE && current_function != NULL)
-			storage_class = STORAGE_CLASS_AUTO;
-		entity->declaration.storage_class = storage_class;
+		entity->declaration.alignment = get_type_alignment(orig_type);
 	}
+
+	entity->declaration.type       = orig_type;
+	entity->declaration.modifiers  = env.modifiers;
+	entity->declaration.attributes = attributes;
+
+	storage_class_t storage_class = specifiers->storage_class;
+	entity->declaration.declared_storage_class = storage_class;
+
+	if (storage_class == STORAGE_CLASS_NONE && current_function != NULL)
+		storage_class = STORAGE_CLASS_AUTO;
+	entity->declaration.storage_class = storage_class;
 
 	if (attributes != NULL)
 		handle_entity_attributes(attributes, entity);
@@ -3782,8 +3776,6 @@ static bool is_entity_valid(entity_t *const ent)
 {
 	if (is_declaration(ent)) {
 		return is_type_valid(skip_typeref(ent->declaration.type));
-	} else if (ent->kind == ENTITY_TYPEDEF) {
-		return is_type_valid(skip_typeref(ent->typedefe.type));
 	}
 	return true;
 }
@@ -3967,8 +3959,8 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				goto finish;
 			}
 			if (kind == ENTITY_TYPEDEF) {
-				type_t *const type      = skip_typeref(entity->typedefe.type);
-				type_t *const prev_type = skip_typeref(previous->typedefe.type);
+				type_t *const type      = skip_typeref(entity->declaration.type);
+				type_t *const prev_type = skip_typeref(previous->declaration.type);
 				if (dialect.cpp) {
 					/* C++ allows double typedef if they are identical
 					 * (after skipping typedefs) */
@@ -5947,7 +5939,7 @@ static expression_t *parse_reference(void)
 
 	expression_kind_t kind;
 	type_t           *orig_type;
-	if (is_declaration(entity)) {
+	if (is_declaration(entity) && entity->kind != ENTITY_TYPEDEF) {
 		entity->declaration.used = true;
 		kind      = EXPR_REFERENCE;
 		orig_type = entity->declaration.type;
@@ -8284,7 +8276,7 @@ static bool has_const_fields(const compound_type_t *type)
 	entity_t   *entry    = compound->members.entities;
 
 	for (; entry != NULL; entry = entry->base.next) {
-		if (!is_declaration(entry))
+		if (!is_declaration(entry) || entry->kind == ENTITY_TYPEDEF)
 			continue;
 
 		const type_t *decl_type = skip_typeref(entry->declaration.type);
@@ -10596,7 +10588,7 @@ static void check_unused_globals(void)
 
 	for (const entity_t *entity = file_scope->entities; entity != NULL;
 	     entity = entity->base.next) {
-		if (!is_declaration(entity))
+		if (!is_declaration(entity) || entity->kind == ENTITY_TYPEDEF)
 			continue;
 
 		const declaration_t *declaration = &entity->declaration;

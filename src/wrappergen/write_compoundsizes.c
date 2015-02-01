@@ -15,7 +15,7 @@ void write_compoundsizes(FILE *output, const translation_unit_t *unit)
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
 
-		type_t *type = skip_typeref(entity->typedefe.type);
+		type_t *type = skip_typeref(entity->declaration.type);
 		if (!is_type_compound(type))
 			continue;
 

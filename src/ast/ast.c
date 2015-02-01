@@ -895,7 +895,7 @@ static void print_case_label(const case_label_statement_t *statement)
 static void print_typedef(const entity_t *entity)
 {
 	print_string("typedef ");
-	print_type_ext(entity->typedefe.type, entity->base.symbol, NULL);
+	print_type_ext(entity->declaration.type, entity->base.symbol, NULL);
 	print_char(';');
 }
 
@@ -905,9 +905,6 @@ static void print_typedef(const entity_t *entity)
  */
 static bool is_generated_entity(const entity_t *entity)
 {
-	if (entity->kind == ENTITY_TYPEDEF)
-		return entity->typedefe.builtin;
-
 	if (is_declaration(entity))
 		return entity->declaration.implicit;
 

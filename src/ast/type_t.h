@@ -129,9 +129,9 @@ struct enum_type_t {
 };
 
 struct typedef_type_t {
-	type_base_t  base;
-	typedef_t   *typedefe;
-	type_t      *resolved_type;
+	type_base_t    base;
+	declaration_t *typedefe;
+	type_t        *resolved_type;
 };
 
 struct typeof_type_t {

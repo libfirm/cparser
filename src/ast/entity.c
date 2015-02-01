@@ -45,7 +45,7 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_PARAMETER]       = sizeof(variable_t),
 		[ENTITY_COMPOUND_MEMBER] = sizeof(compound_member_t),
 		[ENTITY_FUNCTION]        = sizeof(function_t),
-		[ENTITY_TYPEDEF]         = sizeof(typedef_t),
+		[ENTITY_TYPEDEF]         = sizeof(declaration_t),
 		[ENTITY_STRUCT]          = sizeof(compound_t),
 		[ENTITY_UNION]           = sizeof(compound_t),
 		[ENTITY_ENUM]            = sizeof(enum_t),

@@ -185,8 +185,6 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	switch (entity->kind) {
 	case DECLARATION_KIND_CASES:
 		entity->declaration.alignment = alignment;
-	case ENTITY_TYPEDEF:
-		entity->typedefe.alignment = alignment;
 		break;
 	case ENTITY_STRUCT:
 	case ENTITY_UNION:
@@ -317,11 +315,7 @@ static void handle_attribute_alias(const attribute_t *attribute,
 
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 {
-	if (entity->kind == ENTITY_TYPEDEF) {
-		type_t *type = entity->typedefe.type;
-		type = handle_type_attributes(attributes, type);
-		entity->typedefe.type = type;
-	} else if (is_declaration(entity)) {
+	if (is_declaration(entity)) {
 		type_t *type = entity->declaration.type;
 		type = handle_type_attributes(attributes, type);
 		entity->declaration.type = type;
@@ -389,13 +383,11 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 
 	if (modifiers != 0) {
 		switch (entity->kind) {
-		case ENTITY_TYPEDEF:
-			entity->typedefe.modifiers |= modifiers;
-			break;
 		case ENTITY_UNION:
 		case ENTITY_STRUCT:
 			entity->compound.modifiers |= modifiers;
 			break;
+		case ENTITY_TYPEDEF:
 		case ENTITY_COMPOUND_MEMBER:
 		case ENTITY_VARIABLE:
 		case ENTITY_FUNCTION:

@@ -57,7 +57,7 @@ static entity_t *find_typedef(const type_t *type)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
-		if (entity->typedefe.type == type)
+		if (entity->declaration.type == type)
 			break;
 	}
 
@@ -289,7 +289,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
 
-		type_t *type = entity->typedefe.type;
+		type_t *type = entity->declaration.type;
 		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
 		} else if (type->kind == TYPE_ENUM) {

@@ -4190,7 +4190,7 @@ static void create_local_declaration(entity_t *entity)
 		}
 		return;
 	case STORAGE_CLASS_TYPEDEF:
-		break;
+		return;
 	}
 	panic("invalid storage class");
 }
@@ -4210,7 +4210,7 @@ static void initialize_local_declaration(entity_t *entity)
 
 	// no need to emit code in dead blocks
 	if (entity->declaration.storage_class != STORAGE_CLASS_STATIC
-			&& !currently_reachable())
+	    && !currently_reachable())
 		return;
 
 	switch ((declaration_kind_t) entity->declaration.kind) {
@@ -4247,15 +4247,15 @@ static ir_node *declaration_statement_to_firm(declaration_statement_t *statement
 
 	entity_t *const last = statement->declarations_end;
 	for ( ;; entity = entity->base.next) {
-		if (is_declaration(entity)) {
-			initialize_local_declaration(entity);
-		} else if (entity->kind == ENTITY_TYPEDEF) {
+		if (entity->kind == ENTITY_TYPEDEF) {
 			/* §6.7.7:3  Any array size expressions associated with variable length
 			 * array declarators are evaluated each time the declaration of the
 			 * typedef name is reached in the order of execution. */
-			type_t *const type = skip_typeref(entity->typedefe.type);
+			type_t *const type = skip_typeref(entity->declaration.type);
 			if (is_type_array(type) && type->array.is_vla)
 				get_vla_size(&type->array);
+		} else if (is_declaration(entity)) {
+			initialize_local_declaration(entity);
 		}
 		if (entity == last)
 			break;

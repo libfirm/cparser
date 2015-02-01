@@ -93,7 +93,7 @@ static entity_t *find_typedef(const type_t *type)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
-		if (entity->typedefe.type == type)
+		if (entity->declaration.type == type)
 			break;
 	}
 
@@ -107,7 +107,7 @@ static entity_t *find_enum_typedef(const enum_t *enume)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
-		type_t *type = entity->typedefe.type;
+		type_t *type = entity->declaration.type;
 		if (type->kind != TYPE_ENUM)
 			continue;
 
@@ -484,7 +484,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 				continue;
 			write_enum(entity->base.symbol, &entity->enume);
 		} else if (entity->kind == ENTITY_TYPEDEF) {
-			type_t *type = entity->typedefe.type;
+			type_t *type = entity->declaration.type;
 			if (type->kind == TYPE_ENUM) {
 				write_enum(entity->base.symbol, type->enumt.enume);
 			}

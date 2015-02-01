@@ -151,14 +151,6 @@ struct namespace_t {
 	scope_t       members;
 };
 
-struct typedef_t {
-	entity_base_t     base;
-	decl_modifiers_t  modifiers;
-	type_t           *type;
-	il_alignment_t    alignment;
-	bool              builtin : 1;
-};
-
 struct declaration_t {
 	entity_base_t           base;
 	type_t                 *type;
@@ -256,7 +248,6 @@ union entity_t {
 	enum_value_t          enum_value;
 	label_t               label;
 	namespace_t           namespacee;
-	typedef_t             typedefe;
 	declaration_t         declaration;
 	variable_t            variable;
 	function_t            function;
@@ -268,7 +259,8 @@ union entity_t {
 	     ENTITY_FUNCTION:        \
 	case ENTITY_VARIABLE:        \
 	case ENTITY_PARAMETER:       \
-	case ENTITY_COMPOUND_MEMBER
+	case ENTITY_COMPOUND_MEMBER: \
+	case ENTITY_TYPEDEF
 
 static inline bool is_declaration(const entity_t *entity)
 {
