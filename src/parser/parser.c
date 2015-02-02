@@ -9160,9 +9160,9 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 }
 
 /**
- * Parse an asm statement.
+ * Parse a GCC-style asm statement.
  */
-static statement_t *parse_asm_statement(void)
+static statement_t *parse_gcc_asm_statement(void)
 {
 	statement_t     *statement     = allocate_statement_zero(STATEMENT_ASM);
 	asm_statement_t *asm_statement = &statement->asms;
@@ -9219,6 +9219,37 @@ static statement_t *parse_asm_statement(void)
 	normalize_asm_text(asm_statement);
 
 	return statement;
+}
+
+/* Parse an MSC-style asm statement. */
+static statement_t *parse_ms_asm_statement(void)
+{
+	statement_t *const stmt = allocate_statement_zero(STATEMENT_ASM);
+	begin_string_construction();
+	stmt->asms.asm_text = finish_string_construction(STRING_ENCODING_CHAR);
+
+	errorf(HERE, "'asm { ... }' not supported");
+
+	eat(T_asm);
+	eat('{');
+
+	/* Skip body. */
+	while (token.kind != '}' && token.kind != T_EOF) {
+		next_token();
+	}
+	expect('}');
+	accept(';'); // Optional ';' at the end
+
+	return stmt;
+}
+
+static statement_t *parse_asm_statement(void)
+{
+	if (look_ahead(1)->kind == '{') {
+		return parse_ms_asm_statement();
+	} else {
+		return parse_gcc_asm_statement();
+	}
 }
 
 static statement_t *parse_label_inner_statement(statement_t const *const label,
