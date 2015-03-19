@@ -1371,12 +1371,12 @@ static designator_t *parse_designation(void)
 			add_anchor_token(T_DOTDOTDOT);
 			designator->array_index
 				= parse_integer_constant_expression("array index");
+			rem_anchor_token(T_DOTDOTDOT);
 			if (accept(T_DOTDOTDOT)) {
 				designator->range_last
 					= parse_integer_constant_expression("array range end");
 				errorf(&designator->pos, "range initializer not supported");
 			}
-			rem_anchor_token(T_DOTDOTDOT);
 			rem_anchor_token(']');
 			expect(']');
 			break;
