@@ -892,13 +892,6 @@ static void print_case_label(const case_label_statement_t *statement)
 	print_indented_statement(statement->statement);
 }
 
-static void print_typedef(const entity_t *entity)
-{
-	print_string("typedef ");
-	print_type_ext(entity->declaration.type, entity->base.symbol, NULL);
-	print_char(';');
-}
-
 /**
  * returns true if the entity is a compiler generated one and has no real
  * correspondenc in the source file
@@ -1357,11 +1350,10 @@ void print_entity(const entity_t *entity)
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 	case ENTITY_FUNCTION:
+	case ENTITY_TYPEDEF:
 		print_declaration(entity);
 		return;
-	case ENTITY_TYPEDEF:
-		print_typedef(entity);
-		return;
+
 	case ENTITY_CLASS:
 	case ENTITY_STRUCT:
 	case ENTITY_UNION:
