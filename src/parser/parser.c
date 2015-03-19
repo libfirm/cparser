@@ -9294,6 +9294,7 @@ static statement_t *parse_case_statement(void)
 
 	eat(T_case);
 	add_anchor_token(':');
+	add_anchor_token(T_DOTDOTDOT);
 
 	expression_t *expression = parse_integer_constant_expression("case label");
 	type_t       *type       = expression->base.type;
@@ -9314,6 +9315,7 @@ static statement_t *parse_case_statement(void)
 	}
 	statement->case_label.expression = expression;
 
+	rem_anchor_token(T_DOTDOTDOT);
 	if (accept(T_DOTDOTDOT)) {
 		if (!GNU_MODE)
 			errorf(pos, "case ranges are a GCC extension");
