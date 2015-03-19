@@ -952,6 +952,8 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 	print_string(");");
 }
 
+static void print_declaration(entity_t const *entity);
+
 /**
  * Print a for statement.
  *
@@ -1269,7 +1271,7 @@ static void print_namespace(const namespace_t *namespace)
 /**
  * Print a variable or function declaration
  */
-void print_declaration(const entity_t *entity)
+static void print_declaration(entity_t const *const entity)
 {
 	assert(is_declaration(entity));
 	const declaration_t *declaration = &entity->declaration;
