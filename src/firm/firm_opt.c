@@ -932,6 +932,7 @@ void choose_optimization_pack(int level)
 	switch (level) {
 	default:
 	case 3:
+		set_option("bool");
 		set_option("thread-jumps");
 		set_option("if-conversion");
 		/* FALLTHROUGH */
