@@ -3961,8 +3961,7 @@ static bool var_needs_entity(variable_t const *const var)
 	if (var->address_taken)
 		return true;
 	type_t *const type = skip_typeref(var->base.type);
-	return (!is_type_scalar(type) && !is_type_complex(type))
-	     || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+	return !is_type_scalar(type) || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
 }
 
 /**
