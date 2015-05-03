@@ -55,81 +55,45 @@ typedef struct format_spec_t {
 	unsigned       arg_idx;  /**< index of the first argument */
 } format_spec_t;
 
+static char const *const format_length_modifier_names[] = {
+	[FMT_MOD_NONE] = "",
+	[FMT_MOD_L]    = "L",
+	[FMT_MOD_hh]   = "hh",
+	[FMT_MOD_h]    = "h",
+	[FMT_MOD_l]    = "l",
+	[FMT_MOD_ll]   = "ll",
+	[FMT_MOD_j]    = "j",
+	[FMT_MOD_t]    = "t",
+	[FMT_MOD_z]    = "z",
+	[FMT_MOD_q]    = "q",
+	/* only in microsoft mode */
+	[FMT_MOD_w]    = "w",
+	[FMT_MOD_I]    = "I",
+	[FMT_MOD_I32]  = "I32",
+	[FMT_MOD_I64]  = "I64"
+};
+
 static const char* get_length_modifier_name(const format_length_modifier_t mod)
 {
-	static const char* const names[] = {
-		[FMT_MOD_NONE] = "",
-		[FMT_MOD_L]    = "L",
-		[FMT_MOD_hh]   = "hh",
-		[FMT_MOD_h]    = "h",
-		[FMT_MOD_l]    = "l",
-		[FMT_MOD_ll]   = "ll",
-		[FMT_MOD_j]    = "j",
-		[FMT_MOD_t]    = "t",
-		[FMT_MOD_z]    = "z",
-		[FMT_MOD_q]    = "q",
-		/* only in microsoft mode */
-		[FMT_MOD_w]    = "w",
-		[FMT_MOD_I]    = "I",
-		[FMT_MOD_I32]  = "I32",
-		[FMT_MOD_I64]  = "I64"
-	};
-	assert((size_t)mod < ARRAY_SIZE(names));
-	return names[mod];
+	assert((size_t)mod < ARRAY_SIZE(format_length_modifier_names));
+	return format_length_modifier_names[mod];
 }
 
 static format_length_modifier_t parse_length_modifier(char const **const c_inout)
 {
-	char              const *c = *c_inout;
-	format_length_modifier_t mod;
-	switch (*c) {
-	case 'h':
-		if (c[1] == 'h') {
-			c += 2, mod = FMT_MOD_hh;
-		} else {
-			c += 1, mod = FMT_MOD_h;
+	format_length_modifier_t mod      = FMT_MOD_NONE;
+	char        const *const c        = *c_inout;
+	char        const *      last_end = c;
+	char const *const *      i        = format_length_modifier_names + 1;
+	char const *const *const e        = dialect.ms ? endof(format_length_modifier_names) : format_length_modifier_names + FMT_MOD_w;
+	for (; i != e; ++i) {
+		char const *const end = strstart(c, *i);
+		if (end && last_end < end) {
+			last_end = end;
+			mod      = (format_length_modifier_t)(i - format_length_modifier_names);
 		}
-		break;
-
-	case 'l':
-		if (c[1] == 'l') {
-			c += 2, mod = FMT_MOD_ll;
-		} else {
-			c += 1, mod = FMT_MOD_l;
-		}
-		break;
-
-	case 'L': ++c, mod = FMT_MOD_L; break;
-	case 'j': ++c, mod = FMT_MOD_j; break;
-	case 'q': ++c, mod = FMT_MOD_q; break;
-	case 't': ++c, mod = FMT_MOD_t; break;
-	case 'z': ++c, mod = FMT_MOD_z; break;
-
-	/* microsoft mode */
-	case 'w':
-		if (!dialect.ms)
-			goto mod_none;
-		++c, mod = FMT_MOD_w;
-		break;
-
-	case 'I':
-		if (!dialect.ms)
-			goto mod_none;
-		if (c[1] == '3' && c[2] == '2') {
-			c += 3, mod = FMT_MOD_I32;
-		} else if (c[1] == '6' && c[2] == '4') {
-			c += 3, mod = FMT_MOD_I64;
-		} else {
-			c += 1, mod = FMT_MOD_I;
-		}
-		break;
-
-	default:
-mod_none:
-		mod = FMT_MOD_NONE;
-		break;
 	}
-	*c_inout = c;
+	*c_inout = last_end;
 	return mod;
 }
 
