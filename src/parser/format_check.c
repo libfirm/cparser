@@ -78,6 +78,61 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 	return names[mod];
 }
 
+static format_length_modifier_t parse_length_modifier(char const **const c_inout)
+{
+	char              const *c = *c_inout;
+	format_length_modifier_t mod;
+	switch (*c) {
+	case 'h':
+		if (c[1] == 'h') {
+			c += 2, mod = FMT_MOD_hh;
+		} else {
+			c += 1, mod = FMT_MOD_h;
+		}
+		break;
+
+	case 'l':
+		if (c[1] == 'l') {
+			c += 2, mod = FMT_MOD_ll;
+		} else {
+			c += 1, mod = FMT_MOD_l;
+		}
+		break;
+
+	case 'L': ++c, mod = FMT_MOD_L; break;
+	case 'j': ++c, mod = FMT_MOD_j; break;
+	case 'q': ++c, mod = FMT_MOD_q; break;
+	case 't': ++c, mod = FMT_MOD_t; break;
+	case 'z': ++c, mod = FMT_MOD_z; break;
+
+	/* microsoft mode */
+	case 'w':
+		if (!dialect.ms)
+			goto mod_none;
+		++c, mod = FMT_MOD_w;
+		break;
+
+	case 'I':
+		if (!dialect.ms)
+			goto mod_none;
+		if (c[1] == '3' && c[2] == '2') {
+			c += 3, mod = FMT_MOD_I32;
+		} else if (c[1] == '6' && c[2] == '4') {
+			c += 3, mod = FMT_MOD_I64;
+		} else {
+			c += 1, mod = FMT_MOD_I;
+		}
+		break;
+
+	default:
+mod_none:
+		mod = FMT_MOD_NONE;
+		break;
+	}
+	*c_inout = c;
+	return mod;
+}
+
 static void warn_invalid_length_modifier(const position_t *pos,
                                          const format_length_modifier_t mod,
                                          const char conversion)
@@ -234,72 +289,8 @@ break_fmt_flags:
 			}
 		}
 
-		/* length modifier */
-		format_length_modifier_t fmt_mod;
-		switch (fmt) {
-			case 'h':
-				fmt = *(++c);
-				if (fmt == 'h') {
-					fmt = *(++c);
-					fmt_mod = FMT_MOD_hh;
-				} else {
-					fmt_mod = FMT_MOD_h;
-				}
-				break;
-
-			case 'l':
-				fmt = *(++c);
-				if (fmt == 'l') {
-					fmt = *(++c);
-					fmt_mod = FMT_MOD_ll;
-				} else {
-					fmt_mod = FMT_MOD_l;
-				}
-				break;
-
-			case 'L': fmt = *(++c); fmt_mod = FMT_MOD_L;    break;
-			case 'j': fmt = *(++c); fmt_mod = FMT_MOD_j;    break;
-			case 't': fmt = *(++c); fmt_mod = FMT_MOD_t;    break;
-			case 'z': fmt = *(++c); fmt_mod = FMT_MOD_z;    break;
-			case 'q': fmt = *(++c); fmt_mod = FMT_MOD_q;    break;
-			/* microsoft mode */
-			case 'w':
-				if (dialect.ms) {
-					fmt = *(++c); fmt_mod = FMT_MOD_w;
-				} else {
-					fmt_mod = FMT_MOD_NONE;
-				}
-				break;
-			case 'I':
-				if (dialect.ms) {
-					fmt = *(++c); fmt_mod = FMT_MOD_I;
-					if (fmt == '3') {
-						fmt = *(++c);
-						if (fmt == '2') {
-							fmt = *(++c);
-							fmt_mod = FMT_MOD_I32;
-						} else {
-							/* rewind */
-							fmt = *(--c);
-						}
-					} else if (fmt == '6') {
-						fmt = *(++c);
-						if (fmt == '4') {
-							fmt = *(++c);
-							fmt_mod = FMT_MOD_I64;
-						} else {
-							/* rewind */
-							fmt = *(--c);
-						}
-					}
-				} else {
-					fmt_mod = FMT_MOD_NONE;
-				}
-				break;
-			default:
-				fmt_mod = FMT_MOD_NONE;
-				break;
-		}
+		format_length_modifier_t const fmt_mod = parse_length_modifier(&c);
+		fmt = *c;
 
 		if (fmt == '\0') {
 			warningf(WARN_FORMAT, pos, "dangling %% in format string");
@@ -621,66 +612,8 @@ static void check_scanf_format(const call_argument_t *arg,
 			}
 		}
 
-		/* look for length modifiers */
-		format_length_modifier_t fmt_mod = FMT_MOD_NONE;
-		switch (fmt) {
-		case 'h':
-			fmt = *(++c);
-			if (fmt == 'h') {
-				fmt = *(++c);
-				fmt_mod = FMT_MOD_hh;
-			} else {
-				fmt_mod = FMT_MOD_h;
-			}
-			break;
-
-		case 'l':
-			fmt = *(++c);
-			if (fmt == 'l') {
-				fmt = *(++c);
-				fmt_mod = FMT_MOD_ll;
-			} else {
-				fmt_mod = FMT_MOD_l;
-			}
-			break;
-
-		case 'L': fmt = *(++c); fmt_mod = FMT_MOD_L; break;
-		case 'j': fmt = *(++c); fmt_mod = FMT_MOD_j; break;
-		case 't': fmt = *(++c); fmt_mod = FMT_MOD_t; break;
-		case 'z': fmt = *(++c); fmt_mod = FMT_MOD_z; break;
-		/* microsoft mode */
-		case 'w':
-			if (dialect.ms) {
-				fmt = *(++c);
-				fmt_mod = FMT_MOD_w;
-			}
-			break;
-		case 'I':
-			if (dialect.ms) {
-				fmt = *(++c);
-				fmt_mod = FMT_MOD_I;
-				if (fmt == '3') {
-					fmt = *(++c);
-					if (fmt == '2') {
-						fmt = *(++c);
-						fmt_mod = FMT_MOD_I32;
-					} else {
-						/* rewind */
-						fmt = *(--c);
-					}
-				} else if (fmt == '6') {
-					fmt = *(++c);
-					if (fmt == '4') {
-						fmt = *(++c);
-						fmt_mod = FMT_MOD_I64;
-					} else {
-						/* rewind */
-						fmt = *(--c);
-					}
-				}
-			}
-			break;
-		}
+		format_length_modifier_t const fmt_mod = parse_length_modifier(&c);
+		fmt = *c;
 
 		if (fmt == '\0') {
 			warningf(WARN_FORMAT, pos, "dangling %% with conversion specififer in format string");
