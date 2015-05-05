@@ -120,6 +120,11 @@ done_flags:;
 			++f;
 			field_width = va_arg(ap, int);
 		}
+
+		/* Automatic highlight for some formats. */
+		if (!flag_high)
+			flag_high = strchr("EKNQTYk", *f);
+
 		if (flag_high)
 			fputs(colors.highlight, stderr);
 		switch (*f++) {
@@ -171,46 +176,35 @@ done_flags:;
 
 		case 'Y': {
 			const symbol_t *const symbol = va_arg(ap, const symbol_t*);
-			fputs(colors.highlight, out);
 			fputs(symbol ? symbol->string : "(null)", out);
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'E': {
 			const expression_t* const expr = va_arg(ap, const expression_t*);
-			fputs(colors.highlight, stderr);
 			print_expression(expr);
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'Q': {
 			const unsigned qualifiers = va_arg(ap, unsigned);
-			fputs(colors.highlight, stderr);
 			print_type_qualifiers(qualifiers, QUAL_SEP_NONE);
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'T': {
 			const type_t* const type = va_arg(ap, const type_t*);
-			fputs(colors.highlight, stderr);
 			print_type_ext(type, NULL, NULL);
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'K': {
 			const token_t* const token = va_arg(ap, const token_t*);
-			fputs(colors.highlight, stderr);
 			print_token(out, token);
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'k': {
-			fputs(colors.highlight, stderr);
 			if (extended) {
 				va_list* const toks = va_arg(ap, va_list*);
 				separator_t    sep  = { "", va_arg(ap, const char*) };
@@ -229,27 +223,22 @@ done_flags:;
 				print_token_kind(out, token);
 				fputc('\'', out);
 			}
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
 		case 'N': {
 			entity_t const *const ent = va_arg(ap, entity_t const*);
-			fputs(colors.highlight, stderr);
 			if (extended && is_declaration(ent)) {
 				print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
 			} else {
 				char     const *const ent_kind = get_entity_kind_name(ent->kind);
 				symbol_t const *const sym      = ent->base.symbol;
 				if (sym) {
-					fprintf(out, "%s%s %s%s", colors.highlight, ent_kind,
-					        sym->string, colors.reset_highlight);
+					fprintf(out, "%s %s", ent_kind, sym->string);
 				} else {
-					fprintf(out, "%sanonymous %s%s", colors.highlight, ent_kind,
-					        colors.reset_highlight);
+					fprintf(out, "anonymous %s", ent_kind);
 				}
 			}
-			fputs(colors.reset_highlight, stderr);
 			break;
 		}
 
