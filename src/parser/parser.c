@@ -2643,33 +2643,31 @@ wrong_thread_storage_class:
 		MATCH_TYPE_QUALIFIER(T___uptr,   TYPE_QUALIFIER_UPTR);
 		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
 
-		/* type specifiers */
-#define MATCH_SPECIFIER(token, specifier, name)                         \
-		case token:                                                     \
-			if (type_specifiers & specifier) {                           \
-				errorf(HERE, "multiple " name " type specifiers given"); \
-			} else {                                                    \
-				type_specifiers |= specifier;                           \
-			}                                                           \
-			eat(token); \
-			break
-
-		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
-		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex");
-		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary");
-		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16");
-		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32");
-		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64");
-		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8");
-		MATCH_SPECIFIER(T_bool,       SPECIFIER_BOOL,      "bool");
-		MATCH_SPECIFIER(T_char,       SPECIFIER_CHAR,      "char");
-		MATCH_SPECIFIER(T_double,     SPECIFIER_DOUBLE,    "double");
-		MATCH_SPECIFIER(T_float,      SPECIFIER_FLOAT,     "float");
-		MATCH_SPECIFIER(T_int,        SPECIFIER_INT,       "int");
-		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short");
-		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
-		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
-		MATCH_SPECIFIER(T_wchar_t,    SPECIFIER_WCHAR_T,   "wchar_t");
+		{ /* type specifiers */
+			specifiers_t specifier;
+		case T__Bool:      specifier = SPECIFIER_BOOL;      goto check_specifier;
+		case T__Complex:   specifier = SPECIFIER_COMPLEX;   goto check_specifier;
+		case T__Imaginary: specifier = SPECIFIER_IMAGINARY; goto check_specifier;
+		case T__int16:     specifier = SPECIFIER_INT16;     goto check_specifier;
+		case T__int32:     specifier = SPECIFIER_INT32;     goto check_specifier;
+		case T__int64:     specifier = SPECIFIER_INT64;     goto check_specifier;
+		case T__int8:      specifier = SPECIFIER_INT8;      goto check_specifier;
+		case T_bool:       specifier = SPECIFIER_BOOL;      goto check_specifier;
+		case T_char:       specifier = SPECIFIER_CHAR;      goto check_specifier;
+		case T_double:     specifier = SPECIFIER_DOUBLE;    goto check_specifier;
+		case T_float:      specifier = SPECIFIER_FLOAT;     goto check_specifier;
+		case T_int:        specifier = SPECIFIER_INT;       goto check_specifier;
+		case T_short:      specifier = SPECIFIER_SHORT;     goto check_specifier;
+		case T_signed:     specifier = SPECIFIER_SIGNED;    goto check_specifier;
+		case T_unsigned:   specifier = SPECIFIER_UNSIGNED;  goto check_specifier;
+		case T_wchar_t:    specifier = SPECIFIER_WCHAR_T;   goto check_specifier;
+check_specifier:
+			if (type_specifiers & specifier)
+				errorf(HERE, "multiple %K type specifiers given", &token);
+			type_specifiers |= specifier;
+			next_token();
+			break;
+		}
 
 		case T_inline:
 			eat(T_inline);
