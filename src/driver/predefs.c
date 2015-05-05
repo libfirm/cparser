@@ -19,7 +19,6 @@
 #include "parser/preprocessor.h"
 #include "version.h"
 
-const char *user_label_prefix = "";
 bool predef_optimize;
 bool predef_optimize_size;
 
@@ -380,7 +379,7 @@ void add_predefined_macros(void)
 	add_define("__FLT_EVAL_METHOD__", flt_eval_metod, false);
 
 	/* TODO: query from backend? */
-	add_define("__USER_LABEL_PREFIX__", user_label_prefix, false);
+	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);
 	add_define("__REGISTER_PREFIX__", "", false);
 	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
 

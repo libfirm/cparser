@@ -7,7 +7,6 @@
 
 #include <stdbool.h>
 
-extern const char *user_label_prefix;
 extern bool predef_optimize;
 extern bool predef_optimize_size;
 
