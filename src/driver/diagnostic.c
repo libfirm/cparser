@@ -126,7 +126,7 @@ done_flags:;
 			flag_high = strchr("EKNQTYk", *f);
 
 		if (flag_high)
-			fputs(colors.highlight, stderr);
+			fputs(colors.highlight, out);
 		switch (*f++) {
 		case '%':
 			fputc('%', out);
@@ -246,7 +246,7 @@ done_flags:;
 			panic("unknown format specifier");
 		}
 		if (flag_high)
-			fputs(colors.reset_highlight, stderr);
+			fputs(colors.reset_highlight, out);
 	}
 	fputs(fmt, out); // Print rest.
 }
