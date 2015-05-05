@@ -2002,13 +2002,17 @@ void init_ast(void)
 {
 	obstack_init(&ast_obstack);
 	init_typehash();
-	init_basic_types();
+}
+
+void init_ast_dialect(void)
+{
+	init_predefined_types();
 	init_constfold();
 }
 
 void exit_ast(void)
 {
-	exit_typehash();
 	exit_types();
+	exit_typehash();
 	obstack_free(&ast_obstack, NULL);
 }

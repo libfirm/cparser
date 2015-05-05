@@ -25,6 +25,8 @@ typedef enum lang_features_t {
 
 typedef struct c_dialect_t {
 	atomic_type_kind_t wchar_atomic_kind;
+	atomic_type_kind_t pointer_sized_int;
+	atomic_type_kind_t pointer_sized_uint;
 	bool               freestanding   : 1;
 	bool               char_is_signed : 1;
 	bool               strict         : 1;

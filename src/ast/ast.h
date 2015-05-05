@@ -77,6 +77,11 @@ void init_ast(void);
  */
 void exit_ast(void);
 
+/**
+ * Initialize remaining AST datastructures after the language dialect is set.
+ */
+void init_ast_dialect(void);
+
 void print_expression(const expression_t *expression);
 void print_initializer(const initializer_t *initializer);
 void print_ast(const translation_unit_t *unit);

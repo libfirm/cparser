@@ -429,15 +429,25 @@ void add_predefined_macros(void)
 	define_int_n_types(8,  ATOMIC_TYPE_UCHAR,  ATOMIC_TYPE_SCHAR);
 	define_int_n_types(16, ATOMIC_TYPE_USHORT, ATOMIC_TYPE_SHORT);
 	define_int_n_types(32, ATOMIC_TYPE_UINT,   ATOMIC_TYPE_INT);
-	if (get_type_size(type_void_ptr) == 4) {
-		define_type_type_max("UINTPTR", ATOMIC_TYPE_UINT);
-		define_type_type_max("INTPTR",  ATOMIC_TYPE_INT);
-	} else if (get_type_size(type_void_ptr) == 8) {
-		assert(props[ATOMIC_TYPE_LONG].size == 8);
-		assert(props[ATOMIC_TYPE_ULONG].size == 8);
-		define_type_type_max("UINTPTR", ATOMIC_TYPE_ULONG);
-		define_type_type_max("INTPTR",  ATOMIC_TYPE_LONG);
+	atomic_type_kind_t akind_uintptr;
+	atomic_type_kind_t akind_intptr;
+	if (get_type_size(type_void_ptr) == 4 &&
+		get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+		akind_intptr = ATOMIC_TYPE_INT;
+		akind_uintptr = ATOMIC_TYPE_UINT;
+	} else if (get_type_size(type_void_ptr) == 8 &&
+	           get_atomic_type_size(ATOMIC_TYPE_LONG) == 8) {
+		akind_intptr = ATOMIC_TYPE_LONG;
+		akind_uintptr = ATOMIC_TYPE_ULONG;
+	} else if (get_type_size(type_void_ptr) == 8 &&
+			   get_atomic_type_size(ATOMIC_TYPE_LONGLONG) == 8) {
+		akind_intptr = ATOMIC_TYPE_LONGLONG;
+		akind_uintptr = ATOMIC_TYPE_ULONGLONG;
+	} else {
+		panic("Couldn't determine uintptr type for target");
 	}
+	define_type_type_max("UINTPTR", akind_uintptr);
+	define_type_type_max("INTPTR",  akind_intptr);
 	if (props[ATOMIC_TYPE_LONG].size == 8) {
 		define_int_n_types(64, ATOMIC_TYPE_ULONG, ATOMIC_TYPE_LONG);
 	} else if (props[ATOMIC_TYPE_LONGLONG].size == 8) {

@@ -13,6 +13,8 @@
 bool target_setup(void);
 void warn_experimental_target(void);
 
+void target_adjust_types_and_dialect(void);
+
 typedef struct codegen_option_t codegen_option_t;
 
 struct codegen_option_t {

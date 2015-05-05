@@ -167,16 +167,11 @@ atomic_type_properties_t pointer_properties = {
 	.flags     = ATOMIC_TYPE_FLAG_NONE,
 };
 
-void init_types(unsigned machine_size)
+void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size)
 {
 	obstack_init(&type_obst);
 
 	atomic_type_properties_t *props = atomic_type_properties;
-
-	/* atempt to set some sane defaults based on machine size */
-
-	unsigned int_size   = machine_size < 32 ? 2 : 4;
-	unsigned long_size  = machine_size < 64 ? 4 : 8;
 
 	props[ATOMIC_TYPE_INT].size        = int_size;
 	props[ATOMIC_TYPE_INT].alignment   = int_size;
@@ -186,10 +181,8 @@ void init_types(unsigned machine_size)
 	props[ATOMIC_TYPE_LONG].alignment  = long_size;
 	props[ATOMIC_TYPE_ULONG].size      = long_size;
 	props[ATOMIC_TYPE_ULONG].alignment = long_size;
-
-	pointer_properties.size             = long_size;
-	pointer_properties.alignment        = long_size;
-	pointer_properties.struct_alignment = long_size;
+	pointer_properties.size            = pointer_size;
+	pointer_properties.alignment       = pointer_size;
 
 	props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
@@ -198,6 +191,7 @@ void init_types(unsigned machine_size)
 	for (size_t i = 0; i != ARRAY_SIZE(atomic_type_properties); ++i) {
 		props[i].struct_alignment = props[i].alignment;
 	}
+	pointer_properties.struct_alignment = pointer_size;
 }
 
 void exit_types(void)

@@ -272,7 +272,8 @@ static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 	if (features & _CXX)
 	    dialect.c89 = dialect.cpp = true;
 
-	init_types_dialect();
+	target_adjust_types_and_dialect();
+	init_ast_dialect();
 }
 
 static void init_c_dialect_for_unit(compilation_unit_t *unit)

@@ -96,9 +96,8 @@ extern type_t *type_unsigned_int16;
 extern type_t *type_unsigned_int32;
 extern type_t *type_unsigned_int64;
 
-/** Initialize predefined types that are independent of the language dialect */
-void init_basic_types(void);
-/** Initialize predefined types that depend on the C/C++ language dialect */
-void init_types_dialect(void);
+/** Initialize predefined types. This has to be called after setting up the
+ * language dialect. */
+void init_predefined_types(void);
 
 #endif

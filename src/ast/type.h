@@ -75,13 +75,12 @@ typedef struct typeof_type_t        typeof_type_t;
 typedef union  type_t               type_t;
 
 /**
- * Initializes the type system. Attempts to set some defaults on the atomic
- * types based on a given machine size.
- * These type properties are not final but you should adapt them to your system
- * as your architecture and operating systems application binary interface (ABI)
- * requires.
+ * Initializes the type system. Set some defaults on the atomic types based on a
+ * given sizes. These type properties are not final but you should adapt them
+ * to your system as your architecture and operating systems application binary
+ * interface (ABI) requires.
  */
-void init_types(unsigned machine_size);
+void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size);
 void exit_types(void);
 
 /**

@@ -44,11 +44,26 @@ static void copy_typeprops(atomic_type_properties_t *dest,
 	dest->flags            = src->flags;
 }
 
-static void setup_types(void)
+void target_adjust_types_and_dialect(void)
 {
 	const backend_params *be_params = be_get_backend_param();
 	unsigned machine_size = be_params->machine_size;
-	init_types(machine_size);
+	if (machine_size % BITS_PER_BYTE != 0)
+		panic("Invalid target machine_size");
+	unsigned pointer_size = machine_size / BITS_PER_BYTE;
+	unsigned int_size     = MIN(pointer_size, 4);
+	unsigned long_size    = MIN(pointer_size, 8);
+	/* to ease porting of old c-code microsoft decided to use 32bits
+	 * even for long */
+	const char *operating_system = target.machine->operating_system;
+	if (is_windows_os(operating_system) && pointer_size == 8)
+		long_size = 4;
+	init_types(int_size, long_size, pointer_size);
+
+	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
+	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
+	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
+	dialect.intmax_predefs     = false;
 
 	atomic_type_properties_t *props = atomic_type_properties;
 
@@ -67,8 +82,8 @@ static void setup_types(void)
 		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_ull);
 
 	/* operating system ABI specifics */
-	const char *operating_system = target.machine->operating_system;
 	if (is_darwin_os(operating_system)) {
+		dialect.intmax_predefs = true;
 		if (streq(firm_isa, "ia32")) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
@@ -78,19 +93,18 @@ static void setup_types(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
 	} else if (is_windows_os(operating_system)) {
-		if (streq(firm_isa, "ia32")) {
-			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
-			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
-			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
-		} else if (machine_size == 64) {
-			/* to ease porting of old c-code microsoft decided to use 32bits
-			 * even for long */
-			props[ATOMIC_TYPE_LONG]  = props[ATOMIC_TYPE_INT];
-			props[ATOMIC_TYPE_ULONG] = props[ATOMIC_TYPE_UINT];
-		}
-
-		/* on windows long double is not supported */
+		props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 8;
+		props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 8;
+		props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 8;
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
+		if (machine_size == 32) {
+			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
+			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
+		} else {
+			dialect.pointer_sized_int  = ATOMIC_TYPE_LONGLONG;
+			dialect.pointer_sized_uint = ATOMIC_TYPE_ULONGLONG;
+		}
 	} else if (streq(firm_isa, "ia32")) {
 		props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
 		props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
@@ -112,23 +126,6 @@ static void setup_types(void)
 		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
 		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
-
-	target.byte_order_big_endian = be_params->byte_order_big_endian;
-	target.modulo_shift          = be_params->modulo_shift;
-	target.float_int_overflow    = be_params->float_int_overflow;
-
-	/* initialize firm pointer modes */
-	char     name[64];
-	unsigned bit_size     = machine_size;
-	unsigned modulo_shift = target.modulo_shift;
-	if (modulo_shift != 0 && modulo_shift < bit_size)
-		modulo_shift = bit_size;
-
-	snprintf(name, sizeof(name), "p%u", machine_size);
-	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
-
-	/* Hmm, pointers should be machine size */
-	set_modeP(ptr_mode);
 }
 
 static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
@@ -153,33 +150,26 @@ static void set_be_option(const char *arg)
 static void init_os_support(void)
 {
 	const char *os = target.machine->operating_system;
-	dialect.wchar_atomic_kind        = ATOMIC_TYPE_INT;
-	dialect.intmax_predefs           = false;
 	target.enable_main_collect2_hack = false;
 	driver_default_exe_output        = "a.out";
 
 	if (is_elf_os(os)) {
 		set_create_ld_ident(create_name_linux_elf);
 		target.user_label_prefix = "";
-
 		set_be_option("ia32-gasmode=elf");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (is_darwin_os(os)) {
 		set_create_ld_ident(create_name_macho);
 		target.user_label_prefix = "_";
-		dialect.intmax_predefs   = true;
-
 		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else if (is_windows_os(os)) {
 		set_create_ld_ident(create_name_win32);
-		dialect.wchar_atomic_kind        = ATOMIC_TYPE_USHORT;
 		target.enable_main_collect2_hack = true;
 		target.user_label_prefix         = "_";
 		driver_default_exe_output        = "a.exe";
-
 		set_be_option("ia32-gasmode=mingw");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else {
@@ -332,7 +322,6 @@ bool target_setup(void)
 	bool res = setup_firm_isa();
 	init_os_support();
 	res &= pass_options_to_firm_be();
-	setup_types();
 
 	multilib_directory_target_triple = NULL;
 	if (target.triple == NULL) {
@@ -346,5 +335,10 @@ bool target_setup(void)
 			multilib_directory_target_triple = MULTILIB_M64_TRIPLE;
 #endif
 	}
+
+	const backend_params *be_params = be_get_backend_param();
+	target.byte_order_big_endian = be_params->byte_order_big_endian;
+	target.modulo_shift          = be_params->modulo_shift;
+	target.float_int_overflow    = be_params->float_int_overflow;
 	return res;
 }

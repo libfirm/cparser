@@ -293,6 +293,8 @@ int main(int argc, char **argv)
 	init_default_driver();
 	init_preprocessor();
 	init_gen_firm(); /* initialize early because we need to parse options */
+	init_ast();
+	init_parser();
 
 	options_state_t state;
 	memset(&state, 0, sizeof(state));
@@ -327,8 +329,6 @@ int main(int argc, char **argv)
 
 	if (!target_setup())
 		return EXIT_FAILURE;
-	init_ast();
-	init_parser();
 
 	assert(state.action != NULL);
 	int ret = state.action(argv[0]);
