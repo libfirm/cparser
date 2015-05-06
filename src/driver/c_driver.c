@@ -209,9 +209,10 @@ static void determine_unit_standard(compilation_unit_t *unit)
 	}
 }
 
-static void init_c_dialect(bool is_cpp, lang_standard_t standard)
+static void init_c_dialect(bool const is_cpp, compilation_unit_t const *const unit)
 {
-	lang_features_t features = 0;
+	lang_features_t       features = 0;
+	lang_standard_t const standard = unit->standard;
 	if (!is_cpp) {
 		switch (standard) {
 		case STANDARD_C89:     features = _C89;                       break;
@@ -225,9 +226,10 @@ static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 		case STANDARD_ANSI:
 		case STANDARD_CXX98:
 		case STANDARD_GNUXX98:
-		case STANDARD_DEFAULT:
-			warningf(WARN_OTHER, NULL, "command line option '%hs%hs' is not valid for C", "-std=", str_lang_standard(standard));
-			/* FALLTHROUGH */
+		case STANDARD_DEFAULT: {
+			position_t const pos = { unit->name, 0, 0, 0 };
+			warningf(WARN_OTHER, &pos, "command line option '%hs%hs' is not valid for C", "-std=", str_lang_standard(standard));
+		} /* FALLTHROUGH */
 		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
 		default:
 			panic("invalid standard");
@@ -244,9 +246,10 @@ static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 		case STANDARD_GNU89:
 		case STANDARD_GNU99:
 		case STANDARD_GNU11:
-		case STANDARD_DEFAULT:
-			warningf(WARN_OTHER, NULL, "command line option '%hs%hs' is not valid for C++", "-std=", str_lang_standard(standard));
-			/* FALLTHROUGH */
+		case STANDARD_DEFAULT: {
+			position_t const pos = { unit->name, 0, 0, 0 };
+			warningf(WARN_OTHER, &pos, "command line option '%hs%hs' is not valid for C++", "-std=", str_lang_standard(standard));
+		} /* FALLTHROUGH */
 		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
 		default:
 			panic("invalid standard");
@@ -296,7 +299,7 @@ static void init_c_dialect_for_unit(compilation_unit_t *unit)
 	} else {
 		panic("can't determine c mode from unit type");
 	}
-	init_c_dialect(is_cpp, unit->standard);
+	init_c_dialect(is_cpp, unit);
 }
 
 static const char *get_dependency_filename(compilation_env_t *env,
@@ -884,7 +887,8 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		errorf(NULL, "linker reported an error");
+		position_t const pos = { outname, 0, 0, 0 };
+		errorf(&pos, "linker reported an error");
 		unlink(outname);
 		return false;
 	}
@@ -900,7 +904,8 @@ bool write_ir_file(compilation_env_t *env, compilation_unit_t *unit)
 	close_output(env);
 
 	if (errors != 0) {
-		errorf(NULL, "writing to output failed");
+		position_t const pos = { env->outname, 0, 0, 0 };
+		errorf(&pos, "writing to output failed");
 		unlink(env->outname);
 		return false;
 	}

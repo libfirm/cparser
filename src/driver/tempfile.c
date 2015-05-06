@@ -13,6 +13,7 @@
 #include "adt/array.h"
 #include "adt/error.h"
 #include "adt/obst.h"
+#include "diagnostic.h"
 
 static char         **temp_files;
 static struct obstack file_obst;
@@ -77,8 +78,8 @@ static const char *make_tempsubdir(const char *tempdir)
 	char *templ = obstack_finish(&file_obst);
 	const char *dir = mkdtemp(templ);
 	if (dir == NULL) {
-		fprintf(stderr, "error: mkdtemp could not create a directory"
-			" from template: %s\n", templ);
+		position_t const pos = { templ, 0, 0, 0 };
+		errorf(&pos, "mkdtemp could not create a directory from template");
 		panic("abort");
 	}
 	return dir;
@@ -96,8 +97,8 @@ FILE *make_temp_file(const char *name_orig, const char **name_result)
 	char *name = obstack_finish(&file_obst);
 	FILE *out = fopen(name, "w");
 	if (out == NULL) {
-		fprintf(stderr, "error: could not create temporary file: %s",
-		        strerror(errno));
+		position_t const pos = { name, 0, 0, 0 };
+		errorf(&pos, "could not create temporary file: %s", strerror(errno));
 		panic("abort");
 	}
 
