@@ -226,7 +226,7 @@ static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 		case STANDARD_CXX98:
 		case STANDARD_GNUXX98:
 		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
+			warningf(WARN_OTHER, NULL, "command line option '%hs%hs' is not valid for C", "-std=", str_lang_standard(standard));
 			/* FALLTHROUGH */
 		case STANDARD_GNU99:   features = _C89 | _C99 | _GNUC; break;
 		default:
@@ -245,7 +245,7 @@ static void init_c_dialect(bool is_cpp, lang_standard_t standard)
 		case STANDARD_GNU99:
 		case STANDARD_GNU11:
 		case STANDARD_DEFAULT:
-			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
+			warningf(WARN_OTHER, NULL, "command line option '%hs%hs' is not valid for C++", "-std=", str_lang_standard(standard));
 			/* FALLTHROUGH */
 		case STANDARD_GNUXX98: features = _CXX | _GNUC; break;
 		default:
@@ -382,8 +382,8 @@ static bool run_external_preprocessor(compilation_env_t *env,
 	}
 	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
-		fprintf(stderr, "%s: error: invoking preprocessor failed\n",
-		        unit->name);
+		position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos, "invoking preprocessor failed");
 		return false;
 	}
 	/* we do not really need that anymore */
@@ -448,7 +448,8 @@ static bool assemble(compilation_unit_t *unit, const char *o_name)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "%s: error: assembler reported an error\n", unit->name);
+		position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos, "assembler reported an error");
 		unlink(o_name);
 		return false;
 	}
@@ -956,8 +957,8 @@ int action_print_file_name(const char *argv0)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "%s: error: linker reported an error\n",
-		        print_file_name_file);
+		position_t const pos = { print_file_name_file, 0, 0, 0 };
+		errorf(&pos, "linker reported an error");
 	}
 	obstack_free(&ldflags_obst, commandline);
 	return err;

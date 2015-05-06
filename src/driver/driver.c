@@ -119,8 +119,8 @@ bool open_input(compilation_unit_t *unit)
 	} else {
 		unit->input = fopen(inputname, "r");
 		if (unit->input == NULL) {
-			fprintf(stderr, "%s: error: could not open: %s\n", inputname,
-			        strerror(errno));
+			position_t const pos = { inputname, 0, 0, 0 };
+			errorf(&pos, "could not open: %s", strerror(errno));
 			return false;
 		}
 	}
