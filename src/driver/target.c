@@ -170,14 +170,22 @@ static void init_os_support(void)
 		set_be_option("pic=true");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else if (is_windows_os(os)) {
-		set_create_ld_ident(create_name_win32);
-		target.enable_main_collect2_hack = true;
-		target.user_label_prefix         = "_";
-		driver_default_exe_output        = "a.exe";
+		const char *cpu = target.machine->cpu_type;
+		driver_default_exe_output = "a.exe";
 		set_be_option("objectformat=coff");
 		set_be_option("ia32-struct_in_reg=no");
-		set_be_option("x86_64-x64abi=yes");
-		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
+		if (strstr(os, "mingw") != NULL)
+			target.enable_main_collect2_hack = true;
+		if (streq(cpu, "x86_64")) {
+			set_be_option("x86_64-x64abi=yes");
+			set_create_ld_ident(create_name_win64);
+			target.user_label_prefix = "";
+			set_compilerlib_name_mangle(compilerlib_name_mangle_default);
+		} else {
+			set_create_ld_ident(create_name_win32);
+			target.user_label_prefix = "_";
+			set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
+		}
 	} else {
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
 		exit(EXIT_FAILURE);

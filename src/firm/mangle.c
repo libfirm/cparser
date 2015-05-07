@@ -245,6 +245,29 @@ static ident *make_id_from_obst(void)
 	return id;
 }
 
+ident *create_name_win64(entity_t *entity)
+{
+	const char *name = entity->base.symbol->string;
+
+	if (entity->kind == ENTITY_FUNCTION) {
+		type_t *type = skip_typeref(entity->declaration.type);
+		assert(is_type_function(type));
+		assert(type->function.linkage == LINKAGE_C &&
+			   "Only C name mangling is implemented");
+		if (entity->declaration.modifiers & DM_DLLIMPORT) {
+			/* add prefix for imported symbols */
+			obstack_printf(&obst, "__imp_%s",
+						   entity->function.actual_name->string);
+			return make_id_from_obst();
+		}
+		if (entity->function.actual_name != NULL)
+			name = entity->function.actual_name->string;
+	}
+
+	return new_id_from_str(name);
+
+}
+
 /**
  * Mangles an entity linker (ld) name for win32 usage.
  *
