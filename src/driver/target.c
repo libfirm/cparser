@@ -158,6 +158,7 @@ static void init_os_support(void)
 		target.user_label_prefix = "";
 		set_be_option("objectformat=elf");
 		set_be_option("ia32-struct_in_reg=no");
+		set_be_option("x86_64-x64abi=no");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (is_darwin_os(os)) {
 		set_create_ld_ident(create_name_macho);
@@ -165,6 +166,7 @@ static void init_os_support(void)
 		set_be_option("objectformat=mach-o");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
+		set_be_option("x86_64-x64abi=no");
 		set_be_option("pic=true");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else if (is_windows_os(os)) {
@@ -174,6 +176,7 @@ static void init_os_support(void)
 		driver_default_exe_output        = "a.exe";
 		set_be_option("objectformat=coff");
 		set_be_option("ia32-struct_in_reg=no");
+		set_be_option("x86_64-x64abi=yes");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else {
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
