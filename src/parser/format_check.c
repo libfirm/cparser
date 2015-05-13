@@ -108,9 +108,7 @@ static void warn_invalid_length_modifier(const position_t *pos,
 /**
  * Check printf-style format. Returns number of expected arguments.
  */
-static int internal_check_printf_format(const expression_t *fmt_expr,
-                                        const call_argument_t *arg,
-                                        const format_spec_t *spec)
+static int internal_check_printf_format(expression_t const *fmt_expr, call_argument_t const *arg)
 {
 	while (fmt_expr->kind == EXPR_UNARY_CAST) {
 		fmt_expr = fmt_expr->unary.value;
@@ -125,8 +123,8 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 		expression_t             const *      t = c->true_expression;
 		if (t == NULL)
 			t = c->condition;
-		int const nt = internal_check_printf_format(t,                   arg, spec);
-		int const nf = internal_check_printf_format(c->false_expression, arg, spec);
+		int const nt = internal_check_printf_format(t,                   arg);
+		int const nf = internal_check_printf_format(c->false_expression, arg);
 		return MAX(nt, nf);
 	}
 
@@ -500,7 +498,7 @@ static void check_printf_format(call_argument_t const *arg,
 			for (; idx < spec->arg_idx && arg != NULL; ++idx)
 				arg = arg->next;
 
-			int const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
+			int const num_fmt = internal_check_printf_format(fmt_expr, arg);
 			if (num_fmt < 0)
 				return;
 
