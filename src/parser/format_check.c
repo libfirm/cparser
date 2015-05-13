@@ -108,29 +108,8 @@ static void warn_invalid_length_modifier(const position_t *pos,
 /**
  * Check printf-style format. Returns number of expected arguments.
  */
-static int check_printf_format(expression_t const *fmt_expr, call_argument_t const *arg)
+static int check_printf_format(expression_t const *const fmt_expr, call_argument_t const *arg)
 {
-	while (fmt_expr->kind == EXPR_UNARY_CAST) {
-		fmt_expr = fmt_expr->unary.value;
-	}
-
-	/*
-	 * gettext results in expressions like (X ? "format_string" : Y)
-	 * we assume the left part is the format string
-	 */
-	if (fmt_expr->kind == EXPR_CONDITIONAL) {
-		conditional_expression_t const *const c = &fmt_expr->conditional;
-		expression_t             const *      t = c->true_expression;
-		if (t == NULL)
-			t = c->condition;
-		int const nt = check_printf_format(t,                   arg);
-		int const nf = check_printf_format(c->false_expression, arg);
-		return MAX(nt, nf);
-	}
-
-	if (fmt_expr->kind != EXPR_STRING_LITERAL)
-		return -1;
-
 	const char *string = fmt_expr->string_literal.value->begin;
 	size_t      size   = fmt_expr->string_literal.value->size;
 	const char *c      = string;
@@ -486,15 +465,8 @@ next_arg:
 /**
  * Check scanf-style format.
  */
-static int check_scanf_format(expression_t const *fmt_expr, call_argument_t const *arg)
+static int check_scanf_format(expression_t const *const fmt_expr, call_argument_t const *arg)
 {
-	if (fmt_expr->kind == EXPR_UNARY_CAST) {
-		fmt_expr = fmt_expr->unary.value;
-	}
-
-	if (fmt_expr->kind != EXPR_STRING_LITERAL)
-		return -1;
-
 	const char *string = fmt_expr->string_literal.value->begin;
 	size_t      size   = fmt_expr->string_literal.value->size;
 	const char *c      = string;
@@ -761,6 +733,32 @@ next_arg:
 
 typedef int check_func_t(expression_t const *fmt_expr, call_argument_t const *arg);
 
+static int internal_check_format_recursive(expression_t const *const fmt_expr, call_argument_t const *const arg, check_func_t *const check_func)
+{
+	switch (fmt_expr->kind) {
+	case EXPR_CONDITIONAL: {
+		/* gettext results in expressions like (X ? "format_string" : Y).
+		 * Recursively check both alternatives. */
+		conditional_expression_t const *const c = &fmt_expr->conditional;
+		expression_t             const *      t = c->true_expression;
+		if (!t)
+			t = c->condition;
+		int const nt = internal_check_format_recursive(t,                   arg, check_func);
+		int const nf = internal_check_format_recursive(c->false_expression, arg, check_func);
+		return MAX(nt, nf);
+	}
+
+	case EXPR_STRING_LITERAL:
+		return check_func(fmt_expr, arg);
+
+	case EXPR_UNARY_CAST:
+		return internal_check_format_recursive(fmt_expr->unary.value, arg, check_func);
+
+	default:
+		return -1;
+	}
+}
+
 static void internal_check_format(format_spec_t const *const spec, call_argument_t const *arg, check_func_t *const check_func)
 {
 	unsigned idx = 0;
@@ -780,7 +778,7 @@ static void internal_check_format(format_spec_t const *const spec, call_argument
 			break;
 	}
 
-	int const num_fmt = check_func(fmt_expr, arg);
+	int const num_fmt = internal_check_format_recursive(fmt_expr, arg, check_func);
 	if (num_fmt < 0)
 		return;
 
