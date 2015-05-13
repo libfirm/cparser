@@ -108,7 +108,7 @@ static void warn_invalid_length_modifier(const position_t *pos,
 /**
  * Check printf-style format. Returns number of expected arguments.
  */
-static int internal_check_printf_format(expression_t const *fmt_expr, call_argument_t const *arg)
+static int check_printf_format(expression_t const *fmt_expr, call_argument_t const *arg)
 {
 	while (fmt_expr->kind == EXPR_UNARY_CAST) {
 		fmt_expr = fmt_expr->unary.value;
@@ -123,8 +123,8 @@ static int internal_check_printf_format(expression_t const *fmt_expr, call_argum
 		expression_t             const *      t = c->true_expression;
 		if (t == NULL)
 			t = c->condition;
-		int const nt = internal_check_printf_format(t,                   arg);
-		int const nf = internal_check_printf_format(c->false_expression, arg);
+		int const nt = check_printf_format(t,                   arg);
+		int const nf = check_printf_format(c->false_expression, arg);
 		return MAX(nt, nf);
 	}
 
@@ -484,66 +484,20 @@ next_arg:
 }
 
 /**
- * Check printf-style format.
- */
-static void check_printf_format(call_argument_t const *arg,
-                                format_spec_t const *const spec)
-{
-	/* find format arg */
-	for (size_t idx = 0; arg; ++idx, arg = arg->next) {
-		if (idx == spec->fmt_idx) {
-			expression_t const *const fmt_expr = arg->expression;
-
-			/* find the real args */
-			for (; idx < spec->arg_idx && arg != NULL; ++idx)
-				arg = arg->next;
-
-			int const num_fmt = internal_check_printf_format(fmt_expr, arg);
-			if (num_fmt < 0)
-				return;
-
-			size_t num_args = 0;
-			for (; arg != NULL; arg = arg->next)
-				++num_args;
-			if (num_args > (size_t)num_fmt) {
-				position_t const *const pos = &fmt_expr->base.pos;
-				warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
-			}
-			break;
-		}
-	}
-}
-
-/**
  * Check scanf-style format.
  */
-static void check_scanf_format(const call_argument_t *arg,
-                               const format_spec_t *spec)
+static int check_scanf_format(expression_t const *fmt_expr, call_argument_t const *arg)
 {
-	/* find format arg */
-	unsigned idx = 0;
-	for (; arg != NULL; ++idx, arg = arg->next) {
-		if (idx == spec->fmt_idx)
-			break;
-	}
-	if (arg == NULL)
-		return;
-
-	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 
 	if (fmt_expr->kind != EXPR_STRING_LITERAL)
-		return;
+		return -1;
 
 	const char *string = fmt_expr->string_literal.value->begin;
 	size_t      size   = fmt_expr->string_literal.value->size;
 	const char *c      = string;
-
-	/* find the real args */
-	for (; idx < spec->arg_idx && arg != NULL; ++idx)
-		arg = arg->next;
 
 	const position_t *pos = &fmt_expr->base.pos;
 	unsigned num_fmt = 0;
@@ -758,7 +712,7 @@ check_c_width:
 		if (arg == NULL) {
 too_few_args:
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
-			return;
+			return -1;
 		}
 
 		{ /* create a scope here to prevent warning about the jump to next_arg */
@@ -802,13 +756,41 @@ next_arg:
 	if (c+1 < string + size) {
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
 	}
-	if (arg != NULL) {
-		unsigned num_args = num_fmt;
-		while (arg != NULL) {
-			++num_args;
-			arg = arg->next;
-		}
-		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt, num_fmt != 1 ? "s" : "");
+	return num_fmt;
+}
+
+typedef int check_func_t(expression_t const *fmt_expr, call_argument_t const *arg);
+
+static void internal_check_format(format_spec_t const *const spec, call_argument_t const *arg, check_func_t *const check_func)
+{
+	unsigned idx = 0;
+
+	/* Find format argument. */
+	for (;; ++idx, arg = arg->next) {
+		if (!arg)
+			return;
+		if (idx == spec->fmt_idx)
+			break;
+	}
+	expression_t const *const fmt_expr = arg->expression;
+
+	/* Find start of variadic arguments. */
+	for (; arg; ++idx, arg = arg->next) {
+		if (idx == spec->arg_idx)
+			break;
+	}
+
+	int const num_fmt = check_func(fmt_expr, arg);
+	if (num_fmt < 0)
+		return;
+
+	unsigned num_args = 0;
+	for (; arg; arg = arg->next) {
+		++num_args;
+	}
+	if (num_args > (unsigned)num_fmt) {
+		position_t const *const pos = &fmt_expr->base.pos;
+		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
 
@@ -879,15 +861,11 @@ void check_format(const call_expression_t *const call)
 	 * header included.
 	 */
 	const char *const name = entity->base.symbol->string;
-	for (size_t i = 0; i < ARRAY_SIZE(builtin_table); ++i) {
-		if (streq(name, builtin_table[i].name)) {
-			switch (builtin_table[i].fmt_kind) {
-			case FORMAT_PRINTF:
-				check_printf_format(arg, &builtin_table[i]);
-				break;
-			case FORMAT_SCANF:
-				check_scanf_format(arg, &builtin_table[i]);
-				break;
+	for (format_spec_t const *i = builtin_table; i != endof(builtin_table); ++i) {
+		if (streq(name, i->name)) {
+			switch (i->fmt_kind) {
+			case FORMAT_PRINTF: internal_check_format(i, arg, &check_printf_format); break;
+			case FORMAT_SCANF:  internal_check_format(i, arg, &check_scanf_format);  break;
 			case FORMAT_STRFTIME:
 			case FORMAT_STRFMON:
 				/* TODO: implement other cases */
