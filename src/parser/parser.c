@@ -607,9 +607,9 @@ void parse_error_expected(const char *message, ...)
 	va_list ap;
 	va_start(ap, message);
 	if (message) {
-		errorf(HERE, "expected %#k while parsing %s, got %K", &ap, ", ", message, &token);
+		errorf(HERE, "expected %lk while parsing %s, got %K", &ap, message, &token);
 	} else {
-		errorf(HERE, "expected %#k, got %K", &ap, ", ", &token);
+		errorf(HERE, "expected %lk, got %K", &ap, &token);
 	}
 	va_end(ap);
 }

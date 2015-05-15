@@ -16,7 +16,7 @@
  *  %E   expression_t const*
  *  %K   token_t const*
  *  %k   token_kind_t
- *  %#k  va_list*, char const*
+ *  %lk  va_list*
  *  %N   entity_t const*
  *  %#N  entity_t const*
  *  %Q   unsigned (qualifier)

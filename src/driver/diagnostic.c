@@ -203,9 +203,9 @@ done_flags:;
 		}
 
 		case 'k': {
-			if (extended) {
+			if (flag_long) {
 				va_list* const toks = va_arg(ap, va_list*);
-				separator_t    sep  = { "", va_arg(ap, const char*) };
+				separator_t    sep  = { "", ", " };
 				for (;;) {
 					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
 					if (tok == 0)
