@@ -925,6 +925,7 @@ static expression_t *create_implicit_cast(expression_t *expression,
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->unary.value   = expression;
+	cast->base.pos      = expression->base.pos;
 	cast->base.type     = dest_type;
 	cast->base.implicit = true;
 	return cast;
