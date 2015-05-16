@@ -18,6 +18,16 @@
 #include "driver/warning.h"
 #include "parser.h"
 
+static inline bool accept(char const **const c_inout, char const expected)
+{
+	if (**c_inout == expected) {
+		++*c_inout;
+		return true;
+	} else {
+		return false;
+	}
+}
+
 typedef enum format_flag_t {
 	FMT_FLAG_NONE  = 0,
 	FMT_FLAG_HASH  = 1U << 0,
@@ -110,39 +120,32 @@ static void warn_invalid_length_modifier(const position_t *pos,
  */
 static int check_printf_format(expression_t const *const fmt_expr, call_argument_t const *arg)
 {
-	const char *string = fmt_expr->string_literal.value->begin;
-	size_t      size   = fmt_expr->string_literal.value->size;
-	const char *c      = string;
-
-	const position_t *pos = &fmt_expr->base.pos;
-	unsigned num_fmt  = 0;
-	unsigned num_args = 0;
-	char     fmt;
-	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
-		if (fmt != '%')
+	position_t const *const pos      = &fmt_expr->base.pos;
+	char       const *const string   = fmt_expr->string_literal.value->begin;
+	char       const       *c        = string;
+	unsigned                num_fmt  = 0;
+	unsigned                num_args = 0;
+	while (*c != '\0') {
+		if (*c++ != '%')
 			continue;
-		fmt = *(++c);
-
-		if (fmt == '%')
+		if (accept(&c, '%'))
 			continue;
 
 		++num_fmt;
 		++num_args;
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
-		if (fmt == '0') {
-			fmt = *(++c);
+		if (accept(&c, '0'))
 			fmt_flags |= FMT_FLAG_ZERO;
-		}
 
 		/* argument selector or minimum field width */
-		if (is_digit(fmt)) {
+		if (is_digit(*c)) {
 			do {
-				fmt = *(++c);
-			} while (is_digit(fmt));
+				++c;
+			} while (is_digit(*c));
 
 			/* digit string was ... */
-			if (fmt == '$') {
+			if (accept(&c, '$')) {
 				/* ... argument selector */
 				fmt_flags = FMT_FLAG_NONE; /* reset possibly set 0-flag */
 				/* TODO implement */
@@ -153,246 +156,217 @@ static int check_printf_format(expression_t const *const fmt_expr, call_argument
 			/* flags */
 			for (;;) {
 				format_flags_t flag;
+				char const fmt = *c;
 				switch (fmt) {
-					case '#':  flag = FMT_FLAG_HASH;  break;
-					case '0':  flag = FMT_FLAG_ZERO;  break;
-					case '-':  flag = FMT_FLAG_MINUS; break;
-					case '\'': flag = FMT_FLAG_TICK;  break;
+				case '#':  flag = FMT_FLAG_HASH;  break;
+				case '0':  flag = FMT_FLAG_ZERO;  break;
+				case '-':  flag = FMT_FLAG_MINUS; break;
+				case '\'': flag = FMT_FLAG_TICK;  break;
 
-					case ' ':
-						if (fmt_flags & FMT_FLAG_PLUS) {
-							warningf(WARN_FORMAT, pos, "' ' is overridden by prior '+' in conversion specification %u", num_fmt);
-						}
-						flag = FMT_FLAG_SPACE;
-						break;
+				case ' ':
+					if (fmt_flags & FMT_FLAG_PLUS)
+						warningf(WARN_FORMAT, pos, "' ' is overridden by prior '+' in conversion specification %u", num_fmt);
+					flag = FMT_FLAG_SPACE;
+					break;
 
-					case '+':
-						if (fmt_flags & FMT_FLAG_SPACE) {
-							warningf(WARN_FORMAT, pos, "'+' overrides prior ' ' in conversion specification %u", num_fmt);
-						}
-						flag = FMT_FLAG_PLUS;
-						break;
+				case '+':
+					if (fmt_flags & FMT_FLAG_SPACE)
+						warningf(WARN_FORMAT, pos, "'+' overrides prior ' ' in conversion specification %u", num_fmt);
+					flag = FMT_FLAG_PLUS;
+					break;
 
-					default: goto break_fmt_flags;
+				default: goto break_fmt_flags;
 				}
-				if (fmt_flags & flag) {
-					warningf(WARN_FORMAT, pos, "repeated flag '%c' in conversion specification %u", (char)fmt, num_fmt);
-				}
+				if (fmt_flags & flag)
+					warningf(WARN_FORMAT, pos, "repeated flag '%c' in conversion specification %u", fmt, num_fmt);
 				fmt_flags |= flag;
-				fmt = *(++c);
+				++c;
 			}
 break_fmt_flags:
 
 			/* minimum field width */
-			if (fmt == '*') {
-				++num_args;
-				fmt = *(++c);
-				if (arg == NULL) {
+			if (accept(&c, '*')) {
+				if (!arg) {
 					warningf(WARN_FORMAT, pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
 					return -1;
 				}
-				const type_t *const arg_type = arg->expression->base.type;
-				if (arg_type != type_int) {
+				++num_args;
+				type_t const *const arg_type = arg->expression->base.type;
+				if (arg_type != type_int)
 					warningf(WARN_FORMAT, pos, "argument for '*' field width in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
-				}
 				arg = arg->next;
 			} else {
-				while (is_digit(fmt)) {
-					fmt = *(++c);
+				while (is_digit(*c)) {
+					++c;
 				}
 			}
 		}
 
 		/* precision */
-		if (fmt == '.') {
-			if (fmt_flags & FMT_FLAG_ZERO) {
+		if (accept(&c, '.')) {
+			if (fmt_flags & FMT_FLAG_ZERO)
 				warningf(WARN_FORMAT, pos, "'0' flag ignored with precision in conversion specification %u", num_fmt);
-			}
 
 			++num_args;
-			fmt = *(++c);
-			if (fmt == '*') {
-				fmt = *(++c);
-				if (arg == NULL) {
+			if (accept(&c, '*')) {
+				if (!arg) {
 					warningf(WARN_FORMAT, pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
 					return -1;
 				}
-				const type_t *const arg_type = arg->expression->base.type;
-				if (arg_type != type_int) {
+				type_t const *const arg_type = arg->expression->base.type;
+				if (arg_type != type_int)
 					warningf(WARN_FORMAT, pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
-				}
 				arg = arg->next;
 			} else {
 				/* digit string may be omitted */
-				while (is_digit(fmt)) {
-					fmt = *(++c);
+				while (is_digit(*c)) {
+					++c;
 				}
 			}
 		}
 
 		format_length_modifier_t const fmt_mod = parse_length_modifier(&c);
-		fmt = *c;
-
-		if (fmt == '\0') {
-			warningf(WARN_FORMAT, pos, "dangling %% in format string");
-			break;
-		}
 
 		type_t        *expected_type;
 		format_flags_t allowed_flags;
+		char     const fmt = *c++;
 		switch (fmt) {
-			case 'd':
-			case 'i':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;         break;
-					case FMT_MOD_hh:   expected_type = type_signed_char; break;
-					case FMT_MOD_h:    expected_type = type_short;       break;
-					case FMT_MOD_l:    expected_type = type_long;        break;
-					case FMT_MOD_ll:   expected_type = type_long_long;   break;
-					case FMT_MOD_j:    expected_type = type_intmax_t;    break;
-					case FMT_MOD_z:    expected_type = type_ssize_t;     break;
-					case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
-					case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
-					case FMT_MOD_I32:  expected_type = type_int32;       break;
-					case FMT_MOD_I64:  expected_type = type_int64;       break;
+		case '\0':
+			--c;
+			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			goto fmt_end;
 
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_ZERO;
-				break;
+		case 'd':
+		case 'i':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int;         break;
+			case FMT_MOD_hh:   expected_type = type_signed_char; break;
+			case FMT_MOD_h:    expected_type = type_short;       break;
+			case FMT_MOD_l:    expected_type = type_long;        break;
+			case FMT_MOD_ll:   expected_type = type_long_long;   break;
+			case FMT_MOD_j:    expected_type = type_intmax_t;    break;
+			case FMT_MOD_z:    expected_type = type_ssize_t;     break;
+			case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
+			case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
+			case FMT_MOD_I32:  expected_type = type_int32;       break;
+			case FMT_MOD_I64:  expected_type = type_int64;       break;
+			default:           goto bad_len_mod;
+			}
+			allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_ZERO;
+			break;
 
-			case 'o':
-			case 'X':
-			case 'x':
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
-				goto eval_fmt_mod_unsigned;
+		case 'o':
+		case 'X':
+		case 'x':
+			allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
+			goto eval_fmt_mod_unsigned;
 
-			case 'u':
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_ZERO;
+		case 'u':
+			allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_ZERO;
 eval_fmt_mod_unsigned:
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_unsigned_int;       break;
-					case FMT_MOD_hh:   expected_type = type_unsigned_char;      break;
-					case FMT_MOD_h:    expected_type = type_unsigned_short;     break;
-					case FMT_MOD_l:    expected_type = type_unsigned_long;      break;
-					case FMT_MOD_ll:   expected_type = type_unsigned_long_long; break;
-					case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
-					case FMT_MOD_z:    expected_type = type_size_t;             break;
-					case FMT_MOD_t:    expected_type = type_uptrdiff_t;         break;
-					case FMT_MOD_I:    expected_type = type_size_t;             break;
-					case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
-					case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_unsigned_int;       break;
+			case FMT_MOD_hh:   expected_type = type_unsigned_char;      break;
+			case FMT_MOD_h:    expected_type = type_unsigned_short;     break;
+			case FMT_MOD_l:    expected_type = type_unsigned_long;      break;
+			case FMT_MOD_ll:   expected_type = type_unsigned_long_long; break;
+			case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
+			case FMT_MOD_z:    expected_type = type_size_t;             break;
+			case FMT_MOD_t:    expected_type = type_uptrdiff_t;         break;
+			case FMT_MOD_I:    expected_type = type_size_t;             break;
+			case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
+			case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
+			default:           goto bad_len_mod;
+			}
+			break;
 
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
+		case 'A':
+		case 'a':
+		case 'E':
+		case 'e':
+		case 'F':
+		case 'f':
+		case 'G':
+		case 'g':
+			switch (fmt_mod) {
+			case FMT_MOD_l:    /* l modifier is ignored */
+			case FMT_MOD_NONE: expected_type = type_double;      break;
+			case FMT_MOD_L:    expected_type = type_long_double; break;
+			default:           goto bad_len_mod;
+			}
+			allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
+			break;
 
-			case 'A':
-			case 'a':
-			case 'E':
-			case 'e':
-			case 'F':
-			case 'f':
-			case 'G':
-			case 'g':
-				switch (fmt_mod) {
-					case FMT_MOD_l:    /* l modifier is ignored */
-					case FMT_MOD_NONE: expected_type = type_double;      break;
-					case FMT_MOD_L:    expected_type = type_long_double; break;
+		case 'C':
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
+			expected_type = type_wchar_t;
+			allowed_flags = FMT_FLAG_NONE;
+			break;
 
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
-				break;
+		case 'c':
+			expected_type = type_int;
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int;     break; /* TODO promoted char */
+			case FMT_MOD_l:    expected_type = type_wint_t;  break;
+			case FMT_MOD_w:    expected_type = type_wchar_t; break;
+			default:           goto bad_len_mod;
+			}
+			allowed_flags = FMT_FLAG_NONE;
+			break;
 
-			case 'C':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_wchar_t;
-				allowed_flags = FMT_FLAG_NONE;
-				break;
+		case 'S':
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
+			expected_type = type_const_wchar_t_ptr;
+			allowed_flags = FMT_FLAG_MINUS;
+			break;
 
-			case 'c':
-				expected_type = type_int;
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;     break; /* TODO promoted char */
-					case FMT_MOD_l:    expected_type = type_wint_t;  break;
-					case FMT_MOD_w:    expected_type = type_wchar_t; break;
+		case 's':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_const_char_ptr;    break;
+			case FMT_MOD_l:    expected_type = type_const_wchar_t_ptr; break;
+			case FMT_MOD_w:    expected_type = type_const_wchar_t_ptr; break;
+			default:           goto bad_len_mod;
+			}
+			allowed_flags = FMT_FLAG_MINUS;
+			break;
 
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				allowed_flags = FMT_FLAG_NONE;
-				break;
+		case 'p':
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
+			expected_type = type_void_ptr;
+			allowed_flags = FMT_FLAG_NONE;
+			break;
 
-			case 'S':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_const_wchar_t_ptr;
-				allowed_flags = FMT_FLAG_MINUS;
-				break;
-
-			case 's':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_const_char_ptr;    break;
-					case FMT_MOD_l:    expected_type = type_const_wchar_t_ptr; break;
-					case FMT_MOD_w:    expected_type = type_const_wchar_t_ptr; break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				allowed_flags = FMT_FLAG_MINUS;
-				break;
-
-			case 'p':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_void_ptr;
-				allowed_flags = FMT_FLAG_NONE;
-				break;
-
-			case 'n':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int_ptr;         break;
-					case FMT_MOD_hh:   expected_type = type_signed_char_ptr; break;
-					case FMT_MOD_h:    expected_type = type_short_ptr;       break;
-					case FMT_MOD_l:    expected_type = type_long_ptr;        break;
-					case FMT_MOD_ll:   expected_type = type_long_long_ptr;   break;
-					case FMT_MOD_j:    expected_type = type_intmax_t_ptr;    break;
-					case FMT_MOD_z:    expected_type = type_ssize_t_ptr;     break;
-					case FMT_MOD_t:    expected_type = type_ptrdiff_t_ptr;   break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				allowed_flags = FMT_FLAG_NONE;
-				break;
+		case 'n':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int_ptr;         break;
+			case FMT_MOD_hh:   expected_type = type_signed_char_ptr; break;
+			case FMT_MOD_h:    expected_type = type_short_ptr;       break;
+			case FMT_MOD_l:    expected_type = type_long_ptr;        break;
+			case FMT_MOD_ll:   expected_type = type_long_long_ptr;   break;
+			case FMT_MOD_j:    expected_type = type_intmax_t_ptr;    break;
+			case FMT_MOD_z:    expected_type = type_ssize_t_ptr;     break;
+			case FMT_MOD_t:    expected_type = type_ptrdiff_t_ptr;   break;
 
 			default:
-				warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
-				if (arg == NULL) {
-					goto too_few_args;
-				}
+bad_len_mod:
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
+			}
+			allowed_flags = FMT_FLAG_NONE;
+			break;
+
+		default:
+			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
+			expected_type = NULL;
+			allowed_flags = ~FMT_FLAG_NONE;
+			break;
 		}
 
-		format_flags_t wrong_flags = fmt_flags & ~allowed_flags;
-		if (wrong_flags != 0) {
+		format_flags_t const wrong_flags = fmt_flags & ~allowed_flags;
+		if (wrong_flags != FMT_FLAG_NONE) {
 			char  wrong[8];
 			char *p = wrong;
 			if (wrong_flags & FMT_FLAG_HASH)  *p++ = '#';
@@ -406,13 +380,12 @@ eval_fmt_mod_unsigned:
 			warningf(WARN_FORMAT, pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, num_fmt);
 		}
 
-		if (arg == NULL) {
-too_few_args:
+		if (!arg) {
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return -1;
 		}
 
-		{ /* create a scope here to prevent warning about the jump to next_arg */
+		if (expected_type) {
 			type_t *const arg_type           = arg->expression->base.type;
 			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);
@@ -428,37 +401,32 @@ too_few_args:
 					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
 					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
 					if ((arg_to->base.qualifiers & ~exp_to->base.qualifiers) == 0 &&
-						types_compatible_ignore_qualifiers(arg_to, exp_to))
+					    types_compatible_ignore_qualifiers(arg_to, exp_to))
 						goto next_arg;
 				}
-			} else if (types_compatible_ignore_qualifiers(arg_skip,
-			                                              expected_type_skip)) {
+			} else if (types_compatible_ignore_qualifiers(arg_skip, expected_type_skip)) {
 				goto next_arg;
 			} else if (arg->expression->kind == EXPR_UNARY_CAST) {
 				expression_t const *const expr        = arg->expression->unary.value;
 				type_t             *const unprom_type = skip_typeref(expr->base.type);
-				if (types_compatible_ignore_qualifiers(unprom_type,
-				                                       expected_type_skip)) {
+				if (types_compatible_ignore_qualifiers(unprom_type, expected_type_skip))
 					goto next_arg;
-				}
-				if (expected_type_skip == type_unsigned_int
-				    && !is_type_signed(unprom_type)) {
+				if (expected_type_skip == type_unsigned_int && !is_type_signed(unprom_type))
 					goto next_arg;
-				}
 			}
 			if (is_type_valid(arg_skip)) {
 				position_t const *const apos = &arg->expression->base.pos;
 				char       const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:
 		arg = arg->next;
 	}
-	assert(fmt == '\0');
-	if (c+1 < string + size) {
+fmt_end:
+	assert(*c == '\0');
+	if (c + 1 < string + fmt_expr->string_literal.value->size)
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
-	}
 	return num_args;
 }
 
@@ -467,49 +435,39 @@ next_arg:
  */
 static int check_scanf_format(expression_t const *const fmt_expr, call_argument_t const *arg)
 {
-	const char *string = fmt_expr->string_literal.value->begin;
-	size_t      size   = fmt_expr->string_literal.value->size;
-	const char *c      = string;
-
-	const position_t *pos = &fmt_expr->base.pos;
-	unsigned num_fmt = 0;
-	char     fmt;
-	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
-		if (fmt != '%')
+	position_t const *const pos     = &fmt_expr->base.pos;
+	char       const *const string  = fmt_expr->string_literal.value->begin;
+	char       const       *c       = string;
+	unsigned                num_fmt = 0;
+	while (*c != '\0') {
+		if (*c++ != '%')
 			continue;
-		fmt = *(++c);
-		if (fmt == '%')
+		if (accept(&c, '%'))
 			continue;
 
 		++num_fmt;
 
-		bool suppress_assignment = false;
-		if (fmt == '*') {
-			fmt = *++c;
-			suppress_assignment = true;
-		}
+		bool const suppress_assignment = accept(&c, '*');
 
 		size_t width = 0;
-		if ('0' <= fmt && fmt <= '9') {
+		if (is_digit(*c)) {
 			do {
-				width = width * 10 + (fmt - '0');
-				fmt   = *++c;
-			} while ('0' <= fmt && fmt <= '9');
-			if (width == 0) {
+				width = width * 10 + (*c++ - '0');
+			} while (is_digit(*c));
+			if (width == 0)
 				warningf(WARN_FORMAT, pos, "field width is zero at format %u", num_fmt);
-			}
 		}
 
 		format_length_modifier_t const fmt_mod = parse_length_modifier(&c);
-		fmt = *c;
 
-		if (fmt == '\0') {
-			warningf(WARN_FORMAT, pos, "dangling %% with conversion specififer in format string");
-			break;
-		}
-
-		type_t *expected_type;
+		type_t    *expected_type;
+		char const fmt = *c++;
 		switch (fmt) {
+		case '\0':
+			--c;
+			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			goto fmt_end;
+
 		case 'd':
 		case 'i':
 			switch (fmt_mod) {
@@ -524,10 +482,7 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 			case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
 			case FMT_MOD_I32:  expected_type = type_int32;       break;
 			case FMT_MOD_I64:  expected_type = type_int64;       break;
-
-			default:
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+			default:           goto bad_len_mod;
 			}
 			break;
 
@@ -547,10 +502,7 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 			case FMT_MOD_I:    expected_type = type_size_t;             break;
 			case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
 			case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
-
-			default:
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+			default:           goto bad_len_mod;
 			}
 			break;
 
@@ -566,18 +518,13 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 			case FMT_MOD_l:    expected_type = type_double;      break;
 			case FMT_MOD_NONE: expected_type = type_float;       break;
 			case FMT_MOD_L:    expected_type = type_long_double; break;
-
-			default:
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+			default:           goto bad_len_mod;
 			}
 			break;
 
 		case 'C':
-			if (fmt_mod != FMT_MOD_NONE) {
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
-			}
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
 			expected_type = type_wchar_t;
 			goto check_c_width;
 
@@ -586,16 +533,13 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 			case FMT_MOD_NONE: expected_type = type_char;    break;
 			case FMT_MOD_l:    expected_type = type_wchar_t; break;
 			case FMT_MOD_w:    expected_type = type_wchar_t; break;
-
-			default:
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+			default:           goto bad_len_mod;
 			}
 
 check_c_width:
 			if (width == 0)
 				width = 1;
-			if (!suppress_assignment && arg != NULL) {
+			if (!suppress_assignment && arg) {
 				type_t *const type = skip_typeref(revert_automatic_type_conversion(arg->expression));
 				if (is_type_array(type)       &&
 				    type->array.size_constant &&
@@ -607,28 +551,21 @@ check_c_width:
 		}
 
 		case 'S':
-			if (fmt_mod != FMT_MOD_NONE) {
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
-			}
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
 			expected_type = type_wchar_t;
 			break;
 
 		case 's':
 		case '[': {
 			switch (fmt_mod) {
-				case FMT_MOD_NONE: expected_type = type_char;    break;
-				case FMT_MOD_l:    expected_type = type_wchar_t; break;
-				case FMT_MOD_w:    expected_type = type_wchar_t; break;
-
-				default:
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
+			case FMT_MOD_NONE: expected_type = type_char;    break;
+			case FMT_MOD_l:    expected_type = type_wchar_t; break;
+			case FMT_MOD_w:    expected_type = type_wchar_t; break;
+			default:           goto bad_len_mod;
 			}
 
-			if (!suppress_assignment &&
-			    width != 0           &&
-			    arg   != NULL) {
+			if (!suppress_assignment && width != 0 && arg) {
 				type_t *const type = skip_typeref(revert_automatic_type_conversion(arg->expression));
 				if (is_type_array(type)       &&
 				    type->array.size_constant &&
@@ -640,17 +577,14 @@ check_c_width:
 		}
 
 		case 'p':
-			if (fmt_mod != FMT_MOD_NONE) {
-				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
-			}
+			if (fmt_mod != FMT_MOD_NONE)
+				goto bad_len_mod;
 			expected_type = type_void;
 			break;
 
 		case 'n': {
-			if (suppress_assignment) {
+			if (suppress_assignment)
 				warningf(WARN_FORMAT, pos, "conversion '%n' cannot be suppressed with '*' at format %u", num_fmt);
-			}
 
 			switch (fmt_mod) {
 			case FMT_MOD_NONE: expected_type = type_int;         break;
@@ -663,6 +597,7 @@ check_c_width:
 			case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
 
 			default:
+bad_len_mod:
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
 			}
@@ -671,23 +606,19 @@ check_c_width:
 
 		default:
 			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at format %u", fmt, num_fmt);
-			if (suppress_assignment)
-				continue;
-			if (arg == NULL)
-				goto too_few_args;
-			goto next_arg;
+			expected_type = NULL;
+			break;
 		}
 
 		if (suppress_assignment)
 			continue;
 
-		if (arg == NULL) {
-too_few_args:
+		if (!arg) {
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return -1;
 		}
 
-		{ /* create a scope here to prevent warning about the jump to next_arg */
+		if (expected_type) {
 			type_t *const arg_type           = arg->expression->base.type;
 			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);
@@ -705,8 +636,7 @@ too_few_args:
 			/* do NOT allow const or restrict, all other should be ok */
 			if (ptr_skip->base.qualifiers & (TYPE_QUALIFIER_CONST | TYPE_QUALIFIER_VOLATILE))
 				goto error_arg_type;
-			if (types_compatible_ignore_qualifiers(ptr_skip,
-			                                       expected_type_skip)) {
+			if (types_compatible_ignore_qualifiers(ptr_skip, expected_type_skip)) {
 				goto next_arg;
 			} else if (expected_type_skip == type_char) {
 				/* char matches with unsigned char AND signed char */
@@ -718,16 +648,16 @@ error_arg_type:
 			if (is_type_valid(arg_skip)) {
 				position_t const *const apos = &arg->expression->base.pos;
 				char       const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T*' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T*' but the argument has type '%T'", mod, fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:
 		arg = arg->next;
 	}
-	assert(fmt == '\0');
-	if (c+1 < string + size) {
+fmt_end:
+	assert(*c == '\0');
+	if (c + 1 < string + fmt_expr->string_literal.value->size)
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
-	}
 	return num_fmt;
 }
 
