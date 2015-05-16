@@ -12,6 +12,8 @@
 #ifndef _FIRM_UTIL_H_
 #define _FIRM_UTIL_H_
 
+#include <stdbool.h>
+
 /**
  * Returns size of a static array. Warning: This returns invalid values for
  * dynamically allocated arrays.
@@ -54,5 +56,10 @@
 #undef MIN
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+static inline bool is_digit(char const c)
+{
+	return '0' <= c && c <= '9';
+}
 
 #endif

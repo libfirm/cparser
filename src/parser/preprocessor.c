@@ -1443,15 +1443,6 @@ static inline void set_digraph(token_kind_t const kind, symbol_t *const symbol)
 	pp_token.base.symbol = symbol;
 }
 
-static bool is_digit(const char c)
-{
-	switch (c) {
-	case DIGIT_CASES:
-		return true;
-	}
-	return false;
-}
-
 static bool concat_tokens(const position_t *pos,
                           const token_t *token0, const token_t *token1)
 {
