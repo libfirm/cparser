@@ -128,10 +128,9 @@ static int check_printf_format(expression_t const *const fmt_expr, call_argument
 	while (*c != '\0') {
 		if (*c++ != '%')
 			continue;
+		++num_fmt;
 		if (accept(&c, '%'))
 			continue;
-
-		++num_fmt;
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
 		if (accept(&c, '0'))
@@ -444,10 +443,9 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 	while (*c != '\0') {
 		if (*c++ != '%')
 			continue;
+		++num_fmt;
 		if (accept(&c, '%'))
 			continue;
-
-		++num_fmt;
 
 		bool const suppress_assignment = accept(&c, '*');
 
