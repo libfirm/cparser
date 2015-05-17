@@ -206,12 +206,12 @@ break_fmt_flags:
 			if (fmt_flags & FMT_FLAG_ZERO)
 				warningf(WARN_FORMAT, pos, "'0' flag ignored with precision in conversion specification %u", num_fmt);
 
-			++num_args;
 			if (accept(&c, '*')) {
 				if (!arg) {
 					warningf(WARN_FORMAT, pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
 					return -1;
 				}
+				++num_args;
 				type_t const *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int)
 					warningf(WARN_FORMAT, pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
