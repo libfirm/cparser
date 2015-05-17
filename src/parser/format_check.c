@@ -722,7 +722,7 @@ static void internal_check_format(format_spec_t const *const spec, call_argument
 	}
 	if (num_args > (unsigned)num_fmt) {
 		position_t const *const pos = &fmt_expr->base.pos;
-		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
+		warningf(WARN_FORMAT, pos, "%u argument%s given but only %u argument%s used", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
 
