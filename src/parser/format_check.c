@@ -9,6 +9,8 @@
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast/ast_t.h"
+#include "ast/attribute_t.h"
+#include "ast/constfold.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
@@ -23,6 +25,7 @@ typedef struct format_env_t {
 	unsigned               num_arg;
 	call_argument_t const *arg;
 	position_t      const *pos;
+	void            const *ctx;
 } format_env_t;
 
 static expression_t const *get_next_arg(format_env_t *const env)
@@ -139,15 +142,18 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 		return;
 	}
 
+	type_t *const spec_skip = skip_typeref(spec_type);
+	if (is_type_void(spec_skip))
+		return;
+
 	expression_t const *const arg = get_next_arg(env);
 	if (!arg) {
 		warningf(WARN_FORMAT, env->pos, "too few arguments for format string");
 		return;
 	}
 
-	type_t *const arg_type  = arg->base.type;
-	type_t *const arg_skip  = skip_typeref(arg_type);
-	type_t *const spec_skip = skip_typeref(spec_type);
+	type_t *const arg_type = arg->base.type;
+	type_t *const arg_skip = skip_typeref(arg_type);
 	if (is_type_pointer(spec_skip)) {
 		if (is_type_pointer(arg_skip)) {
 			type_t *const spec_to = skip_typeref(spec_skip->pointer.points_to);
@@ -165,6 +171,12 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 		if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
 			return;
 		if (spec_skip == type_unsigned_int && !is_type_signed(unprom_type))
+			return;
+	} else if (arg->kind == EXPR_LITERAL_CHARACTER) {
+		if (spec_skip == type_char && arg->string_literal.value->size == 1)
+			return;
+	} else if (arg->kind == EXPR_ENUM_CONSTANT) {
+		if (spec_skip->kind == TYPE_ENUM && spec_skip->enumt.enume == arg->reference.entity->enum_value.enume)
 			return;
 	}
 	if (!is_type_valid(arg_skip) || !is_type_valid(spec_skip))
@@ -611,15 +623,52 @@ bad_spec:
 	return c;
 }
 
+static char const *check_custom_format(format_env_t *const env, char const *c)
+{
+	attribute_format_argument_t const *const fmt = (attribute_format_argument_t const*)env->ctx;
+
+	/* Skip format flags. */
+	c += strspn(c, fmt->flags->begin);
+
+	char const *const spec_begin = c;
+	type_t           *expected_type;
+	if (*c == '\0') {
+		expected_type = NULL;
+	} else {
+		/* Determine format specifier. */
+		attribute_format_specifier_t const *best_spec = NULL;
+		char                         const *best_end  = c;
+		for (attribute_format_specifier_t const *s = fmt->specifiers; s; s = s->next) {
+			char const *const end = strstart(c, s->specifier->begin);
+			if (end && best_end < end) {
+				best_spec = s;
+				best_end  = end;
+			}
+		}
+
+		if (best_spec) {
+			expected_type = best_spec->type;
+		} else {
+			warningf(WARN_FORMAT, env->pos, "encountered unknown conversion specifier '%%%c' at format %u", *c, env->num_fmt);
+			expected_type = type_error_type;
+		}
+		c = best_end;
+	}
+
+	check_argument_type(env, expected_type, spec_begin, c);
+	return c;
+}
+
 typedef char const *check_func_t(format_env_t *env, char const *c);
 
-static int do_check_format(string_literal_expression_t const *const fmt_string, call_argument_t const *const arg, check_func_t *const check_func)
+static int do_check_format(string_literal_expression_t const *const fmt_string, call_argument_t const *const arg, check_func_t *const check_func, void const *const ctx)
 {
 	format_env_t env = {
 		.num_fmt = 0,
 		.num_arg = 0,
 		.arg     = arg,
 		.pos     = &fmt_string->base.pos,
+		.ctx     = ctx,
 	};
 
 	char const *const string = fmt_string->value->begin;
@@ -638,7 +687,7 @@ static int do_check_format(string_literal_expression_t const *const fmt_string, 
 	return env.num_arg;
 }
 
-static int internal_check_format_recursive(expression_t const *const fmt_expr, call_argument_t const *const arg, check_func_t *const check_func)
+static int internal_check_format_recursive(expression_t const *const fmt_expr, call_argument_t const *const arg, check_func_t *const check_func, void const *const ctx)
 {
 	switch (fmt_expr->kind) {
 	case EXPR_CONDITIONAL: {
@@ -648,23 +697,23 @@ static int internal_check_format_recursive(expression_t const *const fmt_expr, c
 		expression_t             const *      t = c->true_expression;
 		if (!t)
 			t = c->condition;
-		int const nt = internal_check_format_recursive(t,                   arg, check_func);
-		int const nf = internal_check_format_recursive(c->false_expression, arg, check_func);
+		int const nt = internal_check_format_recursive(t,                   arg, check_func, ctx);
+		int const nf = internal_check_format_recursive(c->false_expression, arg, check_func, ctx);
 		return MAX(nt, nf);
 	}
 
 	case EXPR_STRING_LITERAL:
-		return do_check_format(&fmt_expr->string_literal, arg, check_func);
+		return do_check_format(&fmt_expr->string_literal, arg, check_func, ctx);
 
 	case EXPR_UNARY_CAST:
-		return internal_check_format_recursive(fmt_expr->unary.value, arg, check_func);
+		return internal_check_format_recursive(fmt_expr->unary.value, arg, check_func, ctx);
 
 	default:
 		return -1;
 	}
 }
 
-static void internal_check_format(format_spec_t const *const spec, call_argument_t const *arg, check_func_t *const check_func)
+static void internal_check_format(unsigned const fmt_idx, unsigned const arg_idx, call_argument_t const *arg, check_func_t *const check_func, void const *const ctx)
 {
 	unsigned idx = 0;
 
@@ -672,18 +721,18 @@ static void internal_check_format(format_spec_t const *const spec, call_argument
 	for (;; ++idx, arg = arg->next) {
 		if (!arg)
 			return;
-		if (idx == spec->fmt_idx)
+		if (idx == fmt_idx)
 			break;
 	}
 	expression_t const *const fmt_expr = arg->expression;
 
 	/* Find start of variadic arguments. */
 	for (; arg; ++idx, arg = arg->next) {
-		if (idx == spec->arg_idx)
+		if (idx == arg_idx)
 			break;
 	}
 
-	int const num_fmt = internal_check_format_recursive(fmt_expr, arg, check_func);
+	int const num_fmt = internal_check_format_recursive(fmt_expr, arg, check_func, ctx);
 	if (num_fmt < 0)
 		return;
 
@@ -767,14 +816,23 @@ void check_format(const call_expression_t *const call)
 	for (format_spec_t const *i = builtin_table; i != endof(builtin_table); ++i) {
 		if (streq(name, i->name)) {
 			switch (i->fmt_kind) {
-			case FORMAT_PRINTF: internal_check_format(i, arg, &check_printf_format); break;
-			case FORMAT_SCANF:  internal_check_format(i, arg, &check_scanf_format);  break;
+			case FORMAT_PRINTF: internal_check_format(i->fmt_idx, i->arg_idx, arg, &check_printf_format, NULL); break;
+			case FORMAT_SCANF:  internal_check_format(i->fmt_idx, i->arg_idx, arg, &check_scanf_format,  NULL); break;
 			case FORMAT_STRFTIME:
 			case FORMAT_STRFMON:
 				/* TODO: implement other cases */
 				break;
 			}
 			break;
+		}
+	}
+
+	attribute_t const *const fmt_attr = get_attribute(entity->declaration.attributes, ATTRIBUTE_CPARSER_CUSTOM_FORMAT);
+	if (fmt_attr) {
+		attribute_format_argument_t const *const fmt = fmt_attr->a.format;
+		if (is_constant_expression(fmt->fmt_idx) == EXPR_CLASS_INTEGER_CONSTANT) {
+			unsigned const idx = fold_expression_to_int(fmt->fmt_idx) - 1;
+			internal_check_format(idx, idx + 1 /* TODO make more flexible */, arg, &check_custom_format, fmt);
 		}
 	}
 }

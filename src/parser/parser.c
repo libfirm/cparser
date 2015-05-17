@@ -1220,6 +1220,44 @@ static attribute_argument_t *parse_attribute_arguments(void)
 	return first;
 }
 
+static attribute_format_argument_t *parse_attribute_format(void)
+{
+	char const *const ctx = "attribute 'custom_format'";
+
+	attribute_format_argument_t *const a = allocate_ast_zero(sizeof(*a));
+
+	add_anchor_token(',');
+	add_anchor_token(T_STRING_LITERAL);
+	a->fmt_idx = parse_integer_constant_expression(ctx);
+	expect(',');
+	rem_anchor_token(T_STRING_LITERAL);
+	a->flags   = parse_string_literals(ctx);
+	rem_anchor_token(',');
+
+	if (accept(',')) {
+		add_anchor_token(')');
+		add_anchor_token(',');
+		attribute_format_specifier_t **anchor = &a->specifiers;
+		do {
+			attribute_format_specifier_t *const s = allocate_ast_zero(sizeof(*s));
+
+			add_anchor_token(':');
+			s->specifier = parse_string_literals(ctx);
+			rem_anchor_token(':');
+			expect(':');
+			s->type = parse_typename();
+
+			*anchor = s;
+			anchor  = &s->next;
+		} while (accept(','));
+		rem_anchor_token(',');
+		rem_anchor_token(')');
+	}
+	expect(')');
+
+	return a;
+}
+
 static attribute_t *parse_attribute_asm(void)
 {
 	attribute_t *attribute = allocate_attribute_zero(ATTRIBUTE_GNU_ASM);
@@ -1264,8 +1302,13 @@ static attribute_t *parse_attribute_gnu_single(void)
 	next_token();
 
 	/* parse arguments */
-	if (accept('('))
-		attribute->a.arguments = parse_attribute_arguments();
+	if (accept('(')) {
+		if (kind == ATTRIBUTE_CPARSER_CUSTOM_FORMAT) {
+			attribute->a.format = parse_attribute_format();
+		} else {
+			attribute->a.arguments = parse_attribute_arguments();
+		}
+	}
 
 	return attribute;
 }

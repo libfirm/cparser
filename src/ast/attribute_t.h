@@ -16,7 +16,8 @@ typedef enum attribute_kind_t {
 	ATTRIBUTE_ERROR,
 	ATTRIBUTE_UNKNOWN,
 	ATTRIBUTE_GNU_FIRST,
-	ATTRIBUTE_GNU_ALIAS = ATTRIBUTE_GNU_FIRST,
+	ATTRIBUTE_CPARSER_CUSTOM_FORMAT = ATTRIBUTE_GNU_FIRST,
+	ATTRIBUTE_GNU_ALIAS,
 	ATTRIBUTE_GNU_ALIGNED,
 	ATTRIBUTE_GNU_ALLOC_SIZE,
 	ATTRIBUTE_GNU_ALWAYS_INLINE,
@@ -137,6 +138,19 @@ struct attribute_property_argument_t {
 	symbol_t *get_symbol;
 };
 
+typedef struct attribute_format_specifier_t attribute_format_specifier_t;
+struct attribute_format_specifier_t {
+	attribute_format_specifier_t *next;
+	string_t                     *specifier;
+	type_t                       *type;
+};
+
+typedef struct attribute_format_argument_t {
+	expression_t                 *fmt_idx;
+	string_t                     *flags;
+	attribute_format_specifier_t *specifiers;
+} attribute_format_argument_t;
+
 struct attribute_t {
 	position_t        pos;
 	attribute_t      *next;
@@ -144,11 +158,14 @@ struct attribute_t {
 	union {
 		attribute_argument_t          *arguments;
 		attribute_property_argument_t *property;
+		attribute_format_argument_t   *format;
 	} a;
 };
 
 const char *get_attribute_name(attribute_kind_t kind);
 
 bool attributes_equal(const attribute_t *attr1, const attribute_t *attr2);
+
+attribute_t const *get_attribute(attribute_t const *attributes, attribute_kind_t kind);
 
 #endif

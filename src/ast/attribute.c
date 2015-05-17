@@ -21,6 +21,7 @@
 entity_t                  **alias_entities;
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
+	[ATTRIBUTE_CPARSER_CUSTOM_FORMAT]      = "custom_format",
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",
 	[ATTRIBUTE_GNU_ALIGNED]                = "aligned",
 	[ATTRIBUTE_GNU_ALLOC_SIZE]             = "alloc_size",
@@ -534,10 +535,21 @@ bool attributes_equal(const attribute_t *attr1, const attribute_t *attr2)
 		return false;
 
 	switch (attr1->kind) {
+	case ATTRIBUTE_CPARSER_CUSTOM_FORMAT:
+		return false; /* TODO */
 	case ATTRIBUTE_MS_PROPERTY:
 		return property_attribute_equal(attr1->a.property, attr2->a.property);
 	default:
 		return attribute_arguments_equal(attr1->a.arguments,
 		                                 attr2->a.arguments);
 	}
+}
+
+attribute_t const *get_attribute(attribute_t const *const attributes, attribute_kind_t const kind)
+{
+	for (attribute_t const *a = attributes; a; a = a->next) {
+		if (a->kind == kind)
+			return a;
+	}
+	return NULL;
 }
