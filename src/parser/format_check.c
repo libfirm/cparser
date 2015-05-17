@@ -132,7 +132,6 @@ static int check_printf_format(expression_t const *const fmt_expr, call_argument
 			continue;
 
 		++num_fmt;
-		++num_args;
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
 		if (accept(&c, '0'))
@@ -353,13 +352,14 @@ eval_fmt_mod_unsigned:
 			default:
 bad_len_mod:
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+				goto bad_spec;
 			}
 			allowed_flags = FMT_FLAG_NONE;
 			break;
 
 		default:
 			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
+bad_spec:
 			expected_type = NULL;
 			allowed_flags = ~FMT_FLAG_NONE;
 			break;
@@ -384,6 +384,7 @@ bad_len_mod:
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return -1;
 		}
+		++num_args;
 
 		if (expected_type) {
 			type_t *const arg_type           = arg->expression->base.type;
@@ -599,13 +600,14 @@ check_c_width:
 			default:
 bad_len_mod:
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
-				goto next_arg;
+				goto bad_spec;
 			}
 			break;
 		}
 
 		default:
 			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at format %u", fmt, num_fmt);
+bad_spec:
 			expected_type = NULL;
 			break;
 		}
