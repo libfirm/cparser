@@ -187,7 +187,7 @@ break_fmt_flags:
 			if (accept(&c, '*')) {
 				if (!arg) {
 					warningf(WARN_FORMAT, pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
-					return -1;
+					goto out;
 				}
 				++num_args;
 				type_t const *const arg_type = arg->expression->base.type;
@@ -209,7 +209,7 @@ break_fmt_flags:
 			if (accept(&c, '*')) {
 				if (!arg) {
 					warningf(WARN_FORMAT, pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
-					return -1;
+					goto out;
 				}
 				++num_args;
 				type_t const *const arg_type = arg->expression->base.type;
@@ -382,7 +382,7 @@ bad_spec:
 
 		if (!arg) {
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
-			return -1;
+			goto out;
 		}
 		++num_args;
 
@@ -428,6 +428,7 @@ fmt_end:
 	assert(*c == '\0');
 	if (c + 1 < string + fmt_expr->string_literal.value->size)
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
+out:
 	return num_args;
 }
 
@@ -617,7 +618,7 @@ bad_spec:
 
 		if (!arg) {
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
-			return -1;
+			goto out;
 		}
 
 		if (expected_type) {
@@ -660,6 +661,7 @@ fmt_end:
 	assert(*c == '\0');
 	if (c + 1 < string + fmt_expr->string_literal.value->size)
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
+out:
 	return num_fmt;
 }
 
