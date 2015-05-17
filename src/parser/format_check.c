@@ -231,7 +231,7 @@ break_fmt_flags:
 		switch (fmt) {
 		case '\0':
 			--c;
-			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			warningf(WARN_FORMAT, pos, "dangling '%%' in format string");
 			goto fmt_end;
 
 		case 'd':
@@ -466,7 +466,7 @@ static int check_scanf_format(expression_t const *const fmt_expr, call_argument_
 		switch (fmt) {
 		case '\0':
 			--c;
-			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			warningf(WARN_FORMAT, pos, "dangling '%%' in format string");
 			goto fmt_end;
 
 		case 'd':
