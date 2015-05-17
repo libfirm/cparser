@@ -436,10 +436,11 @@ out:
  */
 static int check_scanf_format(expression_t const *const fmt_expr, call_argument_t const *arg)
 {
-	position_t const *const pos     = &fmt_expr->base.pos;
-	char       const *const string  = fmt_expr->string_literal.value->begin;
-	char       const       *c       = string;
-	unsigned                num_fmt = 0;
+	position_t const *const pos      = &fmt_expr->base.pos;
+	char       const *const string   = fmt_expr->string_literal.value->begin;
+	char       const       *c        = string;
+	unsigned                num_fmt  = 0;
+	unsigned                num_args = 0;
 	while (*c != '\0') {
 		if (*c++ != '%')
 			continue;
@@ -618,6 +619,7 @@ bad_spec:
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			goto out;
 		}
+		++num_args;
 
 		if (expected_type) {
 			type_t *const arg_type           = arg->expression->base.type;
@@ -660,7 +662,7 @@ fmt_end:
 	if (c + 1 < string + fmt_expr->string_literal.value->size)
 		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
 out:
-	return num_fmt;
+	return num_args;
 }
 
 typedef int check_func_t(expression_t const *fmt_expr, call_argument_t const *arg);
