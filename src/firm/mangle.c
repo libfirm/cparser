@@ -253,11 +253,11 @@ ident *create_name_win64(entity_t *entity)
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
 		assert(type->function.linkage == LINKAGE_C &&
-			   "Only C name mangling is implemented");
+		       "Only C name mangling is implemented");
 		if (entity->declaration.modifiers & DM_DLLIMPORT) {
 			/* add prefix for imported symbols */
 			obstack_printf(&obst, "__imp_%s",
-						   entity->function.actual_name->string);
+			               entity->function.actual_name->string);
 			return make_id_from_obst();
 		}
 		if (entity->function.actual_name != NULL)
