@@ -2416,6 +2416,20 @@ static void eat_pp_directive(void)
 	}
 }
 
+static void expect_directive_end(warning_t const warn, char const *const ctx)
+{
+	if (pp_token.kind != T_NEWLINE) {
+		if (!skip_mode) {
+			if (warn == WARN_ERROR) {
+				errorf(&pp_token.base.pos, "extra tokens at end of %s", ctx);
+			} else {
+				warningf(warn, &pp_token.base.pos, "extra tokens at end of %s", ctx);
+			}
+		}
+		eat_pp_directive();
+	}
+}
+
 static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 {
 	if (token1->kind != token2->kind)
@@ -3027,11 +3041,7 @@ static void parse_undef_directive(void)
 	do_undefine(symbol);
 	next_input_token();
 
-	if (pp_token.kind != '\n') {
-		warningf(WARN_OTHER, &input.pos,
-		         "extra tokens at end of #undef directive");
-	}
-	eat_pp_directive();
+	expect_directive_end(WARN_OTHER, "#undef");
 }
 
 /** behind an #include we can have the special headername lexems.
@@ -3580,10 +3590,7 @@ static bool parse_pp_condition(void)
 
 	next_condition_token();
 	bool const res = !tarval_is_null(parse_pp_expression(PREC_BOTTOM));
-	if (pp_token.kind != '\n') {
-		errorf(&pp_token.base.pos, "extra tokens at end of condition");
-		eat_pp_directive();
-	}
+	expect_directive_end(WARN_ERROR, "condition");
 
 	resolve_escape_sequences = old_resolve_escape_sequences;
 
@@ -3656,10 +3663,7 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 		condition = (bool)pp_token.base.symbol->pp_definition == is_ifdef;
 		next_input_token();
 
-		if (pp_token.kind != T_NEWLINE) {
-			errorf(&pp_token.base.pos, "extra tokens at end of %s", ctx);
-			eat_pp_directive();
-		}
+		expect_directive_end(WARN_ERROR, ctx);
 	}
 
 	conditional->condition = condition;
@@ -3672,13 +3676,7 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 static void parse_else_directive(void)
 {
 	eat_pp(TP_else);
-
-	if (pp_token.kind != '\n') {
-		if (!skip_mode) {
-			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #else");
-		}
-		eat_pp_directive();
-	}
+	expect_directive_end(WARN_ENDIF_LABELS, "#else");
 
 	pp_conditional_t *conditional = conditional_stack;
 	if (conditional == NULL) {
@@ -3703,13 +3701,7 @@ static void parse_else_directive(void)
 static void parse_endif_directive(void)
 {
 	eat_pp(TP_endif);
-
-	if (pp_token.kind != '\n') {
-		if (!skip_mode) {
-			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #endif");
-		}
-		eat_pp_directive();
-	}
+	expect_directive_end(WARN_ENDIF_LABELS, "#endif");
 
 	pp_conditional_t *conditional = conditional_stack;
 	if (conditional == NULL) {
