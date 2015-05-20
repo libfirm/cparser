@@ -3823,7 +3823,7 @@ static void parse_line_directive(void)
 		}
 	}
 
-	eat_pp_directive();
+	expect_directive_end(WARN_OTHER, "#line directive");
 }
 
 static void parse_error_directive(void)
