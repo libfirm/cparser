@@ -2710,6 +2710,7 @@ static void get_date_time(void)
 	if (pp_date != NULL)
 		return;
 
+#ifdef HAVE_ASCTIME_R
 	time_t const now = time(NULL);
 	if (now == (time_t)-1)
 		goto unknown_time;
@@ -2718,6 +2719,9 @@ static void get_date_time(void)
 		goto unknown_time;
 	char        buf[32];
 	char const *str     = asctime_r(t, buf);
+#else
+	char const *str = NULL;
+#endif
 	if (str == NULL) {
 unknown_time:
 		str = "??? ??? ?? ??:??:?? ????";
