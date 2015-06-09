@@ -4546,6 +4546,14 @@ typedef struct out_info {
 	ir_node            *proj;
 } out_info;
 
+static void asm_make_target(ir_node *const asmn, unsigned const pos)
+{
+	ir_node *const proj  = new_Proj(asmn, mode_X, pos);
+	ir_node *const in[]  = { proj };
+	ir_node *const block = new_Block(ARRAY_SIZE(in), in);
+	set_cur_block(block);
+}
+
 static void asm_set_values(out_info const *const outs)
 {
 	for (size_t i = 0, n = ARR_LEN(outs); i < n; ++i) {
@@ -4653,6 +4661,19 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		ARR_APP1(ir_asm_constraint, constraints, constraint);
 	}
 
+	{
+		size_t label_pos = pn_ASM_first_out + ARR_LEN(outs);
+		for (entity_t const *l = statement->labels; l; l = l->base.next) {
+			ir_asm_constraint const c = {
+				.in_pos     = -1,
+				.out_pos    = label_pos++,
+				.constraint = NULL,
+				.mode       = mode_X,
+			};
+			ARR_APP1(ir_asm_constraint, constraints, c);
+		}
+	}
+
 	ir_node *mem = needs_memory ? get_store() : new_NoMem();
 
 	size_t const n_ins         = ARR_LEN(ins);
@@ -4661,6 +4682,8 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_cons_flags flags = cons_none;
 	if (!statement->is_volatile)
 		flags |= cons_floats;
+	if (statement->labels)
+		flags |= cons_throws_exception;
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
@@ -4679,6 +4702,17 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	for (size_t i = 0, n = ARR_LEN(outs); i < n; ++i) {
 		ir_mode *const mode = get_ir_mode_storage(outs[i].expr->base.type);
 		outs[i].proj = new_Proj(node, mode, out_pos++);
+	}
+
+	entity_t const *l = statement->labels;
+	if (l) {
+		for (; l; l = l->base.next) {
+			asm_make_target(node, out_pos++);
+			asm_set_values(outs);
+			jump_to_label(l->asm_label.label);
+		}
+
+		asm_make_target(node, pn_ASM_X_regular);
 	}
 
 	asm_set_values(outs);

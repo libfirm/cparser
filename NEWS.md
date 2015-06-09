@@ -20,6 +20,7 @@ cparser 1.22.1 (2016-01-23)
 * Accept asm qualifiers in arbitrary order
 * Accept (and ignore) the asm qualifier `inline`
 * The target triple can also be set by prefixing the executable name, e.g. `x86_64-unknown-elf-cparser`
+* Support `asm goto`; even allow output constraints, which gcc and clang do not
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)

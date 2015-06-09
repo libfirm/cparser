@@ -9365,7 +9365,7 @@ check_duplicate:
 			         "assembler statement with labels should be 'asm goto'");
 		parse_asm_labels(&asm_statement->labels);
 		if (asm_statement->labels)
-			errorf(&statement->base.pos, "'asm goto' not supported");
+			asm_statement->is_volatile = true;
 	} else if (asm_goto)
 		warningf(WARN_OTHER, &statement->base.pos,
 		         "'asm goto' without labels");
