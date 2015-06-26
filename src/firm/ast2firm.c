@@ -77,7 +77,6 @@ static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
 static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
-static ir_entity          *current_vararg_entity;
 static entitymap_t         entitymap;
 
 static struct obstack asm_obst;
@@ -2180,50 +2179,97 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	return compound_statement_to_firm(&statement->compound);
 }
 
-static ir_node *va_start_expression_to_firm(
-	const va_start_expression_t *const expr)
+static ir_node *va_start_expression_to_firm(const va_start_expression_t *const expr)
 {
-	ir_entity *param_ent = current_vararg_entity;
-	if (param_ent == NULL) {
-		size_t   const n           = IR_VA_START_PARAMETER_NUMBER;
-		ir_type *const frame_type  = get_irg_frame_type(current_ir_graph);
-		ir_type *const param_type  = get_unknown_type();
-		param_ent = new_parameter_entity(frame_type, n, param_type);
-		current_vararg_entity = param_ent;
-	}
-
-	ir_node  *const frame   = get_irg_frame(current_ir_graph);
 	dbg_info *const dbgi    = get_dbg_info(&expr->base.pos);
-	ir_node  *const arg_mem = new_d_Member(dbgi, frame, param_ent);
+	ir_node  *const memory  = get_store();
 
-	set_value_for_expression_addr(expr->ap, arg_mem, NULL);
+	backend_params const *const be_params = be_get_backend_param();
+	ir_type *va_list_type = be_params->vararg.va_list_type;
+
+	if (is_Pointer_type(va_list_type)) {
+		/* The backend implements va_list as a single pointer. The initial value of
+		 * a va_list is the result of the va_start call. */
+		ir_type *const funtype = new_type_method(0, 1);
+		set_method_res_type(funtype, 0, va_list_type);
+
+		ir_node *const builtin = new_d_Builtin(dbgi, memory, 0, NULL, ir_bk_va_start, funtype);
+		ir_node *const projM   = new_d_Proj(dbgi, builtin, mode_M, pn_Builtin_M);
+		ir_node *const projP   = new_d_Proj(dbgi, builtin, mode_P, 1);
+
+		set_store(projM);
+		set_value_for_expression_addr(expr->ap, projP, NULL);
+	} else if (is_Struct_type(va_list_type)) {
+		/* The backend implements va_list as a struct. The va_list object is passed
+		 * by reference to va_start, where its fields are initialized. */
+		ir_type *const funtype = new_type_method(1, 0);
+		set_method_param_type(funtype, 0, va_list_type);
+
+		ir_node *const ap      = expression_to_value(expr->ap);
+		ir_node *const in[]    = { ap };
+		ir_node *const builtin = new_d_Builtin(dbgi, memory, ARRAY_SIZE(in), in, ir_bk_va_start, funtype);
+		ir_node *const projM   = new_d_Proj(dbgi, builtin, mode_M, pn_Builtin_M);
+
+		set_store(projM);
+	} else {
+		panic("unknown va_list_type");
+	}
 
 	return NULL;
 }
 
 static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 {
-	const backend_params *be_params = be_get_backend_param();
-	unsigned stack_param_align = be_params->stack_param_align;
+	ir_node  *const ap      = expression_to_value(expr->ap);
+	dbg_info *const dbgi    = get_dbg_info(&expr->base.pos);
+	ir_node  *const memory  = get_store();
 
-	type_t       *const type    = expr->base.type;
-	expression_t *const ap_expr = expr->ap;
-	ir_node      *const ap_addr = expression_to_addr(ap_expr);
-	ir_node      *const ap      = get_value_from_lvalue(ap_expr, ap_addr);
-	dbg_info     *const dbgi    = get_dbg_info(&expr->base.pos);
-	ir_node      *const res     = deref_address(dbgi, type, ap);
+	ir_type  *const aptype  = get_ir_type(expr->ap->base.type);
+	ir_type  *const restype = get_ir_type(expr->base.type);
 
-	ir_node      *const cnst    = get_type_size_node(expr->base.type);
-	ir_mode      *const mode    = get_irn_mode(cnst);
-	ir_node      *const c1      = new_Const_long(mode, stack_param_align - 1);
-	ir_node      *const c2      = new_d_Add(dbgi, cnst, c1, mode);
-	ir_node      *const c3      = new_Const_long(mode, -(long)stack_param_align);
-	ir_node      *const c4      = new_d_And(dbgi, c2, c3, mode);
-	ir_node      *const add     = new_d_Add(dbgi, ap, c4, mode_P);
+	ir_mode *resmode = get_type_mode(restype);
+	if (!resmode)
+		resmode = mode_P;
 
-	set_value_for_expression_addr(ap_expr, add, ap_addr);
+	backend_params const *const be_params = be_get_backend_param();
+	ir_type *va_list_type = be_params->vararg.va_list_type;
 
-	return res;
+	if (is_Pointer_type(va_list_type)) {
+		/* va_arg takes the old pointer as argument and returns the current argument
+		 * and the new pointer. */
+		ir_type *const funtype = new_type_method(1, 2);
+		set_method_param_type(funtype, 0, aptype);
+		set_method_res_type(funtype, 0, restype);
+		set_method_res_type(funtype, 1, aptype);
+
+		ir_node *const in[]    = { ap };
+		ir_node *const builtin = new_d_Builtin(dbgi, memory, ARRAY_SIZE(in), in,
+		                                       ir_bk_va_arg, funtype);
+		ir_node *const projM   = new_d_Proj(dbgi, builtin, mode_M, pn_Builtin_M);
+		ir_node *const res     = new_d_Proj(dbgi, builtin, resmode, 1);
+		ir_node *const projAp  = new_d_Proj(dbgi, builtin, mode_P, 2);
+
+		set_store(projM);
+		set_value_for_expression_addr(expr->ap, projAp, NULL);
+		return res;
+	} else if (is_Struct_type(va_list_type)) {
+		/* va_arg takes the va_list struct by reference and updates its fields. It
+		 * returns the current argument. */
+		ir_type *const funtype = new_type_method(1, 1);
+		set_method_param_type(funtype, 0, aptype);
+		set_method_res_type(funtype, 0, restype);
+
+		ir_node *const in[]    = { ap };
+		ir_node *const builtin = new_d_Builtin(dbgi, memory, ARRAY_SIZE(in), in,
+		                                       ir_bk_va_arg, funtype);
+		ir_node *const projM   = new_d_Proj(dbgi, builtin, mode_M, pn_Builtin_M);
+		ir_node *const res     = new_d_Proj(dbgi, builtin, resmode, 1);
+
+		set_store(projM);
+		return res;
+	} else {
+		panic("unknown va_list_type");
+	}
 }
 
 /**
@@ -4836,9 +4882,6 @@ static void create_function(entity_t *entity)
 	ir_graph *old_current_function = current_function;
 	current_function = irg;
 
-	ir_entity *const old_current_vararg_entity = current_vararg_entity;
-	current_vararg_entity = NULL;
-
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
@@ -4892,7 +4935,6 @@ static void create_function(entity_t *entity)
 
 	irg_finalize_cons(irg);
 
-	current_vararg_entity = old_current_vararg_entity;
 	current_function      = old_current_function;
 }
 

@@ -4,7 +4,13 @@
  */
 #include "types.h"
 
+#include <libfirm/be.h>
+
 #include "driver/lang_features.h"
+#include "ast/entity_t.h"
+#include "ast/position.h"
+#include "ast/symbol.h"
+#include "parser/parser.h"
 #include "type_t.h"
 
 /** The error type. */
@@ -85,6 +91,7 @@ type_t *type_wchar_t_ptr;
 type_t *type_const_wchar_t_ptr;
 
 type_t *type_valist;
+type_t *type_valist_arg;
 
 /* microsoft types */
 atomic_type_kind_t int8_type_kind;
@@ -188,9 +195,37 @@ void init_predefined_types(void)
 	type_float_ptr               = make_pointer_type(type_float,             TYPE_QUALIFIER_NONE);
 
 	type_char_ptr_ptr            = make_pointer_type(type_char_ptr,          TYPE_QUALIFIER_NONE);
-	type_valist                  = type_void_ptr;
 
 	type_builtin_template_ptr    = make_pointer_type(type_builtin_template,  TYPE_QUALIFIER_NONE);
+
+	backend_params const *const be_params = be_get_backend_param();
+	ir_type *be_va_list_type = be_params->vararg.va_list_type;
+	if (!be_va_list_type) {
+		/* Backend has no vararg support. Just hope the the program will not be
+		 * using any. If it does, the parse_va_* functions will complain. */
+		type_valist     = type_error_type;
+		type_valist_arg = type_error_type;
+	} else if (is_Pointer_type(be_va_list_type)) {
+		type_valist     = type_void_ptr;
+		type_valist_arg = type_void_ptr;
+	} else if (is_Struct_type(be_va_list_type)) {
+		entity_t *ent = allocate_entity_zero(ENTITY_STRUCT, NAMESPACE_NORMAL, sym_anonymous, &builtin_position);
+		ent->compound.alignment = get_type_alignment_bytes(be_va_list_type);
+		ent->compound.size      = get_type_size_bytes(be_va_list_type);
+		ent->compound.complete  = true;
+		ent->compound.members   = (scope_t){
+			.first_entity = NULL,
+			.last_entity  = NULL,
+			.depth = 0
+		};
+
+		type_t *type_valist_struct = allocate_type_zero(TYPE_COMPOUND_STRUCT);
+		type_valist_struct->base.firm_type = be_va_list_type;
+		type_valist_struct->compound.compound = &ent->compound;
+
+		type_valist     = make_array_type(type_valist_struct, 1, TYPE_QUALIFIER_NONE);
+		type_valist_arg = automatic_type_conversion(type_valist);
+	}
 
 	/* const character types */
 	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);

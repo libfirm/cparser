@@ -85,6 +85,7 @@ extern type_t *type_wchar_t_ptr;
 extern type_t *type_const_wchar_t_ptr;
 
 extern type_t *type_valist;
+extern type_t *type_valist_arg;
 
 /* microsoft types */
 extern atomic_type_kind_t int8_type_kind;

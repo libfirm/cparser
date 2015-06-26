@@ -38,4 +38,11 @@ translation_unit_t *finish_parsing(void);
 /** set default elf visbility */
 void set_default_visibility(elf_visibility_t visibility);
 
+/**
+ * Performs automatic type cast as described in §6.3.2.1.
+ *
+ * @param orig_type  the original type
+ */
+type_t *automatic_type_conversion(type_t *orig_type);
+
 #endif

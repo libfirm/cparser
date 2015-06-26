@@ -3561,8 +3561,6 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 	return type;
 }
 
-static type_t *automatic_type_conversion(type_t *orig_type);
-
 static type_t *semantic_parameter(const position_t *pos, type_t *type,
                                   const declaration_specifiers_t *specifiers,
                                   entity_t const *const param)
@@ -5931,12 +5929,7 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	return entity;
 }
 
-/**
- * Performs automatic type cast as described in §6.3.2.1.
- *
- * @param orig_type  the original type
- */
-static type_t *automatic_type_conversion(type_t *orig_type)
+type_t *automatic_type_conversion(type_t *orig_type)
 {
 	type_t *type = skip_typeref(orig_type);
 	if (is_type_array(type)) {
@@ -6400,6 +6393,12 @@ static bool is_last_parameter(expression_t *const param)
 	return false;
 }
 
+static void check_vararg_support(expression_t const *const expr)
+{
+	if (!is_type_valid(type_valist))
+		errorf(&expr->base.pos, "backend does not support varargs");
+}
+
 /**
  * Parses a __builtin_va_start() expression.
  */
@@ -6428,6 +6427,8 @@ static expression_t *parse_va_start(void)
 	} else if (!is_last_parameter(param)) {
 		errorf(&param->base.pos,
 		       "second argument of 'va_start' must be last parameter of the current function");
+	} else {
+		check_vararg_support(expression);
 	}
 
 	return expression;
@@ -6448,7 +6449,7 @@ static expression_t *parse_va_arg(void)
 	call_argument_t ap;
 	ap.expression = parse_assignment_expression();
 	expression->va_arge.ap = ap.expression;
-	check_call_argument(type_valist, &ap, 1);
+	check_call_argument(type_valist_arg, &ap, 1);
 
 	rem_anchor_token(',');
 	expect(',');
@@ -6456,6 +6457,7 @@ static expression_t *parse_va_arg(void)
 	rem_anchor_token(')');
 	expect(')');
 
+	check_vararg_support(expression);
 	return expression;
 }
 
@@ -6472,7 +6474,7 @@ static expression_t *parse_va_copy(void)
 	add_anchor_token(',');
 	expect('(');
 	expression_t *dst = parse_assignment_expression();
-	assign_error_t error = semantic_assign(type_valist, dst);
+	assign_error_t error = semantic_assign(type_valist_arg, dst);
 	report_assign_error(error, type_valist, dst, "call argument 1",
 	                    &dst->base.pos);
 	expression->va_copye.dst = dst;
@@ -6482,11 +6484,12 @@ static expression_t *parse_va_copy(void)
 
 	call_argument_t src;
 	src.expression = parse_assignment_expression();
-	check_call_argument(type_valist, &src, 2);
+	check_call_argument(type_valist_arg, &src, 2);
 	expression->va_copye.src = src.expression;
 	rem_anchor_token(')');
 	expect(')');
 
+	check_vararg_support(expression);
 	return expression;
 }
 
