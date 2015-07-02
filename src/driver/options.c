@@ -192,7 +192,7 @@ add_arg_opt:
 		driver_use_integrated_preprocessor = true;
 	} else if (streq(option, "no-integrated-cpp")) {
 		driver_use_integrated_preprocessor = false;
-	} else if (streq(option, "-trigraphs")) {
+	} else if (streq(option, "trigraphs")) {
 		/* pass these through to the preprocessor */
 		driver_add_flag(&cppflags_obst, "-%s", option);
 	} else if (streq(option, "fdollars-in-identifiers")) {
