@@ -159,7 +159,7 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 		}
 	} else if (types_compatible_ignore_qualifiers(arg_skip, spec_skip)) {
 		return;
-	} else if (arg->kind == EXPR_UNARY_CAST) {
+	} else if (arg->kind == EXPR_UNARY_CAST && arg->base.implicit) {
 		expression_t const *const expr        = arg->unary.value;
 		type_t             *const unprom_type = skip_typeref(expr->base.type);
 		if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
