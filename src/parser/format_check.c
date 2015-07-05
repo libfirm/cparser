@@ -132,13 +132,55 @@ static void warn_invalid_length_modifier(const position_t *pos,
 	warningf(WARN_FORMAT, pos, "invalid length modifier '%s' for conversion specifier '%%%c'", lmod, conversion);
 }
 
+static void check_argument_type(format_env_t *const env, type_t *const spec_type, char const *const spec_begin, char const *const spec_end)
+{
+	if (!spec_type) {
+		warningf(WARN_FORMAT, env->pos, "dangling '%%' in format string");
+		return;
+	}
+
+	expression_t const *const arg = get_next_arg(env);
+	if (!arg) {
+		warningf(WARN_FORMAT, env->pos, "too few arguments for format string");
+		return;
+	}
+
+	type_t *const arg_type  = arg->base.type;
+	type_t *const arg_skip  = skip_typeref(arg_type);
+	type_t *const spec_skip = skip_typeref(spec_type);
+	if (is_type_pointer(spec_skip)) {
+		if (is_type_pointer(arg_skip)) {
+			type_t *const spec_to = skip_typeref(spec_skip->pointer.points_to);
+			type_t *const arg_to  = skip_typeref(arg_skip->pointer.points_to);
+			/* Allow any pointer type, if void* is expected. */
+			if ((arg_to->base.qualifiers & ~spec_to->base.qualifiers) == 0 &&
+					(types_compatible_ignore_qualifiers(arg_to, spec_to) || is_type_void(spec_to)))
+				return;
+		}
+	} else if (types_compatible_ignore_qualifiers(arg_skip, spec_skip)) {
+		return;
+	} else if (arg->kind == EXPR_UNARY_CAST) {
+		expression_t const *const expr        = arg->unary.value;
+		type_t             *const unprom_type = skip_typeref(expr->base.type);
+		if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
+			return;
+		if (spec_skip == type_unsigned_int && !is_type_signed(unprom_type))
+			return;
+	}
+	if (!is_type_valid(arg_skip) || !is_type_valid(spec_skip))
+		return;
+	position_t const *const apos = &arg->base.pos;
+	int               const slen = spec_end - spec_begin;
+	warningf(WARN_FORMAT, apos, "conversion '%%%.*s' at position %u specifies type '%T' but the argument has type '%T'", slen, spec_begin, env->num_fmt, spec_type, arg_type);
+}
+
 /**
  * Check printf-style format. Returns number of expected arguments.
  */
 static char const *check_printf_format(format_env_t *const env, char const *c)
 {
 	if (accept(&c, '%'))
-		goto out;
+		return c;
 
 	format_flags_t fmt_flags = FMT_FLAG_NONE;
 	if (accept(&c, '0'))
@@ -229,7 +271,8 @@ break_fmt_flags:
 		}
 	}
 
-	format_length_modifier_t const fmt_mod = parse_length_modifier(&c);
+	char              const *const spec_begin = c;
+	format_length_modifier_t const fmt_mod    = parse_length_modifier(&c);
 
 	type_t        *expected_type;
 	format_flags_t allowed_flags;
@@ -237,8 +280,9 @@ break_fmt_flags:
 	switch (fmt) {
 	case '\0':
 		--c;
-		warningf(WARN_FORMAT, env->pos, "dangling '%%' in format string");
-		goto out;
+		expected_type = NULL;
+		allowed_flags = ~FMT_FLAG_NONE;
+		break;
 
 	case 'd':
 	case 'i':
@@ -365,7 +409,7 @@ bad_len_mod:
 	default:
 		warningf(WARN_FORMAT, env->pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, env->num_fmt);
 bad_spec:
-		expected_type = NULL;
+		expected_type = type_error_type;
 		allowed_flags = ~FMT_FLAG_NONE;
 		break;
 	}
@@ -385,49 +429,7 @@ bad_spec:
 		warningf(WARN_FORMAT, env->pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, env->num_fmt);
 	}
 
-	expression_t const *const arg = get_next_arg(env);
-	if (!arg) {
-		warningf(WARN_FORMAT, env->pos, "too few arguments for format string");
-		return NULL;
-	}
-
-	if (expected_type) {
-		type_t *const arg_type           = arg->base.type;
-		type_t *const arg_skip           = skip_typeref(arg_type);
-		type_t *const expected_type_skip = skip_typeref(expected_type);
-
-		if (fmt == 'p') {
-			/* allow any pointer type for %p, not just void */
-			if (is_type_pointer(arg_skip))
-				goto out;
-		}
-
-		if (is_type_pointer(expected_type_skip)) {
-			if (is_type_pointer(arg_skip)) {
-				type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
-				type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
-				if ((arg_to->base.qualifiers & ~exp_to->base.qualifiers) == 0 &&
-						types_compatible_ignore_qualifiers(arg_to, exp_to))
-					goto out;
-			}
-		} else if (types_compatible_ignore_qualifiers(arg_skip, expected_type_skip)) {
-			goto out;
-		} else if (arg->kind == EXPR_UNARY_CAST) {
-			expression_t const *const expr        = arg->unary.value;
-			type_t             *const unprom_type = skip_typeref(expr->base.type);
-			if (types_compatible_ignore_qualifiers(unprom_type, expected_type_skip))
-				goto out;
-			if (expected_type_skip == type_unsigned_int && !is_type_signed(unprom_type))
-				goto out;
-		}
-		if (is_type_valid(arg_skip)) {
-			position_t const *const apos = &arg->base.pos;
-			char       const *const mod  = get_length_modifier_name(fmt_mod);
-			warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, fmt, env->num_fmt, expected_type, arg_type);
-		}
-	}
-
-out:
+	check_argument_type(env, expected_type, spec_begin, c);
 	return c;
 }
 
