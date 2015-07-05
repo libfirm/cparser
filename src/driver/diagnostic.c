@@ -9,6 +9,7 @@
 
 #include "adt/error.h"
 #include "adt/separator_t.h"
+#include "adt/strutil.h"
 #include "adt/unicode.h"
 #include "ast/ast.h"
 #include "ast/entity_t.h"
@@ -119,6 +120,13 @@ done_flags:;
 			field_width = va_arg(ap, int);
 		}
 
+		int               precision = -1;
+		char const *const rest      = strstart(f, ".*");
+		if (rest) {
+			f         = rest;
+			precision = va_arg(ap, int);
+		}
+
 		/* Automatic highlight for some formats. */
 		if (!flag_high)
 			flag_high = strchr("EKNQTYk", *f);
@@ -149,7 +157,7 @@ done_flags:;
 
 		case 's': {
 			const char* const str = va_arg(ap, const char*);
-			fputs(str, out);
+			fprintf(out, "%.*s", precision, str);
 			break;
 		}
 
