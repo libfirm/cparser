@@ -150,8 +150,13 @@ done_flags:;
 		}
 
 		case 'd': {
-			const int val = va_arg(ap, int);
-			fprintf(out, "%d", val);
+			if (flag_long) {
+				const long val = va_arg(ap, long);
+				fprintf(out, "%ld", val);
+			} else {
+				const int val = va_arg(ap, int);
+				fprintf(out, "%d", val);
+			}
 			break;
 		}
 

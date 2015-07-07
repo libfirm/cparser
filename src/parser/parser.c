@@ -1766,7 +1766,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					long array_size = type->array.size;
 					if (index_long >= array_size) {
 						errorf(&designator->pos,
-						       "designator [%E] (%d) exceeds array size %d",
+						       "designator [%E] (%ld) exceeds array size %ld",
 						       array_index, index_long, array_size);
 					}
 				}
@@ -9926,14 +9926,10 @@ static statement_t *parse_return(void)
 		if (is_type_void(return_type)) {
 			type_t *return_value_type = skip_typeref(return_value->base.type);
 			if (is_type_void(return_value_type)) {
-				warningf(WARN_PEDANTIC, pos,
-				         "void function should not return void expression",
-				         current_function);
+				warningf(WARN_PEDANTIC, pos, "void function should not return void expression");
 			} else {
 				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
-				warningf(WARN_RETURN_TYPE, pos,
-						 "'return' with a value, in function returning 'void'",
-						 current_function);
+				warningf(WARN_RETURN_TYPE, pos, "'return' with a value, in function returning 'void'");
 			}
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
@@ -10774,7 +10770,7 @@ static void parse_external(void)
 
 	case ';':
 		if (!dialect.strict) {
-			warningf(WARN_STRAY_SEMICOLON, HERE, "stray %k outside of function", ';');
+			warningf(WARN_STRAY_SEMICOLON, HERE, "stray %k outside of function", T_SEMICOLON);
 			eat(';');
 			return;
 		}

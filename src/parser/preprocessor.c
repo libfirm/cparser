@@ -1097,7 +1097,7 @@ static void start_function_macro_expansion(const macro_call_t *call)
 	if (parameter_idx < macro->n_parameters) {
 		errorf(&pp_token.base.pos,
 		       "macro '%Y' requires %u arguments, but only %u provided",
-		       macro->symbol, macro->n_parameters, call->parameter_idx+1);
+		       macro->symbol, macro->n_parameters, call->parameter_idx + 1U);
 		/* set remaining arguments to empty replacements */
 		for ( ; parameter_idx < macro->n_parameters; ++parameter_idx) {
 			pp_definition_t *parameter = &macro->parameters[parameter_idx];
@@ -3794,11 +3794,8 @@ static void parse_line_directive(void)
 			input.pos.lineno = line - 1;
 			/* force output of line */
 			input.output_line = input.pos.lineno - 20;
-		} else {
-			if (!skip_mode) {
-				errorf(&input.pos, "'%S' is not a valid line number",
-					   &pp_token.literal.string);
-			}
+		} else if (!skip_mode) {
+			errorf(&input.pos, "'%S' is not a valid line number", pp_token.literal.string);
 		}
 		next_input_token();
 		if (pp_token.kind == '\n')
