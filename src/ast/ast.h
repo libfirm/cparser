@@ -120,13 +120,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 expression_classification_t is_linker_constant(const expression_t *expression);
 
 /**
- * the type of a literal is usually the biggest type that can hold the value.
- * Since this is backend dependent the parses needs this call exposed.
- * Works for EXPR_LITERAL_* expressions.
- */
-void determine_literal_type(literal_expression_t *literal);
-
-/**
  * reverts the automatic casts of array to pointer types and function
  * to function-pointer types as defined §6.3.2.1
  */

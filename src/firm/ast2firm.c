@@ -868,62 +868,6 @@ make_address:;
 	return new_d_Address(dbgi, entity);
 }
 
-static bool try_create_integer(literal_expression_t *literal, type_t *type)
-{
-	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX);
-	atomic_type_kind_t akind = type->atomic.akind;
-
-	ir_mode    *const mode = atomic_modes[akind];
-	char const *const str  = literal->value->begin;
-	ir_tarval  *const tv   = new_tarval_from_str(str, literal->suffix - str, mode);
-	if (tv == tarval_bad)
-		return false;
-
-	literal->base.type    = type;
-	literal->target_value = tv;
-	return true;
-}
-
-void determine_literal_type(literal_expression_t *const literal)
-{
-	assert(literal->base.kind == EXPR_LITERAL_INTEGER);
-
-	/* -1: signed only, 0: any, 1: unsigned only */
-	int const sign =
-		!is_type_signed(literal->base.type) ? 1 :
-		literal->value->begin[0] == '0'     ? 0 :
-		-1; /* Decimal literals only try signed types. */
-
-	int old_wrap_on_overflow = tarval_get_wrap_on_overflow();
-	tarval_set_wrap_on_overflow(false);
-
-	if (try_create_integer(literal, literal->base.type))
-		goto finished;
-
-	/* now try if the constant is small enough for some types */
-	if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
-		goto finished;
-	if (sign <= 0 && try_create_integer(literal, type_long))
-		goto finished;
-	if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
-		goto finished;
-	/* last try? then we should not report tarval_bad */
-	if (sign < 0)
-		tarval_set_wrap_on_overflow(true);
-	if (sign <= 0 && try_create_integer(literal, type_long_long))
-		goto finished;
-
-	/* last try */
-	assert(sign >= 0);
-	tarval_set_wrap_on_overflow(true);
-	bool res = try_create_integer(literal, type_unsigned_long_long);
-	if (!res)
-		panic("internal error when parsing number literal");
-
-finished:
-	tarval_set_wrap_on_overflow(old_wrap_on_overflow);
-}
-
 /**
  * Dereference an address.
  *
