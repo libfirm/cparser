@@ -5637,7 +5637,7 @@ static bool try_create_integer(literal_expression_t *literal, type_t *type)
 }
 
 /**
- * the type of a literal is usually the biggest type that can hold the value.
+ * the type of a literal is usually the smallest type that can hold the value.
  * Since this is backend dependent the parses needs this call exposed.
  * Works for EXPR_LITERAL_* expressions.
  */
@@ -5654,30 +5654,18 @@ static void determine_literal_type(literal_expression_t *const literal)
 	int old_wrap_on_overflow = tarval_get_wrap_on_overflow();
 	tarval_set_wrap_on_overflow(false);
 
-	if (try_create_integer(literal, literal->base.type))
-		goto finished;
+	/* First try, if the constant fits into the type specified by the suffix.
+	 * Otherwise check, if it is small enough for some type. */
+	if (!try_create_integer(literal, literal->base.type)               &&
+	    (sign < 0 || !try_create_integer(literal, type_unsigned_int))  &&
+	    (sign > 0 || !try_create_integer(literal, type_long))          &&
+	    (sign < 0 || !try_create_integer(literal, type_unsigned_long)) &&
+	    (sign > 0 || !try_create_integer(literal, type_long_long))     &&
+	    (sign < 0 || !try_create_integer(literal, type_unsigned_long_long))) {
+		char const *const signedness = sign < 0 ? "signed" : "unsigned";
+		errorf(&literal->base.pos, "integer constant '%E' is larger than the largest %s integer type", literal, signedness);
+	}
 
-	/* now try if the constant is small enough for some types */
-	if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
-		goto finished;
-	if (sign <= 0 && try_create_integer(literal, type_long))
-		goto finished;
-	if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
-		goto finished;
-	/* last try? then we should not report tarval_bad */
-	if (sign < 0)
-		tarval_set_wrap_on_overflow(true);
-	if (sign <= 0 && try_create_integer(literal, type_long_long))
-		goto finished;
-
-	/* last try */
-	assert(sign >= 0);
-	tarval_set_wrap_on_overflow(true);
-	bool res = try_create_integer(literal, type_unsigned_long_long);
-	if (!res)
-		panic("internal error when parsing number literal");
-
-finished:
 	tarval_set_wrap_on_overflow(old_wrap_on_overflow);
 }
 
