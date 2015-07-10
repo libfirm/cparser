@@ -211,7 +211,8 @@ static void setup_isa(const char *isa)
 	snprintf(buf, sizeof(buf), "isa=%s", isa);
 	set_be_option(buf);
 
-	strcpy(firm_isa, isa);
+	if (firm_isa != isa)
+		strcpy(firm_isa, isa);
 }
 
 static void setup_x86_64(void)
