@@ -821,9 +821,9 @@ bool is_type_complete(type_t const *const type)
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
 	case TYPE_REFERENCE:
-	case TYPE_ERROR:
 		return true;
 
+	case TYPE_ERROR:
 	case TYPE_VOID:
 		return false;
 
