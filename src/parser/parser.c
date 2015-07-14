@@ -5211,9 +5211,12 @@ static void parse_external_declaration(void)
 		errorf(pos, "type of function definition '%#N' is a typedef",
 		       ndeclaration);
 
-	if (is_type_compound(skip_typeref(type->function.return_type)))
-		warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate",
-		         ndeclaration);
+	type_t *const orig_return_type = type->function.return_type;
+	type_t *const return_type      = skip_typeref(orig_return_type);
+	if (!is_type_complete(return_type) && !is_type_void(return_type) && is_type_valid(return_type))
+		errorf(pos, "incomplete return type '%T' in definition of '%N'", orig_return_type, ndeclaration);
+	if (is_type_compound(return_type))
+		warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate", ndeclaration);
 	if (type->function.unspecified_parameters) {
 		warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of '%N'",
 		         ndeclaration);
