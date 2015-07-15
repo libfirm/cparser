@@ -3051,9 +3051,8 @@ static void semantic_parameter_complete(const entity_t *entity)
 	 *             definition of that function shall not have
 	 *             incomplete type. */
 	type_t *type = skip_typeref(entity->declaration.type);
-	if (!is_type_complete(type)) {
+	if (!is_type_complete(type) && is_type_valid(type))
 		errorf(&entity->base.pos, "'%N' has incomplete type", entity);
-	}
 }
 
 static bool has_parameters(void)
@@ -4184,10 +4183,8 @@ static void parse_init_declarator_rest(entity_t *entity)
 			errorf(&entity->base.pos,
 			       "variable sized '%N' may not be initialized", entity);
 		}
-	} else if (!is_type_complete(type)) {
-		errorf(&entity->base.pos,
-		       "'%N' has incomplete type '%T' but is initialized", entity,
-		       orig_type);
+	} else if (!is_type_complete(type) && is_type_valid(type)) {
+		errorf(&entity->base.pos, "'%N' has incomplete type '%T' but is initialized", entity, orig_type);
 	}
 
 	parse_initializer_env_t env;
@@ -4260,7 +4257,8 @@ static void check_variable_type_complete(entity_t *ent)
 		return;
 	}
 
-	errorf(&ent->base.pos, "variable '%#N' has incomplete type", ent);
+	if (is_type_valid(type))
+		errorf(&ent->base.pos, "variable '%#N' has incomplete type", ent);
 }
 
 static bool is_common_variable(const entity_t *entity)
@@ -5515,8 +5513,8 @@ static void parse_compound_declarators(compound_t *compound,
 				if (!is_type_array(type)
 				    || token.kind          != ';'
 				    || look_ahead(1)->kind != '}') {
-					errorf(pos, "'%N' has incomplete type '%T'", entity,
-					       orig_type);
+					if (is_type_valid(type))
+						errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
 				} else if (compound->members.entities == NULL) {
 					errorf(pos,
 					       "flexible array member in otherwise empty struct");
@@ -7246,17 +7244,13 @@ static void semantic_call(call_expression_t *call)
 
 	/* do default promotion for other arguments */
 	for (; argument != NULL; argument = argument->next) {
-		type_t *argument_type = argument->expression->base.type;
-		if (!is_type_complete(skip_typeref(argument_type))) {
-			errorf(&argument->expression->base.pos,
-			       "call argument '%E' has an incomplete type",
-			       argument->expression);
-		}
+		type_t *const orig_arg_type = argument->expression->base.type;
+		type_t *const arg_type      = skip_typeref(orig_arg_type);
+		if (!is_type_complete(arg_type) && is_type_valid(arg_type))
+			errorf(&argument->expression->base.pos, "call argument '%E' has incomplete type", argument->expression);
 
-		argument_type = get_default_promoted_type(argument_type);
-
-		argument->expression
-			= create_implicit_cast(argument->expression, argument_type);
+		type_t *const promoted_arg_type = get_default_promoted_type(orig_arg_type);
+		argument->expression = create_implicit_cast(argument->expression, promoted_arg_type);
 	}
 
 	check_format(call);
@@ -8409,9 +8403,8 @@ static bool is_valid_assignment_lhs(expression_t const* const left)
 		return false;
 	}
 	if (!is_type_complete(type_left)) {
-		errorf(&left->base.pos,
-		       "left-hand side '%E' of assignment has incomplete type '%T'",
-		       left, orig_type_left);
+		if (is_type_valid(type_left))
+			errorf(&left->base.pos, "left-hand side '%E' of assignment has incomplete type '%T'", left, orig_type_left);
 		return false;
 	}
 	if (is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
