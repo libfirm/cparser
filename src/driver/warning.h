@@ -100,7 +100,8 @@ typedef enum warn_state_t {
 
 typedef struct warning_switch_t {
 	warn_state_t      state;
-	char const* const name;
+	char const *const name;
+	char const *const explanation;
 } warning_switch_t;
 
 warning_switch_t const *get_warn_switch(warning_t);

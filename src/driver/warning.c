@@ -16,7 +16,7 @@
 static warning_switch_t warning[] = {
 #define ON  WARN_STATE_ON
 #define OFF WARN_STATE_NONE
-#define M(warning, state, option, explanation) [warning] = { state, option },
+#define M(warning, state, option, explanation) [warning] = { state, option, explanation },
 	WARNINGS(M)
 #undef M
 #undef OFF
@@ -36,7 +36,7 @@ void print_warning_opt_help(void)
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
 		char buf[256];
 		snprintf(buf, sizeof(buf), "-W%s", i->name);
-		put_help(buf, "");
+		put_help(buf, i->explanation);
 	}
 }
 
