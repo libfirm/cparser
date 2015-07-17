@@ -3501,20 +3501,15 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 			parsed_array_t *array      = &iter->array;
 			type_t         *array_type = allocate_type_zero(TYPE_ARRAY);
+			array_type->base.qualifiers    = array->type_qualifiers;
+			array_type->array.element_type = type;
+			array_type->array.is_static    = array->is_static;
+			array_type->array.is_variable  = array->is_variable;
 
-			expression_t *size_expression = array->size;
-			if (size_expression != NULL) {
-				size_expression
-					= create_implicit_cast(size_expression, type_size_t);
-			}
+			expression_t *const size_expression = array->size;
+			if (size_expression) {
+				array_type->array.size_expression = create_implicit_cast(size_expression, type_size_t);
 
-			array_type->base.qualifiers       = array->type_qualifiers;
-			array_type->array.element_type    = type;
-			array_type->array.is_static       = array->is_static;
-			array_type->array.is_variable     = array->is_variable;
-			array_type->array.size_expression = size_expression;
-
-			if (size_expression != NULL) {
 				switch (is_constant_expression(size_expression)) {
 				case EXPR_CLASS_INTEGER_CONSTANT: {
 					long const size = fold_expression_to_int(size_expression);
@@ -3534,11 +3529,10 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 				case EXPR_CLASS_CONSTANT:
 				case EXPR_CLASS_VARIABLE:
-					array_type->array.is_vla = true;
-					if (current_scope == file_scope) {
-						errorf(&size_expression->base.pos,
-						       "variable length array '%T' at file scope",
-						       array_type);
+					if (is_type_integer(skip_typeref(size_expression->base.type))) {
+						array_type->array.is_vla = true;
+						if (current_scope == file_scope)
+							errorf(&size_expression->base.pos, "variable length array '%T' at file scope", array_type);
 					}
 					break;
 
