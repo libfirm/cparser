@@ -4172,6 +4172,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	if (is_type_function(type)) {
 		errorf(&entity->base.pos,
 		       "'%N' is initialized like a variable", entity);
+		orig_type = type_error_type;
 	} else if (is_type_array(type)) {
 		if (type->array.is_vla) {
 			errorf(&entity->base.pos,
