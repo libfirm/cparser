@@ -51,6 +51,7 @@ typedef enum decl_modifiers_t {
 	DM_MALLOC            = 1 << 26,
 	DM_WEAK              = 1 << 27,
 	DM_LEAF              = 1 << 28,
+	DM_GNU_INLINE        = 1 << 29,
 } decl_modifiers_t;
 
 #endif

@@ -43,6 +43,7 @@ static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_FORMAT]                 = "format",
 	[ATTRIBUTE_GNU_FUNCTION_VECTOR]        = "function_vector",
 	[ATTRIBUTE_GNU_GCC_STRUCT]             = "gcc_struct",
+	[ATTRIBUTE_GNU_GNU_INLINE]             = "gnu_inline",
 	[ATTRIBUTE_GNU_INTERRUPT_HANDLER]      = "interrupt_handler",
 	[ATTRIBUTE_GNU_INTERRUPT]              = "interrupt",
 	[ATTRIBUTE_GNU_LEAF]                   = "leaf",
@@ -344,6 +345,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
 		case ATTRIBUTE_GNU_WEAK_IMPORT:   modifiers |= DM_WEAK; break;
 		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
+		case ATTRIBUTE_GNU_GNU_INLINE:    modifiers |= DM_GNU_INLINE; break;
 
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;

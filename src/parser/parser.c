@@ -5172,6 +5172,19 @@ static void parse_external_declaration(void)
 		return;
 	}
 
+	/* determine whether this function is purely used for inlining (§6.7.4) */
+	if (ndeclaration->function.is_inline) {
+		storage_class_t const storage_class
+			= ndeclaration->declaration.storage_class;
+		if (dialect.c99
+		    && !(ndeclaration->declaration.modifiers & DM_GNU_INLINE)) {
+			if (storage_class == STORAGE_CLASS_NONE)
+				ndeclaration->function.no_codegen = true;
+		} else if (storage_class == STORAGE_CLASS_EXTERN) {
+			ndeclaration->function.no_codegen = true;
+		}
+	}
+
 	assert(is_declaration(ndeclaration));
 	type_t *const orig_type = ndeclaration->declaration.type;
 	type_t *const type      = skip_typeref(orig_type);

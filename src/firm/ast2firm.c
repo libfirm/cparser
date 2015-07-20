@@ -731,12 +731,8 @@ static ir_entity *get_function_entity(entity_t *entity)
 	}
 
 	bool const is_inline = entity->function.is_inline;
-	if (is_inline && has_body) {
-		if ((dialect.c99 && storage_class == STORAGE_CLASS_NONE)
-			|| (!dialect.c99 && storage_class == STORAGE_CLASS_EXTERN)) {
-			add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
-		}
-	}
+	if (entity->function.no_codegen)
+		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 
 	/* We should check for file scope here, but as long as we compile C only
 	   this is not needed. */
