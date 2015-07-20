@@ -730,7 +730,6 @@ static ir_entity *get_function_entity(entity_t *entity)
 		set_entity_visibility(irentity, ir_visibility_external);
 	}
 
-	bool const is_inline = entity->function.is_inline;
 	if (entity->function.no_codegen)
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 
