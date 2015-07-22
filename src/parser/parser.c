@@ -2448,8 +2448,9 @@ static type_t *parse_typedef_name(void)
 	symbol_t *const symbol = token.base.symbol;
 	entity_t *const entity = get_entity(symbol, NAMESPACE_NORMAL);
 	if (entity && entity->kind == ENTITY_TYPEDEF) {
-		type_t *type            = allocate_type_zero(TYPE_TYPEDEF);
-		type->typedeft.typedefe = &entity->declaration;
+		type_t *type             = allocate_type_zero(TYPE_TYPEDEF);
+		type->typedeft.typedefe  = &entity->declaration;
+		entity->declaration.used = true;
 		return type;
 	}
 
