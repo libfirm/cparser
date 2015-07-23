@@ -11,10 +11,6 @@
 #include "entity.h"
 #include "symbol.h"
 
-/** Type used to express sizes. */
-typedef unsigned long il_size_t;
-typedef unsigned char il_alignment_t;
-
 /* note that the constant values represent the rank of the types as defined
  * in § 6.3.1 */
 typedef enum atomic_type_kind_t {

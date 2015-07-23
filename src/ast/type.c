@@ -1150,7 +1150,7 @@ unsigned get_type_size(type_t const *const type)
 		return pointer_properties.size;
 	case TYPE_ARRAY: {
 		/* TODO: correct if element_type is aligned? */
-		il_size_t element_size = get_type_size(type->array.element_type);
+		unsigned element_size = get_type_size(type->array.element_type);
 		return type->array.size * element_size;
 	}
 	case TYPE_TYPEDEF:
@@ -1185,7 +1185,7 @@ unsigned get_type_alignment(type_t const *const type)
 	case TYPE_ARRAY:
 		return get_type_alignment(type->array.element_type);
 	case TYPE_TYPEDEF: {
-		il_alignment_t const alignment = get_type_alignment(type->typedeft.typedefe->type);
+		unsigned const alignment = get_type_alignment(type->typedeft.typedefe->type);
 		return MAX(alignment, type->typedeft.typedefe->alignment);
 	}
 	case TYPE_TYPEOF:
@@ -1206,7 +1206,7 @@ unsigned get_type_alignment_compound(type_t const *const type)
 		return atomic_type_properties[type->atomic.akind].struct_alignment;
 
 	case TYPE_TYPEDEF: {
-		il_alignment_t const alignment = get_type_alignment_compound(type->typedeft.typedefe->type);
+		unsigned const alignment = get_type_alignment_compound(type->typedeft.typedefe->type);
 		return MAX(type->typedeft.typedefe->alignment, alignment);
 	}
 
@@ -1477,9 +1477,9 @@ type_t *make_void_type(type_qualifiers_t const qualifiers)
 void layout_compound(compound_t *const compound)
 {
 	bool     const is_union   = compound->base.kind == ENTITY_UNION;
-	il_alignment_t alignment  = compound->alignment;
+	unsigned       alignment  = compound->alignment;
 	size_t         bit_offset = 0;
-	il_size_t      size       = 0;
+	unsigned       size       = 0;
 	bool           need_pad   = false;
 	for (entity_t *entry = compound->members.entities; entry; entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
@@ -1497,9 +1497,9 @@ void layout_compound(compound_t *const compound)
 		if (is_union) {
 			size = MAX(size, m_size);
 		} else if (member->bitfield) {
-			il_alignment_t const alignment_mask = m_alignment - 1;
-			size_t         const base_size      = m_size * BITS_PER_BYTE;
-			size_t         const bit_size       = member->bit_size;
+			unsigned const alignment_mask = m_alignment - 1;
+			size_t   const base_size      = m_size * BITS_PER_BYTE;
+			size_t   const bit_size       = member->bit_size;
 
 			bit_offset += (size & alignment_mask) * BITS_PER_BYTE;
 			size       &= ~alignment_mask;
@@ -1527,7 +1527,7 @@ void layout_compound(compound_t *const compound)
 				size      += 1;
 			}
 
-			il_size_t const new_size = round_up2(size, m_alignment);
+			unsigned const new_size = round_up2(size, m_alignment);
 			if (new_size > size) {
 				need_pad = true;
 				size     = new_size;
@@ -1541,7 +1541,7 @@ void layout_compound(compound_t *const compound)
 	if (bit_offset != 0)
 		size += 1;
 
-	il_size_t const new_size = round_up2(size, alignment);
+	unsigned const new_size = round_up2(size, alignment);
 	if (new_size > size) {
 		need_pad = true;
 		size     = new_size;

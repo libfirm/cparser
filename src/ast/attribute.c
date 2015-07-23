@@ -190,7 +190,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 		break;
 	case ENTITY_STRUCT:
 	case ENTITY_UNION:
-		entity->compound.alignment = MAX(entity->compound.alignment, (il_alignment_t)alignment);
+		entity->compound.alignment = MAX(entity->compound.alignment, alignment);
 		break;
 
 	default:
