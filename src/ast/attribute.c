@@ -255,7 +255,27 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
                                       entity_t *entity)
 {
 	warn_arguments(attribute);
-	entity->compound.packed = true;
+	if (entity->kind == ENTITY_STRUCT) {
+		compound_t *compound = &entity->compound;
+		compound->packed = true;
+
+		/* GCC: Specifying this attribute for `struct' and `union' types is
+		 * equivalent to specifying the `packed' attribute on each of the
+		 * structure or union members. */
+		for (entity_t *member = compound->members.entities; member != NULL;
+		     member = member->base.next) {
+			if (member->kind != ENTITY_COMPOUND_MEMBER)
+				continue;
+			member->declaration.modifiers |= DM_PACKED;
+		}
+	} else if (is_declaration(entity)) {
+		entity->declaration.modifiers |= DM_PACKED;
+	} else {
+		position_t const *const pos  = &attribute->pos;
+		warningf(WARN_OTHER, pos, "packed attribute on entity '%N' ignored",
+		         entity);
+		return;
+	}
 }
 
 static void handle_attribute_packed(const attribute_t *attribute, type_t *type)

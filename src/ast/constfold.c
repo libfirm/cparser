@@ -463,7 +463,7 @@ static unsigned get_object_alignment(expression_t const *const expr)
 	default:                     return get_type_alignment(expr->base.type);
 	}
 	assert(is_declaration(ent));
-	return ent->declaration.alignment;
+	return get_declaration_alignment(&ent->declaration);
 }
 
 static ir_tarval *alignof_to_tarval(const typeprop_expression_t *expression)

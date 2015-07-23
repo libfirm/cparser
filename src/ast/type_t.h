@@ -117,7 +117,6 @@ struct compound_type_t {
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
 	compound_t  *compound;
-	bool         packed : 1; /**< Set if packed was specified. */
 };
 
 struct enum_type_t {

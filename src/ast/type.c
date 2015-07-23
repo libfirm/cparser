@@ -1477,7 +1477,6 @@ type_t *make_void_type(type_qualifiers_t const qualifiers)
 void layout_compound(compound_t *const compound)
 {
 	bool     const is_union   = compound->base.kind == ENTITY_UNION;
-	bool     const is_packed  = compound->packed;
 	il_alignment_t alignment  = compound->alignment;
 	size_t         bit_offset = 0;
 	il_size_t      size       = 0;
@@ -1491,14 +1490,7 @@ void layout_compound(compound_t *const compound)
 		if (!is_type_valid(m_type))
 			continue;
 
-		if (is_packed) {
-			/* GCC: Specifying this attribute for `struct' and `union' types is
-			 * equivalent to specifying the `packed' attribute on each of the
-			 * structure or union members. */
-			member->base.alignment = 1;
-		}
-
-		il_alignment_t const m_alignment = member->base.alignment;
+		unsigned m_alignment = get_declaration_alignment(&member->base);
 		alignment = MAX(alignment, m_alignment);
 
 		unsigned const m_size = get_type_size(m_type);
@@ -1508,15 +1500,14 @@ void layout_compound(compound_t *const compound)
 			il_alignment_t const alignment_mask = m_alignment - 1;
 			size_t         const base_size      = m_size * BITS_PER_BYTE;
 			size_t         const bit_size       = member->bit_size;
-			if (!is_packed) {
-				bit_offset += (size & alignment_mask) * BITS_PER_BYTE;
-				size       &= ~alignment_mask;
 
-				if (bit_offset + bit_size > base_size || bit_size == 0) {
-					size      += (bit_offset + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
-					size       = round_up2(size, m_alignment);
-					bit_offset = 0;
-				}
+			bit_offset += (size & alignment_mask) * BITS_PER_BYTE;
+			size       &= ~alignment_mask;
+			if (bit_offset + bit_size > base_size
+				|| (bit_size == 0 && !(member->base.modifiers & DM_PACKED))) {
+				size      += (bit_offset + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
+				size       = round_up2(size, m_alignment);
+				bit_offset = 0;
 			}
 
 			if (target.byte_order_big_endian) {
@@ -1559,8 +1550,9 @@ void layout_compound(compound_t *const compound)
 	position_t const *const pos = &compound->base.pos;
 	if (need_pad) {
 		warningf(WARN_PADDED, pos, "'%N' needs padding", compound);
-	} else if (is_packed) {
-		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'", compound);
+	} else if (compound->packed) {
+		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'",
+		         compound);
 	}
 
 	compound->size      = size;

@@ -3647,8 +3647,6 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				|| specifiers->storage_class != STORAGE_CLASS_NONE)
 				errorf(&env.pos, "'%N' must have no storage class", entity);
 		}
-
-		entity->declaration.alignment = get_type_alignment_compound(orig_type);
 	} else {
 		if (flags & DECL_IS_PARAMETER) {
 			entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
@@ -3691,8 +3689,6 @@ invalid_storage_class:
 				}
 			}
 		}
-
-		entity->declaration.alignment = get_type_alignment(orig_type);
 	}
 
 	entity->declaration.type       = orig_type;

@@ -437,6 +437,8 @@ static ir_type *create_compound_type(type_t *const type)
 		dbg_info  *dbgi   = get_dbg_info(&entry->base.pos);
 		ir_entity *entity = new_entity(irtype, member_id, entry_irtype);
 		set_entity_dbg_info(entity, dbgi);
+		unsigned alignment = get_declaration_alignment(&entry->declaration);
+		set_entity_alignment(entity, alignment);
 
 		set_entity_offset(entity, entry->compound_member.offset);
 		if (entry->compound_member.bitfield) {
@@ -3143,7 +3145,8 @@ static void create_variable_entity(entity_t *variable,
 	ident     *const id        = new_id_from_str(variable->base.symbol->string);
 	ir_type   *const irtype    = get_ir_type(type);
 	dbg_info  *const dbgi      = get_dbg_info(&variable->base.pos);
-	unsigned         alignment = variable->declaration.alignment;
+	unsigned   const alignment
+		= get_declaration_alignment(&variable->declaration);
 
 	ir_entity *irentity;
 	if (variable->variable.alias.entity != NULL) {

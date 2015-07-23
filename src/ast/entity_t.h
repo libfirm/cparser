@@ -111,7 +111,7 @@ struct compound_t {
 	bool              transparent_union : 1;
 	bool              packed            : 1;
 
-	il_alignment_t    alignment;
+	unsigned short    alignment;
 	il_size_t         size;
 };
 
@@ -161,7 +161,8 @@ struct declaration_t {
 	/** Set for implicit (not found in source code) declarations. */
 	bool                    implicit               : 1;
 	decl_modifiers_t        modifiers;
-	il_alignment_t          alignment;
+	/** forced alignment or 0 to use type alignment */
+	unsigned short          alignment;
 	attribute_t            *attributes;
 
 	/* ast2firm info */
