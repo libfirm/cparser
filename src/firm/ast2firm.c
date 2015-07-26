@@ -415,8 +415,8 @@ static ir_type *create_compound_type(type_t *const type)
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
 
-	entity_t *entry = compound->members.first_entity;
-	for ( ; entry != NULL; entry = entry->base.next) {
+	for (entity_t *entry = compound->members.first_entity; entry != NULL;
+	     entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
@@ -3228,8 +3228,8 @@ static size_t get_compound_member_count(const compound_type_t *type)
 {
 	compound_t *compound  = type->compound;
 	size_t      n_members = 0;
-	entity_t   *member    = compound->members.first_entity;
-	for ( ; member != NULL; member = member->base.next) {
+	for (entity_t const *member = compound->members.first_entity;
+		 member != NULL; member = member->base.next) {
 		/* skip anonymous bitfield members */
 		if (member->compound_member.bitfield && member->base.symbol == NULL)
 		    continue;
@@ -3334,7 +3334,8 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.first_entity;
-			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index_int) {}
+			for (; iter->base.symbol != symbol; iter = iter->base.next,
+				 ++index_int) {}
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
 			/* revert previous initialisations of other union elements */
@@ -4275,8 +4276,8 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	create_local_declarations(statement->scope.first_entity);
 
 	if (currently_reachable()) {
-		entity_t *entity = statement->scope.first_entity;
-		for ( ; entity != NULL; entity = entity->base.next) {
+		for (entity_t *entity = statement->scope.first_entity; entity != NULL;
+		     entity = entity->base.next) {
 			if (!is_declaration(entity))
 				continue;
 
@@ -4724,8 +4725,8 @@ static void initialize_function_parameters(entity_t *entity)
 	unsigned  n               = 0;
 	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
 
-	entity_t *parameter = entity->function.parameters.first_entity;
-	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
+	for (entity_t *parameter = entity->function.parameters.first_entity;
+	     parameter != NULL; parameter = parameter->base.next, ++n) {
 		if (parameter->kind != ENTITY_PARAMETER)
 			continue;
 
@@ -4920,8 +4921,8 @@ static ir_entity *get_irentity(entity_t *entity)
 static void scope_to_firm(scope_t *scope)
 {
 	/* first pass: create declarations */
-	entity_t *entity = scope->first_entity;
-	for ( ; entity != NULL; entity = entity->base.next) {
+	for (entity_t *entity = scope->first_entity; entity != NULL;
+	     entity = entity->base.next) {
 		if (entity->base.symbol == NULL)
 			continue;
 
@@ -4945,8 +4946,8 @@ static void scope_to_firm(scope_t *scope)
 	}
 
 	/* second pass: create code/initializers */
-	entity = scope->first_entity;
-	for ( ; entity != NULL; entity = entity->base.next) {
+	for (entity_t *entity = scope->first_entity; entity != NULL;
+	     entity = entity->base.next) {
 		if (entity->base.symbol == NULL)
 			continue;
 

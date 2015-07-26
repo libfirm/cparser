@@ -968,8 +968,8 @@ static void print_for_statement(const for_statement_t *statement)
 			print_expression(statement->initialisation);
 			print_char(';');
 		} else {
-			entity_t const *entity = statement->scope.first_entity;
-			for (; entity != NULL; entity = entity->base.next) {
+			for (entity_t const *entity = statement->scope.first_entity;
+			     entity != NULL; entity = entity->base.next) {
 				if (is_generated_entity(entity))
 					continue;
 				/* FIXME display of multiple declarations is wrong */
@@ -1243,8 +1243,8 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 static void print_scope(const scope_t *scope)
 {
-	const entity_t *entity = scope->first_entity;
-	for ( ; entity != NULL; entity = entity->base.next) {
+	for (entity_t const *entity = scope->first_entity; entity != NULL;
+	     entity = entity->base.next) {
 		print_indent();
 		print_entity(entity);
 		print_char('\n');
@@ -1401,8 +1401,8 @@ void print_entity(const entity_t *entity)
  */
 void print_ast(const translation_unit_t *unit)
 {
-	entity_t *entity = unit->scope.first_entity;
-	for ( ; entity != NULL; entity = entity->base.next) {
+	for (entity_t const *entity = unit->scope.first_entity; entity != NULL;
+	     entity = entity->base.next) {
 		if (entity->kind == ENTITY_ENUM_VALUE)
 			continue;
 		if (entity->base.namespc != NAMESPACE_NORMAL

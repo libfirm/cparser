@@ -344,8 +344,8 @@ static void print_function_type_post(const function_type_t *type,
 			print_type(parameter->type);
 		}
 	} else {
-		entity_t *parameter = parameters->first_entity;
-		for (; parameter != NULL; parameter = parameter->base.next) {
+		for (entity_t const *parameter = parameters->first_entity;
+		     parameter != NULL; parameter = parameter->base.next) {
 			if (parameter->kind != ENTITY_PARAMETER)
 				continue;
 
@@ -501,8 +501,8 @@ void print_compound_definition(const compound_t *compound)
 	print_string("{\n");
 	change_indent(1);
 
-	entity_t *entity = compound->members.first_entity;
-	for ( ; entity != NULL; entity = entity->base.next) {
+	for (entity_t const *entity = compound->members.first_entity;
+	     entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
