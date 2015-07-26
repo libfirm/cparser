@@ -6,7 +6,7 @@
 
 #include "adt/array.h"
 #include "adt/bitfiddle.h"
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "ast_t.h"
 #include "attribute_t.h"

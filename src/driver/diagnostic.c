@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/separator_t.h"
 #include "adt/strutil.h"
 #include "adt/unicode.h"

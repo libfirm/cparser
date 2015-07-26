@@ -6,7 +6,7 @@
 
 #include <assert.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast_t.h"

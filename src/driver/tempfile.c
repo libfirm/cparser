@@ -11,7 +11,7 @@
 #include <stdlib.h>
 
 #include "adt/array.h"
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/obst.h"
 #include "diagnostic.h"
 

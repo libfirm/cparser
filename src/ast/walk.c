@@ -6,7 +6,7 @@
 
 #include <libfirm/adt/pset.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "ast_t.h"
 #include "entity_t.h"
 #include "type_t.h"

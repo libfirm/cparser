@@ -7,7 +7,7 @@
 #include <libfirm/firm.h>
 #include <string.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/obst.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"

@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include "adt/bitfiddle.h"
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/separator_t.h"
 #include "adt/util.h"
 #include "driver/diagnostic.h"

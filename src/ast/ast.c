@@ -24,7 +24,7 @@
 
 #include <ctype.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/separator_t.h"
 #include "adt/util.h"
 #include "constfold.h"

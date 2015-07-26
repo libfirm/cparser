@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "ast/ast.h"
 #include "driver/c_driver.h"

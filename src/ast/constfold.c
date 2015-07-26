@@ -8,7 +8,7 @@
 #include <libfirm/tv.h>
 #include <libfirm/irmode.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast_t.h"

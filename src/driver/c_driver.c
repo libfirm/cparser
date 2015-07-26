@@ -13,7 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast/printer.h"

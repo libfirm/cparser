@@ -5,7 +5,7 @@
 #include <libfirm/be.h>
 #include <libfirm/firm.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast/type_t.h"

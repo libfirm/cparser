@@ -4,7 +4,7 @@
  */
 #include <string.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/pset_new.h"
 #include "adt/separator_t.h"
 #include "adt/strutil.h"

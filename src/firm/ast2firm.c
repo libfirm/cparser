@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 #include "adt/array.h"
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/unicode.h"
 #include "adt/util.h"

@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "adt/array.h"
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/util.h"
 #include "ast/symbol_t.h"
 #include "ast/symbol_table.h"

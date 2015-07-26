@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "ast/constfoldbits.h"
 #include "ast/type_t.h"

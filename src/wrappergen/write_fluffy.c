@@ -2,7 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "adt/error.h"
+#include "adt/panic.h"
 #include "adt/separator_t.h"
 #include "ast/ast_t.h"
 #include "ast/entity_t.h"
