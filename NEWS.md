@@ -1,3 +1,14 @@
+cparser 1.22.0 (2015-07-31)
+---------------------------
+
+* Bump version number to somewhat match libfirm
+* Color diagnostics
+* Full preprocessor support
+* Support C99 complex numbers
+* Improved commandline option handling emulating even more gcc options
+* Create libcparser to facility the creation of external tools
+* Bugfixes
+
 cparser 0.9.14 (2012-11-21)
 ---------------------------
 
