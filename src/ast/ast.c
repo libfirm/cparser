@@ -961,13 +961,14 @@ static void print_declaration(entity_t const *entity);
  */
 static void print_for_statement(const for_statement_t *statement)
 {
-	if (statement->initialisation || statement->scope.entities || !statement->condition || statement->step) {
+	if (statement->initialisation || statement->scope.first_entity
+	 || !statement->condition || statement->step) {
 		print_string("for (");
 		if (statement->initialisation != NULL) {
 			print_expression(statement->initialisation);
 			print_char(';');
 		} else {
-			entity_t const *entity = statement->scope.entities;
+			entity_t const *entity = statement->scope.first_entity;
 			for (; entity != NULL; entity = entity->base.next) {
 				if (is_generated_entity(entity))
 					continue;
@@ -1242,7 +1243,7 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 static void print_scope(const scope_t *scope)
 {
-	const entity_t *entity = scope->entities;
+	const entity_t *entity = scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		print_indent();
 		print_entity(entity);
@@ -1400,7 +1401,7 @@ void print_entity(const entity_t *entity)
  */
 void print_ast(const translation_unit_t *unit)
 {
-	entity_t *entity = unit->scope.entities;
+	entity_t *entity = unit->scope.first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind == ENTITY_ENUM_VALUE)
 			continue;

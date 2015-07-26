@@ -406,7 +406,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			symbol_t *symbol = designator->symbol;
 
 			compound_t *compound = type->compound.compound;
-			entity_t   *iter     = compound->members.entities;
+			entity_t   *iter     = compound->members.first_entity;
 			for (; iter->base.symbol != symbol; iter = iter->base.next) {}
 
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);

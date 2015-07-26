@@ -262,7 +262,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 		/* GCC: Specifying this attribute for `struct' and `union' types is
 		 * equivalent to specifying the `packed' attribute on each of the
 		 * structure or union members. */
-		for (entity_t *member = compound->members.entities; member != NULL;
+		for (entity_t *member = compound->members.first_entity; member != NULL;
 		     member = member->base.next) {
 			if (member->kind != ENTITY_COMPOUND_MEMBER)
 				continue;

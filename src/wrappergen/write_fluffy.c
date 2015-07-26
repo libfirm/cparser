@@ -53,7 +53,7 @@ static void write_pointer_type(const pointer_type_t *type)
 static entity_t *find_typedef(const type_t *type)
 {
 	/* first: search for a matching typedef in the global type... */
-	entity_t *entity = global_scope->entities;
+	entity_t *entity = global_scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
@@ -173,7 +173,7 @@ static void write_compound(const symbol_t *symbol, const compound_type_t *type)
 	        type->base.kind == TYPE_COMPOUND_STRUCT ? "struct" : "union",
 			symbol->string);
 
-	const entity_t *entity = type->compound->members.entities;
+	const entity_t *entity = type->compound->members.first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		write_compound_entry(entity);
 	}
@@ -249,7 +249,7 @@ static void write_function(const entity_t *entity)
 	const function_type_t *function_type
 		= (const function_type_t*) entity->declaration.type;
 
-	entity_t   *parameter = entity->function.parameters.entities;
+	entity_t   *parameter = entity->function.parameters.first_entity;
 	separator_t sep       = { "", ", " };
 	for( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->kind == ENTITY_PARAMETER);
@@ -284,7 +284,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
 	/* write structs,unions + enums */
-	entity_t *entity = unit->scope.entities;
+	entity_t *entity = unit->scope.first_entity;
 	for( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
@@ -298,7 +298,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write global variables */
-	entity = unit->scope.entities;
+	entity = unit->scope.first_entity;
 	for( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_VARIABLE)
 			continue;
@@ -307,7 +307,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write functions */
-	entity = unit->scope.entities;
+	entity = unit->scope.first_entity;
 	for( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;

@@ -10,8 +10,8 @@
 
 void write_compoundsizes(FILE *output, const translation_unit_t *unit)
 {
-	for (const entity_t *entity = unit->scope.entities;
-		 entity != NULL; entity = entity->base.next) {
+	for (const entity_t *entity = unit->scope.first_entity; entity != NULL;
+	     entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
 

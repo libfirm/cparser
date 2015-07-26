@@ -89,7 +89,7 @@ static void write_pointer_type(const pointer_type_t *type)
 static entity_t *find_typedef(const type_t *type)
 {
 	/* first: search for a matching typedef in the global type... */
-	entity_t *entity = global_scope->entities;
+	entity_t *entity = global_scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
@@ -103,7 +103,7 @@ static entity_t *find_typedef(const type_t *type)
 static entity_t *find_enum_typedef(const enum_t *enume)
 {
 	/* first: search for a matching typedef in the global type... */
-	entity_t *entity = global_scope->entities;
+	entity_t *entity = global_scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
@@ -395,7 +395,7 @@ static void write_function(const entity_t *entity)
 	write_type(return_type);
 	fprintf(out, " %s(", entity->base.symbol->string);
 
-	entity_t   *parameter = entity->function.parameters.entities;
+	entity_t   *parameter = entity->function.parameters.first_entity;
 	separator_t sep       = { "", ", " };
 	int         n         = 0;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
@@ -477,7 +477,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write structs,unions + enums */
-	entity_t *entity = unit->scope.entities;
+	entity_t *entity = unit->scope.first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind == ENTITY_ENUM) {
 			if (find_enum_typedef(&entity->enume) != NULL)
@@ -498,7 +498,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write functions */
-	entity = unit->scope.entities;
+	entity = unit->scope.first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;

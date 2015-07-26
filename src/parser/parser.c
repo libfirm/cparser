@@ -1655,7 +1655,8 @@ static void descend_into_subtype(type_path_t *path)
 		return;
 	} if (is_type_compound(top_type)) {
 		compound_t *const compound = top_type->compound.compound;
-		entity_t   *const entry    = skip_unnamed_bitfields(compound->members.entities);
+		entity_t   *const entry
+			= skip_unnamed_bitfields(compound->members.first_entity);
 
 		if (entry != NULL) {
 			top->v.compound_entry = &entry->declaration;
@@ -1720,7 +1721,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				orig_type             = type_error_type;
 			} else {
 				compound_t *compound = type->compound.compound;
-				entity_t   *iter     = compound->members.entities;
+				entity_t   *iter     = compound->members.first_entity;
 				for (; iter != NULL; iter = iter->base.next) {
 					if (iter->base.symbol == symbol) {
 						break;
@@ -2150,7 +2151,7 @@ static void append_entity(scope_t *scope, entity_t *entity)
 	if (scope->last_entity != NULL) {
 		scope->last_entity->base.next = entity;
 	} else {
-		scope->entities = entity;
+		scope->first_entity = entity;
 	}
 	entity->base.parent_entity = current_entity;
 	scope->last_entity         = entity;
@@ -2187,7 +2188,7 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 				errorf(&pos, "multiple definitions of '%N'", entity);
 				note_prev_decl(entity);
 				/* clear members in the hope to avoid further errors */
-				entity->compound.members.entities = NULL;
+				entity->compound.members.first_entity = NULL;
 			}
 		}
 	} else if (token.kind != '{') {
@@ -4397,7 +4398,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 
 	PUSH_SCOPE(&entity->function.parameters);
 
-	entity_t *parameter = entity->function.parameters.entities;
+	entity_t *parameter = entity->function.parameters.first_entity;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->base.parent_scope == NULL);
 		parameter->base.parent_scope = current_scope;
@@ -4448,7 +4449,7 @@ decl_list_end:
 	}
 
 	bool need_incompatible_warning = false;
-	parameter = entity->function.parameters.entities;
+	parameter = entity->function.parameters.first_entity;
 	for (; parameter != NULL; parameter = parameter->base.next,
 			proto_parameter =
 				proto_parameter == NULL ? NULL : proto_parameter->next) {
@@ -4555,7 +4556,8 @@ static void check_unused_variables(statement_t *const stmt, void *const env)
 	}
 
 	case STATEMENT_FOR:
-		warn_unused_entity(WARN_UNUSED_VARIABLE, stmt->fors.scope.entities, NULL);
+		warn_unused_entity(WARN_UNUSED_VARIABLE, stmt->fors.scope.first_entity,
+		                   NULL);
 		return;
 
 	default:
@@ -4570,7 +4572,7 @@ static void check_declarations(void)
 {
 	if (is_warn_on(WARN_UNUSED_PARAMETER)) {
 		const scope_t *scope = &current_function->parameters;
-		warn_unused_entity(WARN_UNUSED_PARAMETER, scope->entities, NULL);
+		warn_unused_entity(WARN_UNUSED_PARAMETER, scope->first_entity, NULL);
 	}
 	if (is_warn_on(WARN_UNUSED_VARIABLE))
 		walk_statements(current_function->body, check_unused_variables, NULL);
@@ -5248,7 +5250,7 @@ static void parse_external_declaration(void)
 
 	PUSH_SCOPE(&function->parameters);
 
-	entity_t *parameter = function->parameters.entities;
+	entity_t *parameter = function->parameters.first_entity;
 	for (; parameter != NULL; parameter = parameter->base.next) {
 		if (parameter->base.parent_scope == &ndeclaration->function.parameters)
 			parameter->base.parent_scope = current_scope;
@@ -5322,7 +5324,7 @@ static void parse_external_declaration(void)
 
 static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
 {
-	entity_t *iter = compound->members.entities;
+	entity_t *iter = compound->members.first_entity;
 	for (; iter != NULL; iter = iter->base.next) {
 		if (iter->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
@@ -5398,7 +5400,7 @@ static expression_t *find_create_select(const position_t *pos,
                                         type_qualifiers_t qualifiers,
                                         compound_t *compound, symbol_t *symbol)
 {
-	entity_t *iter = compound->members.entities;
+	entity_t *iter = compound->members.first_entity;
 	for (; iter != NULL; iter = iter->base.next) {
 		if (iter->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
@@ -5520,7 +5522,7 @@ static void parse_compound_declarators(compound_t *compound,
 				    || look_ahead(1)->kind != '}') {
 					if (is_type_valid(type))
 						errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
-				} else if (compound->members.entities == NULL) {
+				} else if (compound->members.first_entity == NULL) {
 					errorf(pos,
 					       "flexible array member in otherwise empty struct");
 				}
@@ -5963,7 +5965,7 @@ static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
 
 	/* we should optimize here, if scope grows above a certain size we should
 	   construct a hashmap here... */
-	entity_t *entity = scope->entities;
+	entity_t *entity = scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->base.symbol == symbol && entity->base.namespc == namespc)
 			break;
@@ -6954,7 +6956,7 @@ static void check_call_argument(type_t          *expected_type,
 	    && (get_type_modifiers(expected_type) & DM_TRANSPARENT_UNION)) {
 		compound_t *union_decl  = expected_type_skip->compound.compound;
 		type_t     *best_type   = NULL;
-		entity_t   *entry       = union_decl->members.entities;
+		entity_t   *entry       = union_decl->members.first_entity;
 		for ( ; entry != NULL; entry = entry->base.next) {
 			assert(is_declaration(entry));
 			type_t *decl_type = entry->declaration.type;
@@ -8366,7 +8368,7 @@ static void semantic_equality(binary_expression_t *expression)
 static bool has_const_fields(const compound_type_t *type)
 {
 	compound_t *compound = type->compound;
-	entity_t   *entry    = compound->members.entities;
+	entity_t   *entry    = compound->members.first_entity;
 
 	for (; entry != NULL; entry = entry->base.next) {
 		if (!is_declaration(entry) || entry->kind == ENTITY_TYPEDEF)
@@ -10017,7 +10019,7 @@ static statement_t *parse_declaration_statement(void)
 
 	declaration_statement_t *const decl  = &statement->declaration;
 	entity_t                *const begin
-		= before != NULL ? before->base.next : current_scope->entities;
+		= before != NULL ? before->base.next : current_scope->first_entity;
 	decl->declarations_begin = begin;
 	decl->declarations_end   = begin != NULL ? current_scope->last_entity : NULL;
 
@@ -10707,7 +10709,7 @@ static void check_unused_globals(void)
 	if (!is_warn_on(WARN_UNUSED_FUNCTION) && !is_warn_on(WARN_UNUSED_VARIABLE))
 		return;
 
-	for (const entity_t *entity = file_scope->entities; entity != NULL;
+	for (const entity_t *entity = file_scope->first_entity; entity != NULL;
 	     entity = entity->base.next) {
 		if (!is_declaration(entity) || entity->kind == ENTITY_TYPEDEF)
 			continue;

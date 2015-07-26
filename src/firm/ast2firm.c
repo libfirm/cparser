@@ -238,7 +238,7 @@ static type_t *get_parameter_type(type_t *orig_type)
 	if (is_type_union(type)
 			&& get_type_modifiers(orig_type) & DM_TRANSPARENT_UNION) {
 		compound_t *compound = type->compound.compound;
-		type                 = compound->members.entities->declaration.type;
+		type                 = compound->members.first_entity->declaration.type;
 	}
 
 	return type;
@@ -415,7 +415,7 @@ static ir_type *create_compound_type(type_t *const type)
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
 
-	entity_t *entry = compound->members.entities;
+	entity_t *entry = compound->members.first_entity;
 	for ( ; entry != NULL; entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
@@ -3011,7 +3011,7 @@ static void create_local_declarations(entity_t*);
 static complex_value compound_statement_to_firm_complex(
 	const compound_statement_t *compound)
 {
-	create_local_declarations(compound->scope.entities);
+	create_local_declarations(compound->scope.first_entity);
 
 	complex_value result    = { NULL, NULL };
 	statement_t  *statement = compound->statements;
@@ -3228,7 +3228,7 @@ static size_t get_compound_member_count(const compound_type_t *type)
 {
 	compound_t *compound  = type->compound;
 	size_t      n_members = 0;
-	entity_t   *member    = compound->members.entities;
+	entity_t   *member    = compound->members.first_entity;
 	for ( ; member != NULL; member = member->base.next) {
 		/* skip anonymous bitfield members */
 		if (member->compound_member.bitfield && member->base.symbol == NULL)
@@ -3273,7 +3273,8 @@ static void descend_into_subtype(type_path_t *path)
 
 	if (is_type_compound(top_type)) {
 		compound_t *const compound = top_type->compound.compound;
-		entity_t   *const entry    = skip_unnamed_bitfields(compound->members.entities);
+		entity_t   *const entry
+			= skip_unnamed_bitfields(compound->members.first_entity);
 
 		top->compound_entry = entry;
 		top->index          = 0;
@@ -3332,7 +3333,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			symbol_t *symbol    = designator->symbol;
 
 			compound_t *compound = type->compound.compound;
-			entity_t   *iter     = compound->members.entities;
+			entity_t   *iter     = compound->members.first_entity;
 			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index_int) {}
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
@@ -4036,7 +4037,7 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 
 static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
-	create_local_declarations(compound->scope.entities);
+	create_local_declarations(compound->scope.first_entity);
 
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
@@ -4207,7 +4208,7 @@ static ir_node *declaration_statement_to_firm(declaration_statement_t *statement
 
 static ir_node *if_statement_to_firm(if_statement_t *statement)
 {
-	create_local_declarations(statement->scope.entities);
+	create_local_declarations(statement->scope.first_entity);
 
 	/* Create the condition. */
 	jump_target true_target;
@@ -4237,7 +4238,7 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
-	create_local_declarations(statement->scope.entities);
+	create_local_declarations(statement->scope.first_entity);
 
 	PUSH_BREAK(NULL);
 	PUSH_CONTINUE(NULL);
@@ -4271,10 +4272,10 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 
 static ir_node *for_statement_to_firm(for_statement_t *statement)
 {
-	create_local_declarations(statement->scope.entities);
+	create_local_declarations(statement->scope.first_entity);
 
 	if (currently_reachable()) {
-		entity_t *entity = statement->scope.entities;
+		entity_t *entity = statement->scope.first_entity;
 		for ( ; entity != NULL; entity = entity->base.next) {
 			if (!is_declaration(entity))
 				continue;
@@ -4360,7 +4361,7 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 
 static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
-	create_local_declarations(statement->scope.entities);
+	create_local_declarations(statement->scope.first_entity);
 
 	dbg_info *dbgi        = get_dbg_info(&statement->base.pos);
 	ir_node  *switch_node = NULL;
@@ -4687,7 +4688,7 @@ static void count_local_variables_in_stmt(statement_t *stmt, void *const env)
 	}
 
 	case STATEMENT_FOR:
-		*count += count_local_variables(stmt->fors.scope.entities, NULL);
+		*count += count_local_variables(stmt->fors.scope.first_entity, NULL);
 		break;
 
 	default:
@@ -4704,7 +4705,7 @@ static int get_function_n_local_vars(entity_t *entity)
 	int count = 0;
 
 	/* count parameters */
-	count += count_local_variables(function->parameters.entities, NULL);
+	count += count_local_variables(function->parameters.first_entity, NULL);
 
 	/* count local variables declared in body */
 	walk_statements(function->body, count_local_variables_in_stmt, &count);
@@ -4723,7 +4724,7 @@ static void initialize_function_parameters(entity_t *entity)
 	unsigned  n               = 0;
 	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
 
-	entity_t *parameter = entity->function.parameters.entities;
+	entity_t *parameter = entity->function.parameters.first_entity;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
 		if (parameter->kind != ENTITY_PARAMETER)
 			continue;
@@ -4919,7 +4920,7 @@ static ir_entity *get_irentity(entity_t *entity)
 static void scope_to_firm(scope_t *scope)
 {
 	/* first pass: create declarations */
-	entity_t *entity = scope->entities;
+	entity_t *entity = scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->base.symbol == NULL)
 			continue;
@@ -4944,7 +4945,7 @@ static void scope_to_firm(scope_t *scope)
 	}
 
 	/* second pass: create code/initializers */
-	entity = scope->entities;
+	entity = scope->first_entity;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->base.symbol == NULL)
 			continue;

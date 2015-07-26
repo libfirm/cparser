@@ -77,7 +77,7 @@ typedef enum {
  * A scope containing entities.
  */
 struct scope_t {
-	entity_t *entities;
+	entity_t *first_entity;
 	entity_t *last_entity; /**< pointer to last entity (so appending is fast) */
 	unsigned  depth;       /**< while parsing, the depth of this scope in the
 	                            scope stack. */

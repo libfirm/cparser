@@ -274,7 +274,7 @@ static void walk_declarations(entity_t*            entity,
 
 static void walk_scope(const scope_t *const scope, const walk_env_t *const env)
 {
-	walk_declarations(scope->entities, NULL, env);
+	walk_declarations(scope->first_entity, NULL, env);
 }
 
 static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
@@ -290,7 +290,7 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		return;
 
 	case STATEMENT_FOR:
-		walk_declarations(stmt->fors.scope.entities, NULL, env);
+		walk_declarations(stmt->fors.scope.first_entity, NULL, env);
 		if (stmt->fors.initialisation != NULL)
 			walk_expression(stmt->fors.initialisation, env);
 		if (stmt->fors.condition != NULL)
