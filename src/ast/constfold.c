@@ -1068,18 +1068,7 @@ void init_constfold(void)
 {
 	tarval_set_wrap_on_overflow(true);
 
-	/* initialize firm pointer mode */
-	char name[64];
 	const backend_params *be_params = be_get_backend_param();
-	unsigned machine_size = be_params->machine_size;
-	unsigned modulo_shift = target.modulo_shift;
-	if (modulo_shift != 0 && modulo_shift < machine_size)
-		modulo_shift = machine_size;
-
-	snprintf(name, sizeof(name), "p%u", be_params->machine_size);
-	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement,
-	                                       machine_size, modulo_shift);
-	set_modeP(ptr_mode);
 
 	/* initialize modes for arithmetic types */
 	memset(atomic_modes, 0, sizeof(atomic_modes));
