@@ -90,6 +90,8 @@ void target_adjust_types_and_dialect(void)
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
+		}
+		if (streq(firm_isa, "ia32") || streq(firm_isa, "amd64")) {
 			props[ATOMIC_TYPE_LONG_DOUBLE].size             = 16;
 			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
