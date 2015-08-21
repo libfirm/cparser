@@ -2220,10 +2220,7 @@ static ir_node *va_start_expression_to_firm(const va_start_expression_t *const e
 
 static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 {
-	ir_node  *const ap      = expression_to_value(expr->ap);
 	dbg_info *const dbgi    = get_dbg_info(&expr->base.pos);
-	ir_node  *const memory  = get_store();
-
 	ir_type  *const aptype  = get_ir_type(expr->ap->base.type);
 	ir_type  *const restype = get_ir_type(expr->base.type);
 
@@ -2237,6 +2234,11 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	if (is_Pointer_type(va_list_type)) {
 		/* va_arg takes the old pointer as argument and returns the current argument
 		 * and the new pointer. */
+		ir_node *const ap_ptr  = expression_to_addr(expr->ap);
+		ir_node *const ap      = get_value_from_lvalue(expr->ap, ap_ptr);
+
+		ir_node *const memory  = get_store();
+
 		ir_type *const funtype = new_type_method(1, 2);
 		set_method_param_type(funtype, 0, aptype);
 		set_method_res_type(funtype, 0, restype);
@@ -2250,11 +2252,14 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 		ir_node *const projAp  = new_d_Proj(dbgi, builtin, mode_P, 2);
 
 		set_store(projM);
-		set_value_for_expression_addr(expr->ap, projAp, NULL);
+		set_value_for_expression_addr(expr->ap, projAp, ap_ptr);
 		return res;
 	} else if (is_Struct_type(va_list_type)) {
 		/* va_arg takes the va_list struct by reference and updates its fields. It
 		 * returns the current argument. */
+		ir_node *const ap      = expression_to_value(expr->ap);
+		ir_node *const memory  = get_store();
+
 		ir_type *const funtype = new_type_method(1, 1);
 		set_method_param_type(funtype, 0, aptype);
 		set_method_res_type(funtype, 0, restype);
