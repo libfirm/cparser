@@ -4857,10 +4857,10 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 static void create_function(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
-	ir_entity *function_entity = get_function_entity(entity);
 	if (entity->function.body == NULL)
 		return;
 
+	ir_entity *const function_entity = get_function_entity(entity);
 	if (entity->declaration.modifiers & DM_CONSTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_CONSTRUCTORS);
 		add_function_pointer(segment, function_entity, "constructor_ptr.%u");
@@ -4979,7 +4979,12 @@ static void scope_to_firm(scope_t *scope)
 				/* builtins have no representation */
 				continue;
 			}
-			(void)get_function_entity(entity);
+			/* Only create the IR type and entity, if the function is used.
+			 * This saves creating unnecessary IR nodes and allows compiling programs
+			 * with unused function declarations containing va_list for backends
+			 * without support for variadic functions. */
+			if (entity->declaration.used || entity->function.body)
+				(void)get_function_entity(entity);
 			break;
 		case ENTITY_VARIABLE:
 			create_global_variable(entity);
@@ -5007,8 +5012,10 @@ static void scope_to_firm(scope_t *scope)
 
 			entity_t *alias = entity->function.alias.entity;
 			if (alias != NULL) {
-				ir_entity *aliased = get_irentity(alias);
-				set_entity_alias(entity->function.irentity, aliased);
+				if (entity->declaration.used) {
+					ir_entity *aliased = get_irentity(alias);
+					set_entity_alias(entity->function.irentity, aliased);
+				}
 			} else {
 				create_function(entity);
 			}
