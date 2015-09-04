@@ -2604,7 +2604,7 @@ static ir_node *complex_to_memory(dbg_info *dbgi, type_t *type,
 	ir_entity *const tmp_storage = new_entity(frame_type, id, irtype);
 	ir_node   *const frame       = get_irg_frame(irg);
 	ir_node   *const addr        = new_Member(frame, tmp_storage);
-	set_entity_compiler_generated(tmp_storage, 1);
+	set_entity_visibility(tmp_storage, ir_visibility_private);
 	store_complex(dbgi, addr, type, value);
 	return addr;
 }
@@ -4843,7 +4843,6 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ir_node   *val          = new_r_Address(irg, method);
 
 	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
-	set_entity_compiler_generated(ptr, 1);
 	set_entity_visibility(ptr, ir_visibility_private);
 	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
 	set_atomic_ent_value(ptr, val);
