@@ -4979,10 +4979,10 @@ static void scope_to_firm(scope_t *scope)
 				continue;
 			}
 			/* Only create the IR type and entity, if the function is used.
-			 * This saves creating unnecessary IR nodes and allows compiling programs
-			 * with unused function declarations containing va_list for backends
-			 * without support for variadic functions. */
-			if (entity->declaration.used || entity->function.body)
+			 * This saves creating unnecessary IR nodes and allows compiling
+			 * programs with unused function declarations containing va_list
+			 * for backends without support for variadic functions. */
+			if (entity->declaration.used || declaration_is_definition(entity))
 				(void)get_function_entity(entity);
 			break;
 		case ENTITY_VARIABLE:
@@ -5011,10 +5011,8 @@ static void scope_to_firm(scope_t *scope)
 
 			entity_t *alias = entity->function.alias.entity;
 			if (alias != NULL) {
-				if (entity->declaration.used) {
-					ir_entity *aliased = get_irentity(alias);
-					set_entity_alias(entity->function.irentity, aliased);
-				}
+				ir_entity *aliased = get_irentity(alias);
+				set_entity_alias(entity->function.irentity, aliased);
 			} else {
 				create_function(entity);
 			}
