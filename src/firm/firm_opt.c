@@ -37,16 +37,6 @@ struct a_firm_opt {
 	unsigned inline_threshold;/**< Inlining benefice threshold. */
 };
 
-/** statistic options */
-typedef enum a_firmstat_selection_tag {
-	STAT_NONE        = 0x00000000,
-	STAT_BEFORE_OPT  = 0x00000001,
-	STAT_AFTER_OPT   = 0x00000002,
-	STAT_AFTER_LOWER = 0x00000004,
-	STAT_FINAL_IR    = 0x00000008,
-	STAT_FINAL       = 0x00000010,
-} a_firmstat_selection;
-
 /* dumping options */
 struct a_firm_dump {
 	bool debug_print;   /**< enable debug print */
@@ -88,7 +78,6 @@ static struct a_firm_dump firm_dump = {
 	.all_types    = false,
 	.ir_graph     = false,
 	.all_phases   = false,
-	.statistic    = STAT_NONE,
 };
 
 #define X(a)  a, sizeof(a)-1
@@ -132,13 +121,6 @@ static const struct params {
   { X("dump-all-types"),         &firm_dump.all_types,       1, "dump graph of all types" },
   { X("dump-all-phases"),        &firm_dump.all_phases,      1, "dump graphs for all optimization phases" },
   { X("dump-filter=<string>"),   NULL,                       0, "set dumper filter" },
-
-  /* misc */
-  { X("stat-before-opt"),        &firm_dump.statistic,       STAT_BEFORE_OPT,  "Firm statistic output before optimizations" },
-  { X("stat-after-opt"),         &firm_dump.statistic,       STAT_AFTER_OPT,   "Firm statistic output after optimizations" },
-  { X("stat-after-lower"),       &firm_dump.statistic,       STAT_AFTER_LOWER, "Firm statistic output after lowering" },
-  { X("stat-final-ir"),          &firm_dump.statistic,       STAT_FINAL_IR,    "Firm statistic after final optimization" },
-  { X("stat-final"),             &firm_dump.statistic,       STAT_FINAL,       "Firm statistic after code generation" },
 };
 
 #undef X
@@ -525,10 +507,8 @@ static void enable_safe_defaults(void)
 
 /**
  * run all the Firm optimizations
- *
- * @param input_filename     the name of the (main) source file
  */
-static void do_firm_optimizations(const char *input_filename)
+static void do_firm_optimizations(void)
 {
 	be_set_after_transform_func(after_transform);
 
@@ -647,17 +627,12 @@ static void do_firm_optimizations(const char *input_filename)
 	}
 
 	dump_all("opt");
-
-	if (firm_dump.statistic & STAT_AFTER_OPT)
-		stat_dump_snapshot(input_filename, "opt");
 }
 
 /**
  * do Firm lowering
- *
- * @param input_filename  the name of the (main) source file
  */
-static void do_firm_lowering(const char *input_filename)
+static void do_firm_lowering(void)
 {
 	/* enable architecture dependent optimizations */
 	arch_dep_set_opts((arch_dep_opts_t)
@@ -671,9 +646,6 @@ static void do_firm_lowering(const char *input_filename)
 	}
 
 	do_irp_opt("target-lowering");
-
-	if (firm_dump.statistic & STAT_AFTER_LOWER)
-		stat_dump_snapshot(input_filename, "low");
 
 	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 		ir_graph *irg = get_irp_irg(i);
@@ -717,10 +689,6 @@ static void do_firm_lowering(const char *input_filename)
 	do_irp_opt("remove-unused");
 	do_irp_opt("opt-cc");
 	dump_all("low-opt");
-
-	if (firm_dump.statistic & STAT_FINAL) {
-		stat_dump_snapshot(input_filename, "final");
-	}
 }
 
 void init_gen_firm(void)
@@ -754,7 +722,6 @@ void generate_code(FILE *out, const char *input_filename)
 	/* initialize implicit opts, just to be sure because really the frontend
 	 * should have called it already before starting graph construction */
 	init_implicit_optimizations();
-	firm_init_stat();
 
 	/* the general for dumping option must be set, or the others will not work*/
 	firm_dump.ir_graph = (bool) (firm_dump.ir_graph | firm_dump.all_phases);
@@ -781,24 +748,15 @@ void generate_code(FILE *out, const char *input_filename)
 		timer_pop(t_verify);
 	}
 
-	if (firm_dump.statistic & STAT_BEFORE_OPT)
-		stat_dump_snapshot(input_filename, "noopt");
-
-	do_firm_optimizations(input_filename);
-	do_firm_lowering(input_filename);
+	do_firm_optimizations();
+	do_firm_lowering();
 
 	timer_stop(t_all_opt);
-
-	if (firm_dump.statistic & STAT_FINAL_IR)
-		stat_dump_snapshot(input_filename, "final-ir");
 
 	/* run the code generator */
 	timer_start(t_backend);
 	be_main(out, input_filename);
 	timer_stop(t_backend);
-
-	if (firm_dump.statistic & STAT_FINAL)
-		stat_dump_snapshot(input_filename, "final");
 }
 
 void exit_gen_firm(void)
