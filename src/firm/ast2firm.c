@@ -2282,8 +2282,21 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
  */
 static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const expr)
 {
-	ir_node *const src = expression_to_value(expr->src);
-	set_value_for_expression_addr(expr->dst, src, NULL);
+	ir_node              *const src          = expression_to_value(expr->src);
+	backend_params const *const be_params    = be_get_backend_param();
+	ir_type              *const va_list_type = be_params->vararg.va_list_type;
+	dbg_info             *const dbgi         = get_dbg_info(&expr->base.pos);
+
+	if (is_Pointer_type(va_list_type)) {
+		set_value_for_expression_addr(expr->dst, src, NULL);
+	} else if (is_Struct_type(va_list_type)) {
+		ir_node *const dst   = expression_to_value(expr->dst);
+		ir_node *const mem   = get_store();
+		ir_node *const copyb = new_d_CopyB(dbgi, mem, dst, src, va_list_type, cons_none);
+		set_store(copyb);
+	} else {
+		panic("unknown va_list_type");
+	}
 	return NULL;
 }
 
