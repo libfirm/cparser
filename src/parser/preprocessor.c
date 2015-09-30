@@ -344,6 +344,10 @@ static void parse_error(const char *msg)
 	errorf(&pp_token.base.pos, "%s", msg);
 }
 
+/**
+ * Sets input.c to the next character in the input or EOF if there are no
+ * further characters.
+ */
 static inline void next_real_char(void)
 {
 	assert(input.bufpos <= input.bufend);
@@ -409,8 +413,8 @@ static void maybe_concat_lines(void)
 }
 
 /**
- * Set c to the next input character, ie.
- * after expanding trigraphs.
+ * Set c to the next input character after performing the first phases of input
+ * processing: Replace trigraph sequences and remove backslash newline bigrams.
  */
 static inline void next_char(void)
 {
@@ -1603,7 +1607,10 @@ static bool concat_tokens(const position_t *pos,
 }
 
 /**
- * returns next final token from a preprocessor macro expansion
+ * When inside a macro expansion moves to the next token and starts further
+ * macro expansions, token concatenation and stringification to get the next
+ * fully expanded and processed token. Returns false if we are not expanding any
+ * macros or when further expansion did not yield another token.
  */
 static bool expand_next(void)
 {
@@ -1818,7 +1825,7 @@ static whitespace_info_t skip_whitespace(void)
 static inline void eat_pp(pp_token_kind_t const kind)
 {
 	assert(pp_token.base.symbol->pp_ID == kind);
-	(void) kind;
+	(void)kind;
 	next_input_token();
 }
 
@@ -1911,9 +1918,8 @@ end_symbol:
 
 	/* we can free the memory from symbol obstack if we already had an entry in
 	 * the symbol table */
-	if (symbol->string != string) {
+	if (symbol->string != string)
 		obstack_free(&symbol_obstack, string);
-	}
 }
 
 static void parse_number(void)
@@ -1988,14 +1994,16 @@ static void maybe_skip_newline(void)
 	}
 }
 
-/** identifies and returns the next preprocessing token contained in the
- * input stream. No macro expansion is performed. */
+/**
+ * Identifies and returns the next preprocessing token contained in the
+ * input stream. This is before macro expansion.
+ */
 static void next_input_token(void)
 {
 	if (next_info_valid) {
 		info                       = next_info;
 		pp_token.base.space_before = next_space_before;
-		next_info_valid = false;
+		next_info_valid            = false;
 	} else {
 		info.at_line_begin         = false;
 		pp_token.base.space_before = false;
@@ -2003,8 +2011,8 @@ static void next_input_token(void)
 	pp_token.base.expansion_forbidden = false;
 
 restart:
-	pp_token.base.pos            = input.pos;
-	pp_token.base.symbol         = NULL;
+	pp_token.base.pos    = input.pos;
+	pp_token.base.symbol = NULL;
 
 	switch (input.c) {
 	case WHITESPACE:

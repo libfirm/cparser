@@ -34,6 +34,11 @@ void close_pp_input(void);
 /** print the header displayed by gcc when writing preprocessing tokens */
 void print_pp_header(void);
 
+/**
+ * Advance to the next token. This evaluates preprocessing directives, expands
+ * macros, executes token concatenation, stringification.
+ * The final preprocessing token is stored in the global variable pp_token.
+ */
 void next_preprocessing_token(void);
 
 /**
