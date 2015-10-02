@@ -81,6 +81,8 @@ typedef struct pp_expansion_state_t {
 	whitespace_info_t  expand_info;
 	bool               previous_is_expanding;
 	bool               previous_may_recurse;
+	/** If we are expanding a parameter before a '##' token. */
+	bool               expand_parameter_before_concat;
 } pp_expansion_state_t;
 
 typedef struct pp_argument_t {
@@ -1128,6 +1130,13 @@ static void start_object_macro_expansion(pp_definition_t *definition)
 	definition->is_expanding         = true;
 	if (definition->is_parameter) {
 		definition->function_definition->may_recurse = true;
+		/* Special case: do not expand/return the last token in the list yet
+		 * if we are in fron of an outer '##' token, the concat code will
+		 * handle it. */
+		size_t top = ARR_LEN(expansion_stack);
+		assert(top >= 2);
+		if (expansion_stack[top-2].expand_parameter_before_concat)
+			expansion->list_len -= 1;
 	}
 	current_expansion = expansion;
 }
@@ -1635,6 +1644,36 @@ more_concat:
 		token_kind_t   next_kind = next->kind;
 		if (next_kind == T_HASHHASH && pos+1 < current_expansion->list_len
 		    && !current_expansion->definition->is_parameter) {
+
+			/* If we have a parameter left of the '##' we expand that first
+			 * in a special mode which leaves the last token for later '##'
+			 * concat */
+			if (pp_token.kind == T_MACRO_PARAMETER) {
+				const pp_definition_t *def      = pp_token.macro_parameter.def;
+				size_t                 list_len = def->list_len;
+				/* The list_len=={0,1} cases are handled directly in
+				 * concat_tokens */
+				if (list_len > 1) {
+					if (!current_expansion->expand_parameter_before_concat) {
+						/* Continue so the parameter will expand but remember
+						 * that we have to omit expanding the last token. */
+						pos -= 1;
+						current_expansion->expand_parameter_before_concat
+							= true;
+						goto finished;
+
+
+					} else {
+						/* We are back from a previous special mode expansion?
+						 * Take the last token from the replacement list; We
+						 * have omitted it so far. */
+						pp_token = def->token_list[list_len-1];
+						current_expansion->expand_parameter_before_concat
+							= false;
+					}
+				}
+			}
+
 			const token_t *next_but_one = &current_expansion->token_list[pos+1];
 			size_t         advance      = 2;
 			token_t        tmp;
@@ -1665,6 +1704,7 @@ more_concat:
 		}
 	}
 
+finished:
 	current_expansion->pos = pos;
 	pp_token.base.pos      = expansion_pos;
 
