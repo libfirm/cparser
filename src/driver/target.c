@@ -130,6 +130,12 @@ void target_adjust_types_and_dialect(void)
 		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
 		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
+	static bool had_cpp_warning;
+	if (dialect.cpp && !had_cpp_warning) {
+		warningf(WARN_EXPERIMENTAL, NULL,
+		         "C++ support is highly experimental and unfinished");
+		had_cpp_warning = true;
+	}
 }
 
 static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
