@@ -1125,6 +1125,7 @@ static void start_function_macro_expansion(const macro_call_t *call)
 static void start_object_macro_expansion(pp_definition_t *definition)
 {
 	pp_expansion_state_t *expansion  = start_expanding(definition);
+	assert(expansion == current_expansion);
 	expansion->previous_is_expanding = definition->is_expanding;
 	expansion->previous_may_recurse  = definition->may_recurse;
 	definition->is_expanding         = true;
@@ -1138,7 +1139,6 @@ static void start_object_macro_expansion(pp_definition_t *definition)
 		if (expansion_stack[top-2].expand_parameter_before_concat)
 			expansion->list_len -= 1;
 	}
-	current_expansion = expansion;
 }
 
 static void grow_escaped(struct obstack *obst, const char *string, size_t size)
