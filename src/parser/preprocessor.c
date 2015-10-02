@@ -1132,7 +1132,7 @@ static void start_object_macro_expansion(pp_definition_t *definition)
 	if (definition->is_parameter) {
 		definition->function_definition->may_recurse = true;
 		/* Special case: do not expand/return the last token in the list yet
-		 * if we are in fron of an outer '##' token, the concat code will
+		 * if we are in front of an outer '##' token, the concat code will
 		 * handle it. */
 		size_t top = ARR_LEN(expansion_stack);
 		assert(top >= 2);
