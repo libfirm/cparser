@@ -1075,7 +1075,7 @@ static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo,
 	current_call.obstack_level = obstack_alloc(&pp_obstack, 0);
 }
 
-static pp_expansion_state_t *start_expanding(pp_definition_t *definition)
+static pp_expansion_state_t *begin_expanding(pp_definition_t *definition)
 {
 	pp_expansion_state_t *expansion = push_expansion(definition);
 	if (definition->list_len > 0) {
@@ -1112,7 +1112,7 @@ static void start_function_macro_expansion(const macro_call_t *call)
 		}
 	}
 
-	pp_expansion_state_t *expansion  = start_expanding(call->macro);
+	pp_expansion_state_t *expansion  = begin_expanding(call->macro);
 	expansion->previous_is_expanding = call->previous_is_expanding;
 	expansion->previous_may_recurse  = call->previous_may_recurse;
 	macro->is_expanding              = true;
@@ -1124,7 +1124,7 @@ static void start_function_macro_expansion(const macro_call_t *call)
 
 static void start_object_macro_expansion(pp_definition_t *definition)
 {
-	pp_expansion_state_t *expansion  = start_expanding(definition);
+	pp_expansion_state_t *expansion  = begin_expanding(definition);
 	assert(expansion == current_expansion);
 	expansion->previous_is_expanding = definition->is_expanding;
 	expansion->previous_may_recurse  = definition->may_recurse;
@@ -3325,7 +3325,7 @@ static ir_tarval *pp_null;
 static ir_tarval *pp_one;
 
 static void       next_condition_token(void);
-static bool       next_expansion_token(void);
+static bool       start_expanding(void);
 static ir_tarval *parse_pp_expression(precedence_t prec);
 
 static ir_tarval *parse_pp_operand(void)
@@ -3464,7 +3464,7 @@ restart:
 				do {
 					if (!expand_next())
 						goto read_input;
-				} while (!next_expansion_token());
+				} while (start_expanding());
 				if (pp_token.kind == '(' && !has_paren) {
 					has_paren = true;
 					while (current_expansion->pos >= current_expansion->list_len) {
@@ -3974,7 +3974,13 @@ skip:
 	eat_token(T_NEWLINE);
 }
 
-static bool next_expansion_token(void)
+/**
+ * Check if the current token is an object-like macro and start expanding;
+ * Check whether we have the start of a function-like macro call and start
+ * collecting arguments or continue to do so.
+ * Returns true if we started expanding a macro.
+ */
+static bool start_expanding(void)
 {
 	const token_kind_t kind = pp_token.kind;
 	if (current_call.macro == NULL || argument_expanding != NULL) {
@@ -3984,7 +3990,7 @@ static bool next_expansion_token(void)
 				pp_definition_t *def = pp_token.macro_parameter.def;
 				assert(current_expansion != NULL);
 				start_object_macro_expansion(def);
-				return false;
+				return true;
 			}
 
 			pp_definition_t *const pp_definition = symbol->pp_definition;
@@ -4024,14 +4030,14 @@ try_input:;
 					assert(pp_token.kind == '(');
 
 					start_call(pp_definition, oldinfo, space_before);
-					return false;
+					return true;
 				} else {
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
 					if (pp_definition->update != NULL)
 						pp_definition->update(pp_definition);
 					start_object_macro_expansion(pp_definition);
-					return false;
+					return true;
 				}
 			}
 		}
@@ -4050,7 +4056,7 @@ have_token:
 				pop_macro_call();
 				info = call_whitespace_info;
 				pp_token.base.space_before = call_space_before;
-				return false;
+				return true;
 			}
 		} else if (kind == ',' && current_call.argument_brace_count == 0
 		       && (current_call.parameter == NULL
@@ -4065,29 +4071,29 @@ have_token:
 			} else {
 				start_argument(&current_call.macro->parameters[current_call.parameter_idx]);
 			}
-			return false;
+			return true;
 		} else if (kind == T_MACRO_PARAMETER) {
 			/* parameters have to be fully expanded before being used as
 			 * parameters for another macro-call */
 			pp_definition_t *argument = pp_token.macro_parameter.def;
 			argument_expanding = argument;
 			start_object_macro_expansion(argument);
-			return false;
+			return true;
 		} else if (kind == T_EOF) {
 			errorf(&expansion_pos,
 			       "reached end of file while parsing arguments for '%Y'",
 			       current_call.macro->symbol);
-			return true;
+			return false;
 		}
 		if (current_call.parameter != NULL) {
 			if (current_expansion == NULL)
 				pp_token.base.space_before |= info.at_line_begin;
 			ARR_APP1(token_t, current_call.argument_tokens, pp_token);
 		}
-		return false;
+		return true;
 	}
 
-	return true;
+	return false;
 }
 
 void next_preprocessing_token(void)
@@ -4102,7 +4108,7 @@ void next_preprocessing_token(void)
 				parse_preprocessing_directive();
 			}
 		} while (skip_mode && pp_token.kind != T_EOF);
-	} while (!next_expansion_token());
+	} while (start_expanding());
 }
 
 static void next_condition_token(void)
@@ -4110,7 +4116,7 @@ static void next_condition_token(void)
 	do {
 		if (!expand_next())
 			next_input_token();
-	} while (!next_expansion_token());
+	} while (start_expanding());
 }
 
 void append_include_path(searchpath_t *paths, const char *path)
