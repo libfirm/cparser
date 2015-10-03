@@ -466,6 +466,8 @@ bool options_parse_codegen(options_state_t *s)
 			} else if (f_yesno_arg("-fomit-frame-pointer", s)) {
 				target.set_use_frame_pointer = true;
 				target.use_frame_pointer     = !truth_value;
+			} else if (f_yesno_arg("-fexceptions", s)) {
+				set_target_option(truth_value ? "exceptions" : "exceptions=no");
 			} else if (f_yesno_arg("-fstrength-reduce", s)) {
 				/* does nothing, for gcc compatibility (even gcc does
 				 * nothing for this switch anymore) */
