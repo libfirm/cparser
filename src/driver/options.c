@@ -476,6 +476,8 @@ bool options_parse_codegen(options_state_t *s)
 				ir_allow_imprecise_float_transforms(truth_value);
 			} else if (f_yesno_arg("-fomit-frame-pointer", s)) {
 				set_be_option(truth_value ? "omitfp" : "omitfp=no");
+			} else if (f_yesno_arg("-fexceptions", s)) {
+				set_be_option(truth_value ? "exceptions" : "exceptions=no");
 			} else if (f_yesno_arg("-fstrength-reduce", s)) {
 				/* does nothing, for gcc compatibility (even gcc does
 				 * nothing for this switch anymore) */
