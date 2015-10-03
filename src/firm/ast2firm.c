@@ -1106,8 +1106,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	dbg_info *const dbgi = get_dbg_info(&call->base.pos);
 	assert(currently_reachable());
 
-	expression_t   *function = call->function;
 	ir_node        *callee   = NULL;
+	expression_t   *function = call->function;
 	bool            firm_builtin = false;
 	ir_builtin_kind firm_builtin_kind = ir_bk_trap;
 	if (function->kind == EXPR_REFERENCE) {
@@ -1125,6 +1125,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			}
 		}
 	}
+
+	// XXX: Could this be moved to the "if (firm_builtin)" below?
 	if (!firm_builtin)
 		callee = expression_to_value(function);
 
@@ -1199,50 +1201,71 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	/* Const function don't read memory and need no memory input. However
 	 * we cannot model compound types as direct values in firm yet and
 	 * resort to memory in these cases. */
-	ir_node *store;
+	ir_node *store_in;
 	if ((function_type->modifiers & DM_CONST) && !has_compound_parameter) {
-		store = get_irg_no_mem(current_ir_graph);
+		store_in = get_irg_no_mem(current_ir_graph);
 	} else {
-		store = get_store();
+		store_in = get_store();
 	}
 
-	ir_node *node;
+	ir_node *call_node;
 	type_t  *return_type = skip_typeref(function_type->return_type);
 	ir_node *result      = NULL;
+	ir_node *store_out   = NULL;
 	if (firm_builtin) {
-		node = new_d_Builtin(dbgi, store, n_parameters, in, firm_builtin_kind,
-		                     ir_method_type);
+		call_node = new_d_Builtin(dbgi, store_in, n_parameters, in, firm_builtin_kind,
+		                          ir_method_type);
 		if (!(function_type->modifiers & DM_CONST)) {
-			ir_node *mem = new_Proj(node, mode_M, pn_Builtin_M);
-			set_store(mem);
+			store_out = new_Proj(call_node, mode_M, pn_Builtin_M);
 		}
 
 		if (!is_type_void(return_type)) {
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
-			result = new_Proj(node, mode, pn_Builtin_max+1);
+			result = new_Proj(call_node, mode, pn_Builtin_max+1);
 		}
 	} else {
-		node = new_d_Call(dbgi, store, callee, n_parameters, in, ir_method_type);
+		call_node = new_d_Call(dbgi, store_in, callee, n_parameters, in, ir_method_type);
+
 		if (!(function_type->modifiers & DM_CONST)) {
-			ir_node *mem = new_Proj(node, mode_M, pn_Call_M);
-			set_store(mem);
+			store_out = new_Proj(call_node, mode_M, pn_Call_M);
 		}
 
 		if (!is_type_void(return_type)) {
-			ir_node *const resproj = new_Proj(node, mode_T, pn_Call_T_result);
+			ir_node *const resproj = new_Proj(call_node, mode_T, pn_Call_T_result);
 			ir_mode *const mode    = get_ir_mode_storage(return_type);
 			result                 = new_Proj(resproj, mode, 0);
+		}
+
+		if (get_support_exceptions() && !(function_type->modifiers & (DM_CONST | DM_PURE | DM_NOTHROW))) {
+			ir_set_throws_exception(call_node, true);
+
+			/* Wire X_except output to end block */
+			ir_node *const except_proj = new_d_Proj(dbgi, call_node, mode_X, pn_Call_X_except);
+			ir_node *const end_block   = get_irg_end_block(current_ir_graph);
+			add_immBlock_pred(end_block, except_proj);
+
+			/* Put code following the Call into the Call's X_regular block. */
+			if (!(function_type->modifiers & DM_NORETURN)) {
+				ir_node *const regular_proj = new_Proj(call_node, mode_X, pn_Call_X_regular);
+				jump_target regular_target;
+				init_jump_target(&regular_target, NULL);
+				add_pred_to_jump_target(&regular_target, regular_proj);
+				enter_jump_target(&regular_target);
+			}
 		}
 	}
 
 	if (function_type->modifiers & DM_NORETURN) {
 		/* A dead end:  Keep the Call and the Block.  Also place all further
 		 * nodes into a new and unreachable block. */
-		keep_alive(node);
+		keep_alive(call_node);
 		keep_alive(get_cur_block());
 		set_soft_unreachable();
 	}
+
+	if (store_out != NULL)
+		set_store(store_out);
 
 	return result;
 }

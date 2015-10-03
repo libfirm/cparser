@@ -178,7 +178,7 @@ void create_gnu_builtins(void)
 	c("strncpy", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
 
 	/* TODO: gcc has a LONG list of builtin functions (nearly everything from
-	 * C89-C99 and others. Complete this */
+	 * C89-C99 and others). Complete this */
 }
 
 static entity_t *find_existing_entity(const char *name)
