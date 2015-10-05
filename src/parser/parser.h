@@ -38,6 +38,12 @@ translation_unit_t *finish_parsing(void);
 /** set default elf visbility */
 void set_default_visibility(elf_visibility_t visibility);
 
+/** Whether exceptions (-fexceptions) should be suppported. */
+bool get_support_exceptions(void);
+
+/** Set whether exceptions (-fexceptions) should be supported. */
+void set_support_exceptions(bool);
+
 /**
  * Performs automatic type cast as described in §6.3.2.1.
  *
