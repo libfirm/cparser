@@ -680,6 +680,18 @@ static bool is_main(entity_t *entity)
 	return true;
 }
 
+static ir_visibility get_ir_visibility(storage_class_t const storage_class,
+                                       elf_visibility_t const elf_visibility)
+{
+	return storage_class == STORAGE_CLASS_STATIC ? ir_visibility_local
+		 : elf_visibility == ELF_VISIBILITY_HIDDEN
+		|| elf_visibility == ELF_VISIBILITY_INTERNAL
+		  ? ir_visibility_external_private
+		  : elf_visibility == ELF_VISIBILITY_PROTECTED
+		    ? ir_visibility_external_protected
+		    : ir_visibility_external;
+}
+
 /**
  * Creates an entity representing a function.
  *
@@ -725,11 +737,9 @@ static ir_entity *get_function_entity(entity_t *entity)
 	handle_decl_modifiers(irentity, entity);
 
 	storage_class_t const storage_class = entity->declaration.storage_class;
-	if (storage_class == STORAGE_CLASS_STATIC) {
-		set_entity_visibility(irentity, ir_visibility_local);
-	} else {
-		set_entity_visibility(irentity, ir_visibility_external);
-	}
+	elf_visibility_t const elf_visibility = entity->function.elf_visibility;
+	ir_visibility visibility = get_ir_visibility(storage_class, elf_visibility);
+	set_entity_visibility(irentity, visibility);
 
 	if (entity->function.no_codegen)
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
@@ -4116,20 +4126,13 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 static void create_global_variable(entity_t *entity)
 {
 	ir_linkage       linkage    = IR_LINKAGE_DEFAULT;
-	ir_visibility    visibility = ir_visibility_external;
 	storage_class_t  storage    = entity->declaration.storage_class;
 	decl_modifiers_t modifiers  = entity->declaration.modifiers;
 	assert(entity->kind == ENTITY_VARIABLE);
 
-	switch (storage) {
-	case STORAGE_CLASS_EXTERN: visibility = ir_visibility_external; break;
-	case STORAGE_CLASS_STATIC: visibility = ir_visibility_local;    break;
-	case STORAGE_CLASS_NONE:   visibility = ir_visibility_external; break;
-	case STORAGE_CLASS_TYPEDEF:
-	case STORAGE_CLASS_AUTO:
-	case STORAGE_CLASS_REGISTER:
-		panic("invalid storage class for global var");
-	}
+	storage_class_t const storage_class = entity->declaration.storage_class;
+	elf_visibility_t const elf_visibility = entity->variable.elf_visibility;
+	ir_visibility visibility = get_ir_visibility(storage_class, elf_visibility);
 
 	/* "common" symbols */
 	if (storage == STORAGE_CLASS_NONE
