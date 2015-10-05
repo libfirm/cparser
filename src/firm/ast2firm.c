@@ -1974,13 +1974,15 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	POP_IRG();
 
 	ident     *const id          = id_unique("initializer.%u");
+	type_t    *const skipped     = skip_typeref(type);
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
 	ir_entity *const entity      = new_entity(global_type, id, irtype);
 	set_entity_dbg_info(entity, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
+	if (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
+		add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, irinitializer);
 	return entity;
 }
@@ -3825,6 +3827,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	/* create a "template" entity which is copied to the entity on the stack */
 	ir_entity *const init_entity
 		= create_initializer_entity(dbgi, initializer, type);
+	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
 	ir_node *const src_addr = new_d_Address(dbgi, init_entity);
 	ir_type *const irtype   = get_ir_type(type);
 	ir_cons_flags flags     = get_entity_volatility(entity) == volatility_is_volatile ?
