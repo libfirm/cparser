@@ -97,6 +97,7 @@ static declaration_t      **incomplete_arrays;
 static elf_visibility_t     default_visibility = ELF_VISIBILITY_DEFAULT;
 static const string_t      *string_true;
 static const string_t      *string_false;
+static bool                 support_exceptions = false;
 
 #define PUSH_CURRENT_ENTITY(entity) \
 	entity_t *const new_current_entity = (entity); \
@@ -11038,6 +11039,16 @@ static void resolve_aliases(void)
 void set_default_visibility(elf_visibility_t visibility)
 {
 	default_visibility = visibility;
+}
+
+void set_support_exceptions(bool b)
+{
+	support_exceptions = b;
+}
+
+bool get_support_exceptions()
+{
+	return support_exceptions;
 }
 
 void start_parsing(void)
