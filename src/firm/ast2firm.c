@@ -2010,7 +2010,7 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	    )) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
 		/* §6.5.2.5:8 const compound literals and string literals need not be
-		 * distincs */
+		 * distinct */
 		if (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
 			add_entity_linkage(entity, IR_LINKAGE_NO_IDENTITY);
 
