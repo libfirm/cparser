@@ -865,7 +865,7 @@ finish:;
 	entity = new_entity(global_type, id, type);
 	set_entity_ld_ident(   entity, id);
 	set_entity_visibility( entity, ir_visibility_private);
-	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
+	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT|IR_LINKAGE_NO_IDENTITY);
 	set_entity_initializer(entity, initializer);
 
 	value->entity = entity;
@@ -1999,6 +1999,11 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	      is_constant_initializer(initializer) != EXPR_CLASS_VARIABLE
 	    )) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
+		/* §6.5.2.5:8 const compound literals and string literals need not be
+		 * distincs */
+		if (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
+			add_entity_linkage(entity, IR_LINKAGE_NO_IDENTITY);
+
 		return new_d_Address(dbgi, entity);
 	} else {
 		/* create an entity on the stack */
@@ -3827,7 +3832,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	/* create a "template" entity which is copied to the entity on the stack */
 	ir_entity *const init_entity
 		= create_initializer_entity(dbgi, initializer, type);
-	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
+	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT|IR_LINKAGE_NO_IDENTITY);
 	ir_node *const src_addr = new_d_Address(dbgi, init_entity);
 	ir_type *const irtype   = get_ir_type(type);
 	ir_cons_flags flags     = get_entity_volatility(entity) == volatility_is_volatile ?
