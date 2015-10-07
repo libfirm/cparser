@@ -1714,14 +1714,30 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
 	return mul;
 }
 
-static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right,
-                           ir_mode *mode)
+typedef ir_node *(*create_div_func)(dbg_info *dbgi, ir_node *memory,
+		ir_node *left, ir_node *right, ir_mode *mode, int pinned);
+
+static ir_node *create_divmod(create_div_func cons, unsigned pn_res,
+                              dbg_info *dbgi, ir_node *left, ir_node *right,
+                              ir_mode *mode)
 {
 	ir_node *memory = get_store();
 	ir_node *pin    = new_Pin(memory);
-	ir_node *op     = new_d_Div(dbgi, pin, left, right, mode,
-	                            op_pin_state_floats);
-	return new_d_Proj(dbgi, op, mode, pn_Div_res);
+	set_store(pin);
+	ir_node *op     = cons(dbgi, pin, left, right, mode, false);
+	return new_d_Proj(dbgi, op, mode, pn_res);
+}
+
+static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right,
+                           ir_mode *mode)
+{
+	return create_divmod(new_d_Div, pn_Div_res, dbgi, left, right, mode);
+}
+
+static ir_node *create_mod(dbg_info *dbgi, ir_node *left, ir_node *right,
+                           ir_mode *mode)
+{
+	return create_divmod(new_d_Mod, pn_Mod_res, dbgi, left, right, mode);
 }
 
 static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, ir_node *right)
@@ -1817,14 +1833,8 @@ normal_node:
 			return new_d_Shr(dbgi, left, right, mode);
 		}
 	case EXPR_BINARY_MOD:
-	case EXPR_BINARY_MOD_ASSIGN: {
-		ir_node *memory = get_store();
-		ir_node *pin    = new_Pin(memory);
-		ir_node *op     = new_d_Mod(dbgi, pin, left, right, mode,
-		                            op_pin_state_floats);
-		ir_node *res    = new_d_Proj(dbgi, op, mode, pn_Mod_res);
-		return res;
-	}
+	case EXPR_BINARY_MOD_ASSIGN:
+		return create_mod(dbgi, left, right, mode);
 	default:
 		panic("unexpected expression kind");
 	}
