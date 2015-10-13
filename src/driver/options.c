@@ -385,10 +385,10 @@ bool options_parse_codegen(options_state_t *s)
 
 	const char *arg;
 	if ((arg = equals_arg("falign-loops=", s)) != NULL
-     || (arg = equals_arg("falign-jumps=", s)) != NULL
-     || (arg = equals_arg("falign-functions=", s)) != NULL) {
+	 || (arg = equals_arg("falign-jumps=", s)) != NULL
+	 || (arg = equals_arg("falign-functions=", s)) != NULL) {
 		warningf(WARN_COMPAT_OPTION, NULL,
-				 "ignoring gcc option '%s'", full_option);
+		         "ignoring gcc option '%s'", full_option);
 	} else if ((arg = equals_arg("fvisibility=", s)) != NULL) {
 		elf_visibility_t visibility = get_elf_visibility_from_string(arg);
 		if (visibility == ELF_VISIBILITY_ERROR) {
@@ -455,15 +455,15 @@ bool options_parse_codegen(options_state_t *s)
 			} else if (streq(fopt, "plt")) {
 				target.pic_no_plt = !truth_value;
 			} else if (streq(fopt, "jump-tables")             ||
-					   streq(fopt, "expensive-optimizations") ||
-					   streq(fopt, "common")                  ||
-					   streq(fopt, "optimize-sibling-calls")  ||
-					   streq(fopt, "align-loops")             ||
-					   streq(fopt, "align-jumps")             ||
-					   streq(fopt, "align-functions")         ||
-					   streq(fopt, "PIC")                     ||
-					   streq(fopt, "stack-protector")         ||
-					   streq(fopt, "stack-protector-all")) {
+			           streq(fopt, "expensive-optimizations") ||
+			           streq(fopt, "common")                  ||
+			           streq(fopt, "optimize-sibling-calls")  ||
+			           streq(fopt, "align-loops")             ||
+			           streq(fopt, "align-jumps")             ||
+			           streq(fopt, "align-functions")         ||
+			           streq(fopt, "PIC")                     ||
+			           streq(fopt, "stack-protector")         ||
+			           streq(fopt, "stack-protector-all")) {
 				/* better warn the user for these as he might have expected
 				 * that something happens */
 				warningf(WARN_COMPAT_OPTION, NULL,
@@ -527,7 +527,7 @@ bool options_parse_diagnostics(options_state_t *s)
 				} else if (streq(fopt, "show-column")) {
 					show_column = truth_value;
 				} else if (streq(fopt, "color-diagnostics")
-						|| streq(fopt, "diagnostics-color")) {
+				        || streq(fopt, "diagnostics-color")) {
 					diagnostic_enable_color(truth_value
 						? (colorterm != 0 ? colorterm : 8)
 						: 0);
