@@ -305,9 +305,9 @@ static bool pass_options_to_firm_be(void)
 	for (codegen_option_t *option = codegen_options; option != NULL;
 	     option = option->next) {
 		char        buf[256];
-	    const char *opt = option->option;
-	    /* pass option along to firm backend (except the -m32, -m64 stuff) */
-	    if (opt[0] < '0' || opt[0] > '9') {
+		const char *opt = option->option;
+		/* pass option along to firm backend (except the -m32, -m64 stuff) */
+		if (opt[0] < '0' || opt[0] > '9') {
 			snprintf(buf, sizeof(buf), "%s-%s", firm_isa, opt);
 			if (be_parse_arg(buf) == 0) {
 				errorf(NULL, "Unknown codegen option '-m%s'", opt);
