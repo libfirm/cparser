@@ -168,6 +168,7 @@ static void init_os_support(void)
 		target.user_label_prefix = "";
 		set_be_option("objectformat=elf");
 		set_be_option("ia32-struct_in_reg=no");
+		set_be_option("amd64-x64abi=no");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (is_darwin_os(os)) {
 		set_create_ld_ident(create_name_macho);
@@ -175,6 +176,7 @@ static void init_os_support(void)
 		set_be_option("objectformat=mach-o");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
+		set_be_option("amd64-x64abi=no");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 		if (target.pic_mode == -1)
 			target.pic_mode = 2;
