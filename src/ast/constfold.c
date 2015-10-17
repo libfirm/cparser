@@ -126,11 +126,11 @@ static ir_tarval *fold_expression_to_address(expression_t const *const expr)
 	switch (expr->kind) {
 	case EXPR_SELECT: {
 		select_expression_t const *const sel = &expr->select;
-		type_t    *const type      = skip_typeref(sel->compound->base.type);
-		ir_tarval *const base_addr = is_type_pointer(type) ? fold_expression(sel->compound) : fold_expression_to_address(sel->compound);
-		ir_mode   *const mode      = get_tarval_mode(base_addr);
-		ir_mode   *const mode_uint = get_reference_mode_unsigned_eq(mode);
-		ir_tarval *const offset    = new_tarval_from_long(sel->compound_entry->compound_member.offset, mode_uint);
+		type_t    *const type        = skip_typeref(sel->compound->base.type);
+		ir_tarval *const base_addr   = is_type_pointer(type) ? fold_expression(sel->compound) : fold_expression_to_address(sel->compound);
+		ir_mode   *const mode        = get_tarval_mode(base_addr);
+		ir_mode   *const mode_offset = get_reference_offset_mode(mode);
+		ir_tarval *const offset      = new_tarval_from_long(sel->compound_entry->compound_member.offset, mode_offset);
 		return tarval_add(base_addr, offset);
 	}
 
