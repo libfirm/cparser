@@ -368,20 +368,19 @@ bool target_setup(void)
 	init_os_support();
 	res &= pass_options_to_firm_be();
 
+	const backend_params *be_params = be_get_backend_param();
 	multilib_directory_target_triple = NULL;
 	if (target.triple == NULL) {
-		unsigned size = be_get_backend_param()->machine_size;
 #ifdef MULTILIB_M32_TRIPLE
-		if (size == 32)
+		if (be_params->machine_size == 32)
 			multilib_directory_target_triple = MULTILIB_M32_TRIPLE;
 #endif
 #ifdef MULTILIB_M64_TRIPLE
-		if (size == 64)
+		if (be_params->machine_size == 64)
 			multilib_directory_target_triple = MULTILIB_M64_TRIPLE;
 #endif
 	}
 
-	const backend_params *be_params = be_get_backend_param();
 	target.byte_order_big_endian = be_params->byte_order_big_endian;
 	target.modulo_shift          = be_params->modulo_shift;
 	target.float_int_overflow    = be_params->float_int_overflow;
