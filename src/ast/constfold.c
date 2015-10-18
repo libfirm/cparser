@@ -205,18 +205,18 @@ static ir_tarval *fold_binary_sub(binary_expression_t const *const binexpr)
 		type_t *const typer = skip_typeref(binexpr->right->base.type);
 		if (is_type_pointer(typer)) {
 			ir_tarval *const size = get_type_size_tarval(elem, res_mode);
-			ir_tarval *const diff = tarval_sub(l, r, res_mode);
+			ir_tarval *const diff = tarval_sub(l, r);
 			return tarval_div(diff, size);
 		} else {
 			ir_mode   *const mode = get_tarval_mode(r);
 			ir_tarval *const size = get_type_size_tarval(elem, mode);
 			ir_tarval *const rr   = tarval_mul(r, size);
-			return tarval_sub(l, rr, res_mode);
+			return tarval_sub(l, rr);
 		}
 	} else {
 		ir_tarval *const conv_l = tarval_convert_to(l, res_mode);
 		ir_tarval *const conv_r = tarval_convert_to(r, res_mode);
-		return tarval_sub(conv_l, conv_r, NULL);
+		return tarval_sub(conv_l, conv_r);
 	}
 }
 
@@ -782,8 +782,8 @@ static complex_constant fold_complex_sub(complex_constant const left,
                                          complex_constant const right)
 {
 	return (complex_constant) {
-		tarval_sub(left.real, right.real, NULL),
-		tarval_sub(left.imag, right.imag, NULL)
+		tarval_sub(left.real, right.real),
+		tarval_sub(left.imag, right.imag)
 	};
 }
 
@@ -795,7 +795,7 @@ static complex_constant fold_complex_mul(complex_constant const left,
 	ir_tarval *const op3 = tarval_mul(left.real, right.imag);
 	ir_tarval *const op4 = tarval_mul(left.imag, right.real);
 	return (complex_constant) {
-		tarval_sub(op1, op2, NULL),
+		tarval_sub(op1, op2),
 		tarval_add(op3, op4)
 	};
 }
@@ -811,7 +811,7 @@ static complex_constant fold_complex_div(complex_constant const left,
 	ir_tarval *const op6 = tarval_mul(right.imag, right.imag);
 	ir_tarval *const real_dividend = tarval_add(op1, op2);
 	ir_tarval *const real_divisor  = tarval_add(op5, op6);
-	ir_tarval *const imag_dividend = tarval_sub(op3, op4, NULL);
+	ir_tarval *const imag_dividend = tarval_sub(op3, op4);
 	ir_tarval *const imag_divisor  = tarval_add(op5, op6);
 	return (complex_constant) {
 		tarval_div(real_dividend, real_divisor),

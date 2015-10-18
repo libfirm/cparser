@@ -3577,7 +3577,7 @@ static ir_tarval *parse_pp_expression(precedence_t const prev_prec)
 			case '/':              res = tarval_div(res, right); break;
 			case '%':              res = tarval_mod(res, right); break;
 			case '+':              res = tarval_add(res, right); break;
-			case '-':              res = tarval_sub(res, right, mode); break;
+			case '-':              res = tarval_sub(res, right); break;
 			case T_LESSLESS:       res = tarval_shl(res, right); break;
 			case T_GREATERGREATER: res = (mode_is_signed(mode) ? tarval_shrs : tarval_shr)(res, right); break;
 
