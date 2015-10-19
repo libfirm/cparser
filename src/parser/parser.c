@@ -1860,8 +1860,7 @@ static initializer_t *create_empty_initializer(void)
  * Parse a part of an initialiser for a struct or union,
  */
 static initializer_t *parse_sub_initializer(type_path_t *path,
-		type_t *outer_type, size_t top_path_level,
-		parse_initializer_env_t *env)
+		type_t *outer_type, parse_initializer_env_t *env)
 {
 	/* empty initializer? */
 	if (token.kind == '}')
@@ -1878,6 +1877,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		type = skip_typeref(orig_type);
 	}
 
+	size_t top_path_level = ARR_LEN(path->path);
 	initializer_t **initializers = NEW_ARR_F(initializer_t*, 0);
 
 	while (true) {
@@ -1932,8 +1932,7 @@ finish_designator:
 				}
 
 				add_anchor_token('}');
-				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
-				                            env);
+				sub = parse_sub_initializer(path, orig_type, env);
 				rem_anchor_token('}');
 
 				expect('}');
@@ -2093,7 +2092,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		descend_into_subtype(&path);
 
 		add_anchor_token('}');
-		result = parse_sub_initializer(&path, env->type, 1, env);
+		result = parse_sub_initializer(&path, env->type, env);
 		rem_anchor_token('}');
 
 		max_index = path.max_index;
