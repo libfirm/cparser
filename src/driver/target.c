@@ -157,6 +157,7 @@ static void init_os_support(void)
 {
 	const char *os = target.machine->operating_system;
 	target.enable_main_collect2_hack = false;
+	target.biggest_alignment = 16;
 
 	if (is_elf_os(os)) {
 		driver_default_exe_output = "a.out";

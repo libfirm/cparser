@@ -462,7 +462,10 @@ void add_predefined_macros(void)
 	atomic_type_kind_t intmax_kind  = ATOMIC_TYPE_FIRST;
 	unsigned           uintmax_size = 0;
 	atomic_type_kind_t uintmax_kind = ATOMIC_TYPE_FIRST;
+	unsigned           biggest_alignment = target.biggest_alignment;
 	for (atomic_type_kind_t i = ATOMIC_TYPE_FIRST; i <= ATOMIC_TYPE_LAST; ++i) {
+		unsigned align = get_atomic_type_alignment(i);
+		assert(align <= biggest_alignment);
 		unsigned flags = get_atomic_type_flags(i);
 		if (!(flags & ATOMIC_TYPE_FLAG_INTEGER))
 			continue;
@@ -483,6 +486,7 @@ void add_predefined_macros(void)
 	define_type_c("__UINTMAX_C", uintmax_kind);
 	define_type_type_max("INTMAX",  intmax_kind);
 	define_type_c("__INTMAX_C", intmax_kind);
+	add_define_int("__BIGGEST_ALIGNMENT__", biggest_alignment);
 
 	/* TODO: less hardcoding for the following... */
 	define_float_properties("FLT",  ATOMIC_TYPE_FLOAT);
@@ -492,7 +496,4 @@ void add_predefined_macros(void)
 	add_define("__DECIMAL_DIG__", "__LDBL_DECIMAL_DIG__", false);
 
 	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
-	/* TODO: query this from backend? (if we just look for all alignments in
-	 *       our atomic types it's usually < 16... */
-	add_define_int("__BIGGEST_ALIGNMENT__", 16);
 }
