@@ -31,7 +31,6 @@ typedef struct c_dialect_t {
 	bool               freestanding   : 1;
 	bool               char_is_signed : 1;
 	bool               strict         : 1;
-	bool               intmax_predefs : 1;
 	bool               c89            : 1;
 	bool               c99            : 1;
 	bool               c11            : 1;

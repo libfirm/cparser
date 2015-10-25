@@ -65,7 +65,6 @@ void target_adjust_types_and_dialect(void)
 	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
 	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
 	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
-	dialect.intmax_predefs     = false;
 
 	atomic_type_properties_t *props = atomic_type_properties;
 
@@ -85,7 +84,6 @@ void target_adjust_types_and_dialect(void)
 
 	/* operating system ABI specifics */
 	if (is_darwin_os(operating_system)) {
-		dialect.intmax_predefs = true;
 		if (streq(firm_isa, "ia32")) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;

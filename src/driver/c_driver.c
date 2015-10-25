@@ -152,15 +152,6 @@ static void init_external_preprocessor(void)
 	if (!dialect.gnu && !dialect.ms && !dialect.cpp)
 		driver_add_flag(o, "-U__STRICT_ANSI__");
 	driver_add_flag(o, "-U__BLOCKS__");
-
-	if (dialect.intmax_predefs) {
-		driver_add_flag(o, "-U__INTMAX_TYPE__");
-		driver_add_flag(o, "-D__INTMAX_TYPE__=%s",
-						type_to_string(type_intmax_t));
-		driver_add_flag(o, "-U__UINTMAX_TYPE__");
-		driver_add_flag(o, "-D__UINTMAX_TYPE__=%s",
-						type_to_string(type_uintmax_t));
-	}
 }
 
 static void determine_unit_standard(compilation_unit_t *unit)
