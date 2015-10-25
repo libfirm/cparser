@@ -91,8 +91,7 @@ const char *get_output_name(const char *inputname, const char *newext)
 	obstack_grow(&file_obst, filename, name_end-filename);
 	size_t extlen = strlen(newext);
 	obstack_grow(&file_obst, newext, extlen);
-	obstack_1grow(&file_obst, '\0');
-	return obstack_finish(&file_obst);
+	return obstack_nul_finish(&file_obst);
 }
 
 FILE *open_temp_file(const char *basename, const char *extension,

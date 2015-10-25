@@ -1304,8 +1304,7 @@ dollar_sign:
 	char const *const str0 = token0->base.symbol->string;
 	obstack_grow(&symbol_obstack, str0, strlen(str0));
 	obstack_grow(&symbol_obstack, str1, len1);
-	obstack_1grow(&symbol_obstack, '\0');
-	char     *const string = obstack_finish(&symbol_obstack);
+	char     *const string = obstack_nul_finish(&symbol_obstack);
 	symbol_t *const symbol = symbol_table_insert(string);
 	if (symbol->string != string)
 		obstack_free(&symbol_obstack, string);
@@ -1928,11 +1927,9 @@ dollar_sign:
 		}
 	}
 
-end_symbol:
-	obstack_1grow(&symbol_obstack, '\0');
-	char *string = obstack_finish(&symbol_obstack);
-
-	symbol_t *symbol = symbol_table_insert(string);
+end_symbol:;
+	char     *const string = obstack_nul_finish(&symbol_obstack);
+	symbol_t *const symbol = symbol_table_insert(string);
 
 	/* Might be a prefixed string or character constant: L/U/u/u8"string". */
 	if (input.c == '"') {
@@ -2256,8 +2253,7 @@ digraph_percentcolon:
 dollar_sign:
 		assert(obstack_object_size(&symbol_obstack) == 0);
 		obstack_grow_utf8(&symbol_obstack, input.c);
-		obstack_1grow(&symbol_obstack, '\0');
-		char     *const string = obstack_finish(&symbol_obstack);
+		char     *const string = obstack_nul_finish(&symbol_obstack);
 		symbol_t *const symbol = symbol_table_insert(string);
 		if (symbol->string != string)
 			obstack_free(&symbol_obstack, string);
@@ -2659,8 +2655,7 @@ void parse_define(char const *opt)
 	for (p = opt; *p != '\0' && *p != '='; ++p) {
 		obstack_1grow(&config_obstack, *p);
 	}
-	obstack_1grow(&config_obstack, '\0');
-	char *name = obstack_finish(&config_obstack);
+	char *const name = obstack_nul_finish(&config_obstack);
 	if (*p == '\0') {
 		add_define_one(name);
 	} else {
@@ -3184,9 +3179,8 @@ error_invalid_input:
 		}
 	}
 
-finish_headername:
-	obstack_1grow(&symbol_obstack, '\0');
-	char *const  headername = obstack_finish(&symbol_obstack);
+finish_headername:;
+	char *const headername = obstack_nul_finish(&symbol_obstack);
 	pp_token.base.pos = pos;
 	return headername;
 }
@@ -3920,8 +3914,7 @@ string:;
 
 	resolve_escape_sequences = old_resolve_escape_sequences;
 
-	obstack_1grow(&pp_obstack, '\0');
-	char *const str = obstack_finish(&pp_obstack);
+	char *const str = obstack_nul_finish(&pp_obstack);
 	errorf(&pos, "#%s", str);
 	obstack_free(&pp_obstack, str);
 }

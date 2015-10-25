@@ -9230,8 +9230,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 					obstack_1grow(&symbol_obstack, *e);
 					++e;
 				}
-				obstack_1grow(&symbol_obstack, '\0');
-				char *identifier = obstack_finish(&symbol_obstack);
+				char *const identifier = obstack_nul_finish(&symbol_obstack);
 				if (*e == ']') {
 					symbol_t *symbol   = symbol_table_insert(identifier);
 					entity_t *argument = get_entity(symbol, NAMESPACE_ASM_ARGUMENT);

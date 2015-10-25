@@ -73,10 +73,9 @@ static const char *make_tempsubdir(const char *tempdir)
 {
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s/XXXXXX", tempdir);
-	obstack_1grow(&file_obst, '\0');
 
-	char *templ = obstack_finish(&file_obst);
-	const char *dir = mkdtemp(templ);
+	char       *const templ = obstack_nul_finish(&file_obst);
+	char const *const dir   = mkdtemp(templ);
 	if (dir == NULL) {
 		position_t const pos = { templ, 0, 0, 0 };
 		errorf(&pos, "mkdtemp could not create a directory from template");
@@ -92,10 +91,9 @@ FILE *make_temp_file(const char *name_orig, const char **name_result)
 
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s/%s", tempsubdir, name_orig);
-	obstack_1grow(&file_obst, '\0');
 
-	char *name = obstack_finish(&file_obst);
-	FILE *out = fopen(name, "w");
+	char *const name = obstack_nul_finish(&file_obst);
+	FILE *const out  = fopen(name, "w");
 	if (out == NULL) {
 		position_t const pos = { name, 0, 0, 0 };
 		errorf(&pos, "could not create temporary file: %s", strerror(errno));

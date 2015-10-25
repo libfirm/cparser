@@ -79,9 +79,8 @@ void abort_string_construction(void)
 string_t *finish_string_construction_on(struct obstack *obst,
                                         string_encoding_t encoding)
 {
-	obstack_1grow(obst, '\0');
-	size_t const size = obstack_object_size(obst)-sizeof(string_t)-1;
-	string_t    *news = obstack_finish(obst);
+	size_t    const size = obstack_object_size(obst) - sizeof(string_t);
+	string_t *const news = obstack_nul_finish(obst);
 	news->size     = size;
 	news->encoding = encoding;
 	news->entity   = NULL;

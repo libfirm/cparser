@@ -38,9 +38,8 @@ static entity_t *record_builtin_function(builtin_kind_t kind, symbol_t *symbol,
 
 static symbol_t *finalize_symbol_string(void)
 {
-	obstack_1grow(&symbol_obstack, '\0');
-	char *string = obstack_finish(&symbol_obstack);
-	symbol_t *symbol = symbol_table_insert(string);
+	char     *const string = obstack_nul_finish(&symbol_obstack);
+	symbol_t *const symbol = symbol_table_insert(string);
 	if (symbol->string != string)
 		obstack_free(&symbol_obstack, string);
 	return symbol;

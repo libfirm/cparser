@@ -119,8 +119,7 @@ static void decide_external_preprocessor(void)
 	if (target.triple != NULL)
 		obstack_printf(&file_obst, "%s-", target.triple);
 	obstack_printf(&file_obst, "%s", PREPROCESSOR);
-	obstack_1grow(&file_obst, '\0');
-	driver_preprocessor = obstack_finish(&file_obst);
+	driver_preprocessor = obstack_nul_finish(&file_obst);
 }
 
 static void init_external_preprocessor(void)
@@ -300,8 +299,8 @@ static const char *get_dependency_filename(compilation_env_t *env,
 		char const *const ext_begin = find_extension(outname, NULL);
 		assert(obstack_object_size(&file_obst) == 0);
 		obstack_grow(&file_obst, outname, ext_begin - outname);
-		obstack_grow0(&file_obst, ".d", 2);
-		return obstack_finish(&file_obst);
+		obstack_grow(&file_obst, ".d", 2);
+		return obstack_nul_finish(&file_obst);
 	} else {
 		return get_output_name(unit->original_name, ".d");
 	}
@@ -314,8 +313,7 @@ static bool run_external_preprocessor(compilation_env_t *env,
 	init_c_dialect_for_unit(unit);
 	init_external_preprocessor();
 
-	obstack_1grow(&cppflags_obst, '\0');
-	const char *flags = obstack_finish(&cppflags_obst);
+	char const *const flags = obstack_nul_finish(&cppflags_obst);
 
 	obstack_printf(&cppflags_obst, "%s", driver_preprocessor);
 
@@ -331,9 +329,8 @@ static bool run_external_preprocessor(compilation_env_t *env,
 
 	if (unit->type == COMPILATION_UNIT_C
 	    || unit->type == COMPILATION_UNIT_CXX) {
-	    obstack_1grow(&c_cpp_cppflags_obst, '\0');
-	    size_t      len        = obstack_object_size(&c_cpp_cppflags_obst)-1;
-	    const char *extraflags = obstack_finish(&c_cpp_cppflags_obst);
+	    size_t      const len        = obstack_object_size(&c_cpp_cppflags_obst);
+	    char const *const extraflags = obstack_nul_finish(&c_cpp_cppflags_obst);
 	    obstack_1grow(&cppflags_obst, ' ');
 	    obstack_grow(&cppflags_obst, extraflags, len);
 	    driver_add_flag(&cppflags_obst, "-std=%s",
@@ -363,9 +360,8 @@ static bool run_external_preprocessor(compilation_env_t *env,
 	}
 	assert(unit->input == NULL);
 	driver_add_flag(&cppflags_obst, unit->name);
-	obstack_1grow(&cppflags_obst, '\0');
 
-	char *commandline = obstack_finish(&cppflags_obst);
+	char *const commandline = obstack_nul_finish(&cppflags_obst);
 	if (driver_verbose) {
 		puts(commandline);
 	}
@@ -412,16 +408,13 @@ static void decide_assembler(void)
 	if (target.triple != NULL)
 		obstack_printf(&file_obst, "%s-", target.triple);
 	obstack_printf(&file_obst, "%s", ASSEMBLER);
-	obstack_1grow(&file_obst, '\0');
-	driver_assembler = obstack_finish(&file_obst);
+	driver_assembler = obstack_nul_finish(&file_obst);
 }
 
 static bool assemble(compilation_unit_t *unit, const char *o_name)
 {
-	if (asflags == NULL) {
-		obstack_1grow(&asflags_obst, '\0');
-		asflags = obstack_finish(&asflags_obst);
-	}
+	if (!asflags)
+		asflags = obstack_nul_finish(&asflags_obst);
 
 	decide_assembler();
 	obstack_printf(&asflags_obst, "%s", driver_assembler);
@@ -429,9 +422,8 @@ static bool assemble(compilation_unit_t *unit, const char *o_name)
 		obstack_printf(&asflags_obst, " %s", asflags);
 
 	obstack_printf(&asflags_obst, " %s -o %s", unit->name, o_name);
-	obstack_1grow(&asflags_obst, '\0');
 
-	char *commandline = obstack_finish(&asflags_obst);
+	char *const commandline = obstack_nul_finish(&asflags_obst);
 	if (driver_verbose) {
 		puts(commandline);
 	}
@@ -479,8 +471,7 @@ static void append_standard_include_paths(void)
 					   ? multilib_directory_target_triple : target.triple;
 	if (triple != NULL) {
 		obstack_printf(&file_obst, "%s/%s", local_include_dir, triple);
-		obstack_1grow(&file_obst, '\0');
-		char *path = obstack_finish(&file_obst);
+		char *const path = obstack_nul_finish(&file_obst);
 		append_include_path(&system_searchpath, path);
 	}
 #endif
@@ -489,8 +480,7 @@ static void append_standard_include_paths(void)
 #ifdef APPEND_MULTILIB_DIRS
 	if (triple != NULL) {
 		obstack_printf(&file_obst, "%s/%s", system_include_dir, triple);
-		obstack_1grow(&file_obst, '\0');
-		char *path = obstack_finish(&file_obst);
+		char *const path = obstack_nul_finish(&file_obst);
 		append_include_path(&system_searchpath, path);
 	}
 #endif
@@ -838,8 +828,7 @@ static void decide_linker(void)
 	if (target.triple != NULL)
 		obstack_printf(&file_obst, "%s-", target.triple);
 	obstack_printf(&file_obst, "%s", LINKER);
-	obstack_1grow(&file_obst, '\0');
-	driver_linker = obstack_finish(&file_obst);
+	driver_linker = obstack_nul_finish(&file_obst);
 }
 
 bool link_program(compilation_env_t *env, compilation_unit_t *units)
@@ -849,8 +838,7 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 		outname = driver_default_exe_output;
 	}
 
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
+	char const *const flags = obstack_nul_finish(&ldflags_obst);
 
 	/* construct commandline */
 	decide_linker();
@@ -867,9 +855,8 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	driver_add_flag(&file_obst, "-o");
 	driver_add_flag(&file_obst, outname);
 	obstack_printf(&file_obst, "%s", flags);
-	obstack_1grow(&file_obst, '\0');
 
-	char *commandline = obstack_finish(&file_obst);
+	char *const commandline = obstack_nul_finish(&file_obst);
 
 	if (driver_verbose) {
 		puts(commandline);
@@ -937,15 +924,13 @@ int action_print_file_name(const char *argv0)
 	(void)argv0;
 	driver_add_flag(&ldflags_obst, "-print-file-name=%s", print_file_name_file);
 
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
+	char const *const flags = obstack_nul_finish(&ldflags_obst);
 
 	/* construct commandline */
 	obstack_printf(&ldflags_obst, "%s ", driver_linker);
 	obstack_printf(&ldflags_obst, "%s", flags);
-	obstack_1grow(&ldflags_obst, '\0');
 
-	char *commandline = obstack_finish(&ldflags_obst);
+	char *const commandline = obstack_nul_finish(&ldflags_obst);
 	if (driver_verbose) {
 		puts(commandline);
 	}

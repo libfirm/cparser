@@ -439,9 +439,9 @@ bool options_parse_codegen(options_state_t *s)
 		assert(obstack_object_size(&codegenflags_obst) == 0);
 		obstack_blank(&codegenflags_obst, sizeof(codegen_option_t));
 		size_t len = strlen(arg);
-		obstack_grow0(&codegenflags_obst, arg, len);
-		codegen_option_t *cg_option = obstack_finish(&codegenflags_obst);
-		cg_option->next             = NULL;
+		obstack_grow(&codegenflags_obst, arg, len);
+		codegen_option_t *const cg_option = obstack_nul_finish(&codegenflags_obst);
+		cg_option->next = NULL;
 
 		*codegen_options_anchor = cg_option;
 		codegen_options_anchor  = &cg_option->next;
