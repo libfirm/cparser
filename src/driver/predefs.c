@@ -165,20 +165,20 @@ static void define_float_properties(const char *prefix,
 	ir_mode *mode = atomic_modes[akind];
 	unsigned d;
 	if (get_mode_arithmetic(mode) == irma_ieee754
-	    && get_mode_exponent_size(mode) == 8
-	    && get_mode_mantissa_size(mode) == 23) {
+	 && get_mode_exponent_size(mode) == 8
+	 && get_mode_mantissa_size(mode) == 23) {
 	    d = 0;
 	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	           && get_mode_exponent_size(mode) == 11
-	           && get_mode_mantissa_size(mode) == 52) {
+	        && get_mode_exponent_size(mode) == 11
+	        && get_mode_mantissa_size(mode) == 52) {
 	    d = 1;
 	} else if (get_mode_arithmetic(mode) == irma_x86_extended_float
-	           && get_mode_exponent_size(mode) == 15
-	           && get_mode_mantissa_size(mode) == 64) {
+	        && get_mode_exponent_size(mode) == 15
+	        && get_mode_mantissa_size(mode) == 64) {
 		d = 2;
 	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	           && get_mode_exponent_size(mode) == 15
-	           && get_mode_mantissa_size(mode) == 112) {
+	        && get_mode_exponent_size(mode) == 15
+	        && get_mode_mantissa_size(mode) == 112) {
 	    d = 3;
 	} else {
 		panic("unexpected long double mode");
@@ -321,8 +321,8 @@ void add_predefined_macros(void)
 	add_define("__FINITE_MATH_ONLY__",    "0",    false);
 
 	if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 8
-	    && get_type_size(type_void_ptr) == 8
-	    && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+	 && get_type_size(type_void_ptr) == 8
+	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
 		add_define("_LP64",    "1", false);
 		add_define("__LP64__", "1", false);
 	}
@@ -358,16 +358,14 @@ void add_predefined_macros(void)
 		add_define("__sparc__", "1", false);
 		/* we always produce sparc V8 code at the moment */
 		add_define("__sparc_v8__", "1", false);
-		if (strstr(manufacturer, "leon") != NULL) {
+		if (strstr(manufacturer, "leon") != NULL)
 			add_define("__leon__", "1", false);
-		}
 	} else if (streq(cpu, "arm")) {
 		/* TODO: test, what about
 		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
 		add_define("__arm__",   "1", false);
-		if (strstr(operating_system, "eabi") != NULL) {
+		if (strstr(target.machine->operating_system, "eabi") != NULL)
 			add_define("__ARM_EABI__", "1", false);
-		}
 	} else if (streq(cpu, "x86_64")) {
 		add_define("__x86_64",   "1", false);
 		add_define("__x86_64__", "1", false);
@@ -387,18 +385,15 @@ void add_predefined_macros(void)
 		add_define_int("__pic__", target.pic_mode);
 	}
 
-	/* TODO: query from backend? */
 	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);
 	add_define("__REGISTER_PREFIX__", "", false);
 	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
 
 	atomic_type_properties_t *props = atomic_type_properties;
-	if (!(props[ATOMIC_TYPE_CHAR].flags & ATOMIC_TYPE_FLAG_SIGNED)) {
+	if (!(props[ATOMIC_TYPE_CHAR].flags & ATOMIC_TYPE_FLAG_SIGNED))
 		add_define("__CHAR_UNSIGNED__", "1", false);
-	}
-	if (!(props[ATOMIC_TYPE_WCHAR_T].flags & ATOMIC_TYPE_FLAG_SIGNED)) {
+	if (!(props[ATOMIC_TYPE_WCHAR_T].flags & ATOMIC_TYPE_FLAG_SIGNED))
 		add_define("__WCHAR_UNSIGNED__", "1", false);
-	}
 	add_define_int("__CHAR_BIT__", BITS_PER_BYTE);
 
 	assert(type_size_t->kind    == TYPE_ATOMIC);
@@ -440,16 +435,16 @@ void add_predefined_macros(void)
 	define_int_n_types(32, ATOMIC_TYPE_UINT,   ATOMIC_TYPE_INT);
 	atomic_type_kind_t akind_uintptr;
 	atomic_type_kind_t akind_intptr;
-	if (get_type_size(type_void_ptr) == 4 &&
-		get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+	if (get_type_size(type_void_ptr) == 4
+	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
 		akind_intptr = ATOMIC_TYPE_INT;
 		akind_uintptr = ATOMIC_TYPE_UINT;
-	} else if (get_type_size(type_void_ptr) == 8 &&
-	           get_atomic_type_size(ATOMIC_TYPE_LONG) == 8) {
+	} else if (get_type_size(type_void_ptr) == 8
+	        && get_atomic_type_size(ATOMIC_TYPE_LONG) == 8) {
 		akind_intptr = ATOMIC_TYPE_LONG;
 		akind_uintptr = ATOMIC_TYPE_ULONG;
-	} else if (get_type_size(type_void_ptr) == 8 &&
-			   get_atomic_type_size(ATOMIC_TYPE_LONGLONG) == 8) {
+	} else if (get_type_size(type_void_ptr) == 8
+	        && get_atomic_type_size(ATOMIC_TYPE_LONGLONG) == 8) {
 		akind_intptr = ATOMIC_TYPE_LONGLONG;
 		akind_uintptr = ATOMIC_TYPE_ULONGLONG;
 	} else {
