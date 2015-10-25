@@ -278,38 +278,6 @@ void add_predefined_macros(void)
 	case OBJECT_FORMAT_MACH_O:  break;
 	}
 
-	const char *operating_system = target.machine->operating_system;
-	if (is_unixish_os(operating_system)) {
-		if (dialect.gnu)
-			add_define("unix",     "1", false);
-		add_define("__unix",   "1", false);
-		add_define("__unix__", "1", false);
-		if (strstr(operating_system, "linux") != NULL) {
-			if (dialect.gnu)
-				add_define("linux",     "1", false);
-			add_define("__linux",   "1", false);
-			add_define("__linux__", "1", false);
-			if (strstr(operating_system, "gnu") != NULL) {
-				add_define("__gnu_linux__", "1", false);
-			}
-		}
-	} else if (is_darwin_os(operating_system)) {
-		add_define("__MACH__",     "1", false);
-		add_define("__APPLE__",    "1", false);
-		add_define("__APPLE_CC__", "1", false);
-		add_define("__weak",       "",  false);
-		add_define("__strong",     "",  false);
-		/* TODO: when are these disabled? */
-		add_define("__CONSTANT_CFSTRINGS__", "1", false);
-		add_define("__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050",
-		           false);
-		/* TODO: may also be __STATIC__ */
-		add_define("__DYNAMIC__",  "1", false);
-		/* TODO: _REENTRANT for -pthreads */
-		if (!target.byte_order_big_endian) {
-			add_define("__LITTLE_ENDIAN__", "1", false);
-		}
-	}
 	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
 	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
 	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
@@ -327,51 +295,6 @@ void add_predefined_macros(void)
 		add_define("__LP64__", "1", false);
 	}
 
-	const char *cpu          = target.machine->cpu_type;
-	const char *manufacturer = target.machine->manufacturer;
-	if (is_ia32_cpu(cpu)) {
-		if (dialect.gnu)
-			add_define("i386",     "1", false);
-		add_define("__i386",   "1", false);
-		add_define("__i386__", "1", false);
-		if (streq(cpu, "i486")) {
-			add_define("__i486",   "1", false);
-			add_define("__i486__", "1", false);
-		} else if (streq(cpu, "i586")) {
-			add_define("__i586",      "1", false);
-			add_define("__i586__",    "1", false);
-			add_define("__pentium",   "1", false);
-			add_define("__pentium__", "1", false);
-			//add_define("__pentium_mmx__", "1", false);
-		} else if (streq(cpu, "i686")) {
-			add_define("__pentiumpro",   "1", false);
-			add_define("__pentiumpro__", "1", false);
-			add_define("__i686",         "1", false);
-			add_define("__i686__",       "1", false);
-		} else if (streq(cpu, "i786")) {
-			add_define("__pentium4",     "1", false);
-			add_define("__pentium4__",   "1", false);
-		}
-	} else if (streq(cpu, "sparc")) {
-		add_define("sparc",     "1", false);
-		add_define("__sparc",   "1", false);
-		add_define("__sparc__", "1", false);
-		/* we always produce sparc V8 code at the moment */
-		add_define("__sparc_v8__", "1", false);
-		if (strstr(manufacturer, "leon") != NULL)
-			add_define("__leon__", "1", false);
-	} else if (streq(cpu, "arm")) {
-		/* TODO: test, what about
-		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
-		add_define("__arm__",   "1", false);
-		if (strstr(target.machine->operating_system, "eabi") != NULL)
-			add_define("__ARM_EABI__", "1", false);
-	} else if (streq(cpu, "x86_64")) {
-		add_define("__x86_64",   "1", false);
-		add_define("__x86_64__", "1", false);
-		add_define("__amd64",    "1", false);
-		add_define("__amd64__",  "1", false);
-	}
 	ir_mode *float_mode = be_get_mode_float_arithmetic();
 	const char *flt_eval_metod
 		= float_mode == NULL ? "0"
@@ -496,4 +419,12 @@ void add_predefined_macros(void)
 	add_define("__DECIMAL_DIG__", "__LDBL_DECIMAL_DIG__", false);
 
 	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
+
+	/* Add target specific defines */
+	for (const target_define_t *define = target.defines; define != NULL;
+	     define = define->next) {
+		if (define->condition != NULL && !define->condition())
+			continue;
+		add_define(define->name, define->value, false);
+	}
 }

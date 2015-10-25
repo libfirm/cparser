@@ -46,6 +46,16 @@ typedef enum object_format_t {
 	OBJECT_FORMAT_PE_COFF,
 } object_format_t;
 
+/** Name+Value of a target specific preprocessor design. This is necessary to
+ * avoid doing target specific decisions outside of target.c */
+typedef struct target_define_t target_define_t;
+struct target_define_t {
+	char      const *name;
+	char      const *value;
+	target_define_t *next;
+	bool (*condition)(void);
+};
+
 typedef struct target_t {
 	/**
 	 * whether architecture shift instructions usually perform modulo bit_size
@@ -63,6 +73,7 @@ typedef struct target_t {
 	/** enable hack to add call to __main into the main function (mingw) */
 	bool enable_main_collect2_hack : 1;
 	ENUMBF(object_format_t) object_format : 2;
+	target_define_t  *defines;
 	/** parsed machine-triple of target machine. Try not to use this if possible
 	 * but create specific variables for language/target features instead. */
 	machine_triple_t *machine;

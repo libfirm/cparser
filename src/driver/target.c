@@ -151,9 +151,50 @@ static void set_be_option(const char *arg)
 		panic("setting firm backend option failed");
 }
 
+/** Add a target specific preprocessor define. */
+static target_define_t *ppdef(const char *name, const char *value)
+{
+	target_define_t *define = calloc(1, sizeof(*define));
+	define->name = name;
+	define->value = value;
+	define->next = target.defines;
+	target.defines = define;
+	return define;
+}
+
+/** Add a target specific preprocessor define. This calls \p condition_func
+ * to check whether the define should really be added. */
+static target_define_t *ppdefc(const char *name, const char *value,
+                               bool (*condition_func)(void))
+{
+	target_define_t *define = ppdef(name, value);
+	define->condition = condition_func;
+	return define;
+}
+
+static bool cond_not_strict(void)
+{
+	return dialect.gnu;
+}
+
+static bool cond_is_little_endian(void)
+{
+	return !target.byte_order_big_endian;
+}
+
 static void init_os_support(void)
 {
-	const char *os = target.machine->operating_system;
+	/* Note: Code here should only check the target triple! Querying other
+	 * target features is not allowed as subsequent commandline options may
+	 * change those. Example:
+	 * ppdefc("X", "Y", cond_not_strict); // Correct: cond_not_strict is
+	 *                                    // evaluated later
+	 * if (dialect.gnu)
+	 *    ppdef("X", "Y"); // Wrong: language dialect/target is not final yet
+	 */
+
+	const char *os  = target.machine->operating_system;
+	const char *cpu = target.machine->cpu_type;
 	target.enable_main_collect2_hack = false;
 	target.biggest_alignment = 16;
 	dialect.wchar_atomic_kind = ATOMIC_TYPE_INT;
@@ -166,6 +207,14 @@ static void init_os_support(void)
 		set_be_option("ia32-struct_in_reg=no");
 		set_be_option("amd64-x64abi=no");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
+		ppdef( "__unix",    "1");
+		ppdef( "__unix__",  "1");
+		ppdefc("unix",      "1", cond_not_strict);
+		ppdef( "__linux",   "1");
+		ppdef( "__linux__", "1");
+		ppdefc("linux",     "1", cond_not_strict);
+		if (strstr(os, "gnu") != NULL)
+			ppdef("__gnu_linux__", "1");
 	} else if (is_darwin_os(os)) {
 		driver_default_exe_output = "a.out";
 		set_create_ld_ident(create_name_macho);
@@ -177,19 +226,45 @@ static void init_os_support(void)
 		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 		if (target.pic_mode == -1)
 			target.pic_mode = 2;
+		ppdef( "__MACH__",               "1");
+		ppdef( "__APPLE__",              "1");
+		ppdef( "__APPLE_CC__",           "1");
+		ppdef( "__weak",                 "");
+		ppdef( "__strong",               "");
+		ppdef( "__CONSTANT_CFSTRINGS__", "1");
+		ppdef( "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050");
+		ppdef( "__DYNAMIC__",            "1");
+		ppdefc("__LITTLE_ENDIAN__",      "1", cond_is_little_endian);
 	} else if (is_windows_os(os)) {
-		const char *cpu = target.machine->cpu_type;
 		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		driver_default_exe_output = "a.exe";
 		target.object_format = OBJECT_FORMAT_PE_COFF;
 		set_be_option("ia32-struct_in_reg=no");
-		if (strstr(os, "mingw") != NULL)
+		bool is_mingw = strstr(os, "mingw") != NULL;
+		if (is_mingw) {
 			target.enable_main_collect2_hack = true;
+			ppdef("__MINGW32__", "1");
+		}
+		ppdef( "__MSVCRT__", "1");
+		ppdef( "_WINNT",     "1");
+		ppdef( "__WINNT",    "1");
+		ppdef( "__WINNT__",  "1");
+		ppdefc("WINNT",      "1", cond_not_strict);
+		ppdef( "_WIN32",     "1");
+		ppdef( "__WIN32",    "1");
+		ppdef( "__WIN32__",  "1");
+		ppdefc("WIN32",      "1", cond_not_strict);
 		if (streq(cpu, "x86_64")) {
 			set_be_option("amd64-x64abi=yes");
 			set_create_ld_ident(create_name_win64);
 			target.user_label_prefix = "";
 			set_compilerlib_name_mangle(compilerlib_name_mangle_default);
+			ppdef( "_WIN64",    "1");
+			ppdef( "__WIN64",   "1");
+			ppdef( "__WIN64__", "1");
+			ppdefc("WIN64",     "1", cond_not_strict);
+			if (is_mingw)
+				ppdef("__MINGW64__", "1");
 		} else {
 			set_create_ld_ident(create_name_win32);
 			target.user_label_prefix = "_";
@@ -199,6 +274,51 @@ static void init_os_support(void)
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
 		exit(EXIT_FAILURE);
 	}
+
+	const char *manufacturer = target.machine->manufacturer;
+	if (is_ia32_cpu(cpu)) {
+		ppdefc("i386",     "1", cond_not_strict);
+		ppdef( "__i386",   "1");
+		ppdef( "__i386__", "1");
+		if (streq(cpu, "i486")) {
+			ppdef("__i486",   "1");
+			ppdef("__i486__", "1");
+		} else if (streq(cpu, "i586")) {
+			ppdef("__i586",      "1");
+			ppdef("__i586__",    "1");
+			ppdef("__pentium",   "1");
+			ppdef("__pentium__", "1");
+			//ppdef("__pentium_mmx__", "1");
+		} else if (streq(cpu, "i686")) {
+			ppdef("__pentiumpro",   "1");
+			ppdef("__pentiumpro__", "1");
+			ppdef("__i686",         "1");
+			ppdef("__i686__",       "1");
+		} else if (streq(cpu, "i786")) {
+			ppdef("__pentium4",     "1");
+			ppdef("__pentium4__",   "1");
+		}
+	} else if (streq(cpu, "sparc")) {
+		ppdefc("sparc",     "1", cond_not_strict);
+		ppdef( "__sparc",   "1");
+		ppdef( "__sparc__", "1");
+		/* we always produce sparc V8 code at the moment */
+		ppdef( "__sparc_v8__", "1");
+		if (strstr(manufacturer, "leon") != NULL)
+			ppdef("__leon__", "1");
+	} else if (streq(cpu, "arm")) {
+		/* TODO: test, what about
+		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
+		ppdef("__arm__",   "1");
+		if (strstr(os, "eabi") != NULL)
+			ppdef("__ARM_EABI__", "1");
+	} else if (streq(cpu, "x86_64")) {
+		ppdef("__x86_64",   "1");
+		ppdef("__x86_64__", "1");
+		ppdef("__amd64",    "1");
+		ppdef("__amd64__",  "1");
+	}
+
 	if (target.pic_mode == -1)
 		target.pic_mode = 0;
 }
