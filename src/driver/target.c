@@ -70,9 +70,8 @@ void target_adjust_types_and_dialect(void)
 
 	/* adjust types as requested by target architecture */
 	ir_type *const type_ld = be_params->type_long_double;
-	if (type_ld) {
+	if (type_ld)
 		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_ld);
-	}
 
 	ir_type *const type_ll = be_params->type_long_long;
 	if (type_ll)
@@ -124,10 +123,9 @@ void target_adjust_types_and_dialect(void)
 	props[ATOMIC_TYPE_WCHAR_T] = props[dialect.wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
-	if (!type_ld) {
+	if (!type_ld)
 		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
 		               &props[ATOMIC_TYPE_DOUBLE]);
-	}
 	static bool had_cpp_warning;
 	if (dialect.cpp && !had_cpp_warning) {
 		warningf(WARN_EXPERIMENTAL, NULL,
@@ -266,7 +264,7 @@ static bool setup_firm_isa(void)
 
 	const char *cpu = target.machine->cpu_type;
 	if (streq(cpu, "i386") || streq(cpu, "i486")
-	    || streq(cpu, "i586") || streq(cpu, "i686")) {
+	 || streq(cpu, "i586") || streq(cpu, "i686")) {
 		if (get_bitsize_codegen_opt() == 64) {
 			free(target.machine->cpu_type);
 			target.machine->cpu_type = xstrdup("x86_64");
