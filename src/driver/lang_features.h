@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <libfirm/irmode.h>
 
+#include "adt/util.h"
 #include "ast/type.h"
 #include "machine_triple.h"
 
@@ -40,6 +41,12 @@ typedef struct c_dialect_t {
 	lang_features_t    features;
 } c_dialect_t;
 
+typedef enum object_format_t {
+	OBJECT_FORMAT_ELF,
+	OBJECT_FORMAT_MACH_O,
+	OBJECT_FORMAT_PE_COFF,
+} object_format_t;
+
 typedef struct target_t {
 	/**
 	 * whether architecture shift instructions usually perform modulo bit_size
@@ -47,19 +54,20 @@ typedef struct target_t {
 	 */
 	unsigned int modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
-	/** byte-order: true = big-endian, false = little-endian */
-	bool byte_order_big_endian : 1;
-	/** enable hack to add call to __main into the main function (mingw) */
-	bool enable_main_collect2_hack : 1;
-	/** parsed machine-triple of target machine. Try not to use this if possible
-	 * but create specific variables for language features instead. */
-	machine_triple_t *machine;
-	/** target triple as a string */
-	const char       *triple;
 	const char       *user_label_prefix;
 	/** position independent code generation mode */
 	int               pic_mode : 4;
 	bool              pic_no_plt : 1;
+	/** byte-order: true = big-endian, false = little-endian */
+	bool byte_order_big_endian : 1;
+	/** enable hack to add call to __main into the main function (mingw) */
+	bool enable_main_collect2_hack : 1;
+	ENUMBF(object_format_t) object_format : 2;
+	/** parsed machine-triple of target machine. Try not to use this if possible
+	 * but create specific variables for language/target features instead. */
+	machine_triple_t *machine;
+	/** target triple as a string */
+	const char       *triple;
 } target_t;
 
 extern c_dialect_t dialect;

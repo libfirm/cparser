@@ -161,19 +161,20 @@ static void init_os_support(void)
 {
 	const char *os = target.machine->operating_system;
 	target.enable_main_collect2_hack = false;
-	driver_default_exe_output        = "a.out";
 
 	if (is_elf_os(os)) {
+		driver_default_exe_output = "a.out";
 		set_create_ld_ident(create_name_linux_elf);
 		target.user_label_prefix = "";
-		set_be_option("objectformat=elf");
+		target.object_format = OBJECT_FORMAT_ELF;
 		set_be_option("ia32-struct_in_reg=no");
 		set_be_option("amd64-x64abi=no");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (is_darwin_os(os)) {
+		driver_default_exe_output = "a.out";
 		set_create_ld_ident(create_name_macho);
 		target.user_label_prefix = "_";
-		set_be_option("objectformat=mach-o");
+		target.object_format = OBJECT_FORMAT_MACH_O;
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
 		set_be_option("amd64-x64abi=no");
@@ -183,7 +184,7 @@ static void init_os_support(void)
 	} else if (is_windows_os(os)) {
 		const char *cpu = target.machine->cpu_type;
 		driver_default_exe_output = "a.exe";
-		set_be_option("objectformat=coff");
+		target.object_format = OBJECT_FORMAT_PE_COFF;
 		set_be_option("ia32-struct_in_reg=no");
 		if (strstr(os, "mingw") != NULL)
 			target.enable_main_collect2_hack = true;
@@ -299,6 +300,36 @@ static bool setup_firm_isa(void)
 
 static bool pass_options_to_firm_be(void)
 {
+	switch (target.object_format) {
+	case OBJECT_FORMAT_ELF:     set_be_option("objectformat=elf");    break;
+	case OBJECT_FORMAT_MACH_O:  set_be_option("objectformat=mach-o"); break;
+	case OBJECT_FORMAT_PE_COFF: set_be_option("objectformat=coff");   break;
+	}
+
+	if (profile_generate) {
+		driver_add_flag(&ldflags_obst, "-lfirmprof");
+		set_be_option("profilegenerate");
+	}
+	if (profile_use) {
+		set_be_option("profileuse");
+	}
+	if (target.pic_mode > 0) {
+		set_be_option("pic=true");
+		if (streq(firm_isa, "ia32")) {
+			const char *option;
+			if (is_darwin_os(target.machine->operating_system)) {
+				option = "ia32-pic=mach-o";
+			} else {
+				option = target.pic_no_plt ? "ia32-pic=elf-noplt"
+					                       : "ia32-pic=elf";
+			}
+			set_be_option(option);
+		}
+	} else {
+		set_be_option("pic=false");
+		set_be_option("ia32-pic=none");
+	}
+
 	bool res = true;
 	/* pass options to firm backend (this happens delayed because we first
 	 * had to decide which backend is actually used) */
@@ -330,30 +361,6 @@ static bool pass_options_to_firm_be(void)
 				break;
 			}
 		}
-	}
-
-	if (profile_generate) {
-		driver_add_flag(&ldflags_obst, "-lfirmprof");
-		set_be_option("profilegenerate");
-	}
-	if (profile_use) {
-		set_be_option("profileuse");
-	}
-	if (target.pic_mode > 0) {
-		set_be_option("pic=true");
-		if (streq(firm_isa, "ia32")) {
-			const char *option;
-			if (is_darwin_os(target.machine->operating_system)) {
-				option = "ia32-pic=mach-o";
-			} else {
-				option = target.pic_no_plt ? "ia32-pic=elf-noplt"
-					                       : "ia32-pic=elf";
-			}
-			set_be_option(option);
-		}
-	} else {
-		set_be_option("pic=false");
-		set_be_option("ia32-pic=none");
 	}
 
 	return res;

@@ -272,13 +272,18 @@ void add_predefined_macros(void)
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
 
+	switch (target.object_format) {
+	case OBJECT_FORMAT_ELF:     add_define("__ELF__", "1", false); break;
+	case OBJECT_FORMAT_PE_COFF: add_define("__PE__", "1", false); break;
+	case OBJECT_FORMAT_MACH_O:  break;
+	}
+
 	const char *operating_system = target.machine->operating_system;
 	if (is_unixish_os(operating_system)) {
 		if (dialect.gnu)
 			add_define("unix",     "1", false);
 		add_define("__unix",   "1", false);
 		add_define("__unix__", "1", false);
-		add_define("__ELF__",  "1", false);
 		if (strstr(operating_system, "linux") != NULL) {
 			if (dialect.gnu)
 				add_define("linux",     "1", false);
