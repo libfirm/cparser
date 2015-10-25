@@ -62,7 +62,6 @@ void target_adjust_types_and_dialect(void)
 		long_size = 4;
 	init_types(int_size, long_size, pointer_size);
 
-	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
 	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
 	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
 
@@ -98,7 +97,6 @@ void target_adjust_types_and_dialect(void)
 		props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 8;
 		props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 8;
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		if (machine_size == 32) {
 			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
 			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
@@ -158,6 +156,7 @@ static void init_os_support(void)
 	const char *os = target.machine->operating_system;
 	target.enable_main_collect2_hack = false;
 	target.biggest_alignment = 16;
+	dialect.wchar_atomic_kind = ATOMIC_TYPE_INT;
 
 	if (is_elf_os(os)) {
 		driver_default_exe_output = "a.out";
@@ -180,6 +179,7 @@ static void init_os_support(void)
 			target.pic_mode = 2;
 	} else if (is_windows_os(os)) {
 		const char *cpu = target.machine->cpu_type;
+		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		driver_default_exe_output = "a.exe";
 		target.object_format = OBJECT_FORMAT_PE_COFF;
 		set_be_option("ia32-struct_in_reg=no");
