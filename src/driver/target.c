@@ -305,8 +305,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		target.enable_main_collect2_hack = true;
 		ppdef("__MINGW32__", "1");
 		dialect.long_long_and_double_struct_align = 0;
-		dialect.long_double_x87_80bit_float = false;
-		dialect.long_double_size            = 8;
 		ppdef( "__MSVCRT__", "1");
 		ppdef( "_WINNT",     "1");
 		ppdef( "__WINNT",    "1");
@@ -329,15 +327,15 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			/* to ease porting of old c-code microsoft decided to use 32bits
 			 * even for long */
 			dialect.long_size = 4;
-			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
-			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
+			dialect.pointer_sized_int  = ATOMIC_TYPE_LONGLONG;
+			dialect.pointer_sized_uint = ATOMIC_TYPE_ULONGLONG;
 		} else {
 			assert(pointer_size == 4);
 			set_create_ld_ident(create_name_win32);
 			target.user_label_prefix = "_";
 			set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
-			dialect.pointer_sized_int  = ATOMIC_TYPE_LONGLONG;
-			dialect.pointer_sized_uint = ATOMIC_TYPE_ULONGLONG;
+			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
+			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
 		}
 	} else {
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
