@@ -257,7 +257,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
 	dialect.pointer_size       = pointer_size;
 	dialect.int_size           = MIN(pointer_size, 4);
-	dialect.long_size          = MIN(pointer_size, 4);
+	dialect.long_size          = MIN(pointer_size, 8);
 	dialect.long_double_size   = long_double_size;
 	dialect.long_long_size     = 8;
 	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
