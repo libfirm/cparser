@@ -579,14 +579,17 @@ static void write_preproc_dependencies(FILE *out, compilation_env_t *env,
 static bool finish_preprocessing(compilation_env_t *env,
                                  compilation_unit_t *unit)
 {
+	/* print defines before closing the streams otherwise we cannot determine
+	 * __TIMESTAMP__ anymore */
+	if (dump_defines)
+		print_defines();
+
 	close_pp_input();
 	set_preprocessor_output(NULL);
 	bool res = close_input(unit);
 	if (!res || error_count > 0)
 		return false;
 
-	if (dump_defines)
-		print_defines();
 	if (construct_dep_target) {
 		const char *dep_target_name = get_dependency_filename(env, unit);
 		FILE       *dep_out         = fopen(dep_target_name, "w");
