@@ -603,7 +603,7 @@ static const struct {
 
 static ident *rts_idents[ARRAY_SIZE(rts_data)];
 
-static create_ld_ident_func create_ld_ident = create_name_linux_elf;
+static create_ld_ident_func create_ld_ident = create_name_elf;
 
 void set_create_ld_ident(ident *(*func)(entity_t*))
 {

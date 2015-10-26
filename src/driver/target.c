@@ -133,7 +133,7 @@ static bool cond_is_little_endian(void)
 static void init_generic_elf(void)
 {
 	driver_default_exe_output = "a.out";
-	set_create_ld_ident(create_name_linux_elf);
+	set_create_ld_ident(create_name_elf);
 	target.user_label_prefix = "";
 	target.object_format = OBJECT_FORMAT_ELF;
 	set_be_option("ia32-struct_in_reg=no");

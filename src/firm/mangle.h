@@ -9,7 +9,7 @@
 
 #include "ast/entity.h"
 
-ident *create_name_linux_elf(entity_t *entity);
+ident *create_name_elf(entity_t *entity);
 ident *create_name_macho(entity_t *entity);
 ident *create_name_win32(entity_t *entity);
 ident *create_name_win64(entity_t *entity);

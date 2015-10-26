@@ -343,7 +343,7 @@ ident *create_name_win32(entity_t *entity)
  * @param ent          the entity to be mangled
  * @param declaration  the declaration
  */
-ident *create_name_linux_elf(entity_t *entity)
+ident *create_name_elf(entity_t *entity)
 {
 	const char *name = entity->base.symbol->string;
 
