@@ -691,6 +691,13 @@ static void do_firm_lowering(void)
 	dump_all("low-opt");
 }
 
+static void set_be_option(const char *arg)
+{
+	int res = be_parse_arg(arg);
+	(void)res;
+	assert(res);
+}
+
 void init_gen_firm(void)
 {
 	ir_init();
@@ -867,13 +874,6 @@ int firm_option(const char *const opt)
 		return 1;
 
 	return 0;
-}
-
-static void set_be_option(const char *arg)
-{
-	int res = be_parse_arg(arg);
-	(void) res;
-	assert(res);
 }
 
 static void set_option(const char *arg)
