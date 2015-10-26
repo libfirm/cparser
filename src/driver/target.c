@@ -80,16 +80,15 @@ void target_adjust_types_and_dialect(void)
 	assert(target.float_int_overflow    == be_params->float_int_overflow);
 }
 
-static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
+static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
 {
 	(void)mt;
-	return id;
-}
-
-static ident *compilerlib_name_mangle_underscore(ident *id, ir_type *mt)
-{
-	(void)mt;
-	return new_id_fmt("_%s", id);
+	if (*target.user_label_prefix == '\0')
+		return id;
+	else {
+		assert (streq(target.user_label_prefix, "_"));
+		return new_id_fmt("_%s", id);
+	}
 }
 
 static void set_be_option(const char *arg)
@@ -134,11 +133,9 @@ static void init_generic_elf(void)
 {
 	driver_default_exe_output = "a.out";
 	set_create_ld_ident(create_name_elf);
-	target.user_label_prefix = "";
 	target.object_format = OBJECT_FORMAT_ELF;
 	set_be_option("ia32-struct_in_reg=no");
 	set_be_option("amd64-x64abi=no");
-	set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 }
 
 static void init_unix(void)
@@ -262,6 +259,9 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	dialect.long_long_size     = 8;
 	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
 	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
+	target.user_label_prefix   = "";
+
+	set_compilerlib_name_mangle(compilerlib_name_mangle);
 
 	if (strstr(os, "linux") != NULL) {
 		init_generic_elf();
@@ -284,7 +284,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
 		set_be_option("amd64-x64abi=no");
-		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 		dialect.long_double_size = 16;
 		ppdef( "__MACH__",               "1");
 		ppdef( "__APPLE__",              "1");
@@ -317,8 +316,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		if (pointer_size == 8) {
 			set_be_option("amd64-x64abi=yes");
 			set_create_ld_ident(create_name_win64);
-			target.user_label_prefix = "";
-			set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 			ppdef( "_WIN64",    "1");
 			ppdef( "__WIN64",   "1");
 			ppdef( "__WIN64__", "1");
@@ -333,7 +330,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			assert(pointer_size == 4);
 			set_create_ld_ident(create_name_win32);
 			target.user_label_prefix = "_";
-			set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
 			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
 		}
