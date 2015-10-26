@@ -529,6 +529,8 @@ static machine_triple_t *get_host_machine_triple(void)
 	machine->operating_system = xstrdup("linux-gnu");
 #elif defined(__linux__)
 	machine->operating_system = xstrdup("linux");
+#elif defined(__midipix__)
+	machine->operating_system = xstrdup("midipix");
 #elif defined(__ELF__)
 	machine->operating_system = xstrdup("elf");
 #else
