@@ -333,6 +333,22 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
 			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
 		}
+	} else if (strstart(os, "midipix")) {
+		driver_default_exe_output = "a.out";
+		target.object_format = OBJECT_FORMAT_PE_COFF;
+		set_be_option("ia32-struct_in_reg=no");
+		dialect.long_long_and_double_struct_align = 0;
+		ppdef("__midipix__", "1");
+		if (pointer_size == 8) {
+			set_be_option("amd64-x64abi=yes");
+			set_create_ld_ident(create_name_win64);
+			ppdef("__NT64", "1");
+		} else {
+			assert(pointer_size == 4);
+			set_create_ld_ident(create_name_win32);
+			target.user_label_prefix = "_";
+			ppdef("__NT32", "1");
+		}
 	} else {
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
 		exit(EXIT_FAILURE);
