@@ -301,11 +301,8 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		driver_default_exe_output = "a.exe";
 		target.object_format = OBJECT_FORMAT_PE_COFF;
 		set_be_option("ia32-struct_in_reg=no");
-		bool is_mingw = strstr(os, "mingw") != NULL;
-		if (is_mingw) {
-			target.enable_main_collect2_hack = true;
-			ppdef("__MINGW32__", "1");
-		}
+		target.enable_main_collect2_hack = true;
+		ppdef("__MINGW32__", "1");
 		dialect.long_long_and_double_struct_align = 0;
 		dialect.long_double_x87_80bit_float = false;
 		dialect.long_double_size            = 8;
@@ -327,8 +324,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			ppdef( "__WIN64",   "1");
 			ppdef( "__WIN64__", "1");
 			ppdefc("WIN64",     "1", cond_not_strict);
-			if (is_mingw)
-				ppdef("__MINGW64__", "1");
+			ppdef( "__MINGW64__", "1");
 			/* to ease porting of old c-code microsoft decided to use 32bits
 			 * even for long */
 			dialect.long_size = 4;
