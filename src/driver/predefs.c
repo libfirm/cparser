@@ -387,8 +387,7 @@ void add_predefined_macros(void)
 	atomic_type_kind_t uintmax_kind = ATOMIC_TYPE_FIRST;
 	unsigned           biggest_alignment = target.biggest_alignment;
 	for (atomic_type_kind_t i = ATOMIC_TYPE_FIRST; i <= ATOMIC_TYPE_LAST; ++i) {
-		unsigned align = get_atomic_type_alignment(i);
-		assert(align <= biggest_alignment);
+		assert(get_atomic_type_alignment(i) <= biggest_alignment);
 		unsigned flags = get_atomic_type_flags(i);
 		if (!(flags & ATOMIC_TYPE_FLAG_INTEGER))
 			continue;

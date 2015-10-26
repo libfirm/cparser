@@ -84,11 +84,10 @@ void target_adjust_types_and_dialect(void)
 	/* The frontend should do all decisions and should not be influenced by
 	 * outside influences like the firm backend. So we just check here that
 	 * our decisions match the firm backend. */
-	const backend_params *be_params = be_get_backend_param();
-	assert(be_params->machine_size % 8 == 0);
-	assert(dialect.pointer_size == be_params->machine_size / BITS_PER_BYTE);
-	assert(target.byte_order_big_endian == be_params->byte_order_big_endian);
-	assert(target.float_int_overflow    == be_params->float_int_overflow);
+	assert(be_get_backend_param()->machine_size % 8 == 0);
+	assert(dialect.pointer_size == be_get_backend_param()->machine_size / BITS_PER_BYTE);
+	assert(target.byte_order_big_endian == be_get_backend_param()->byte_order_big_endian);
+	assert(target.float_int_overflow    == be_get_backend_param()->float_int_overflow);
 }
 
 static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
