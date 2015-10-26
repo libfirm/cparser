@@ -415,7 +415,11 @@ bool options_parse_codegen(options_state_t *s)
 			|| streq(option, "g2") || streq(option, "g3")) {
 		set_be_option("debug=frameinfo");
 		set_be_option("ia32-optcc=false");
-	} else if (option[0] == 'm' && !strstart(option, "mtarget")) {
+	} else if (option[0] == 'm') {
+		if (strstart(option, "mtarget")) {
+			errorf(NULL, "The -mtarget=X option has been changed to -target X");
+			s->argument_errors = true;
+		}
 		arg = &option[1];
 		/* remember option for backend */
 		assert(obstack_object_size(&codegenflags_obst) == 0);
@@ -640,7 +644,7 @@ bool options_parse_meta(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
-	} else if ((arg = equals_arg("mtarget=", s)) != NULL) {
+	} else if ((arg = spaced_arg("target", s, false)) != NULL) {
 		if (parse_target_triple(arg)) {
 			target.triple = arg;
 		} else {
