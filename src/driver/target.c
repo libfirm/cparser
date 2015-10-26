@@ -265,17 +265,16 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	if (strstr(os, "linux") != NULL) {
 		init_generic_elf();
 		init_unix();
-	} else if (strstr(os, "bsd") != NULL) {
-		init_generic_elf();
-		init_unix();
-	} else if (streq(os, "elf") || streq(os, "octopos") || streq(os, "irtss")) {
-		init_generic_elf();
-		init_unix();
 		ppdef( "__linux",   "1");
 		ppdef( "__linux__", "1");
 		ppdefc("linux",     "1", cond_not_strict);
 		if (strstr(os, "gnu") != NULL)
 			ppdef("__gnu_linux__", "1");
+	} else if (strstr(os, "bsd") != NULL) {
+		init_generic_elf();
+		init_unix();
+	} else if (streq(os, "elf") || streq(os, "octopos") || streq(os, "irtss")) {
+		init_generic_elf();
 	} else if (strstart(os, "darwin")) {
 		driver_default_exe_output = "a.out";
 		set_create_ld_ident(create_name_macho);
