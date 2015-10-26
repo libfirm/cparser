@@ -13,8 +13,6 @@ typedef struct machine_triple_t {
 	char *operating_system;
 } machine_triple_t;
 
-machine_triple_t *get_host_machine_triple(void);
-
 machine_triple_t *parse_machine_triple(const char *triple_string);
 
 void free_machine_triple(machine_triple_t *triple);

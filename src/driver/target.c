@@ -155,7 +155,7 @@ static bool is_ia32_cpu(const char *cpu)
 	    && cpu[1] >= '3' && cpu[1] <= '7';
 }
 
-static void init_defaults_for_target_machine(void)
+static void set_options_for_machine(machine_triple_t const *const machine)
 {
 	/* Note: Code here should only check the target triple! Querying other
 	 * target features is not allowed as subsequent commandline options may
@@ -165,9 +165,9 @@ static void init_defaults_for_target_machine(void)
 	 * if (dialect.gnu)
 	 *    ppdef("X", "Y"); // Wrong: language dialect/target is not final yet
 	 */
-	const char *cpu = target.machine->cpu_type;
-	const char *manufacturer = target.machine->manufacturer;
-	const char *os = target.machine->operating_system;
+	const char *const cpu          = machine->cpu_type;
+	const char *const manufacturer = machine->manufacturer;
+	const char *const os           = machine->operating_system;
 	unsigned                              pointer_size;
 	unsigned                              long_double_size;
 	unsigned                              modulo_shift;
@@ -486,7 +486,53 @@ static bool pass_options_to_firm_be(void)
 	return res;
 }
 
-bool target_setup(void)
+static machine_triple_t *get_host_machine_triple(void)
+{
+#ifdef HOST_TRIPLE
+	/* a triple for the host machine was defined in the Makefile
+	 * or config.mak */
+	return parse_machine_triple(HOST_TRIPLE);
+#else
+	/* no host triple specified, we do some guessing based on preprocessor
+	 * defines (look into predefs.c for inspiration) */
+	machine_triple_t *machine = XMALLOC(machine_triple_t);
+
+#if defined(__x86_64__)
+	machine->cpu_type = xstrdup("x86_64");
+#elif defined(__i686__)
+	machine->cpu_type = xstrdup("i686");
+#elif defined(__i386__)
+	machine->cpu_type = xstrdup("i386");
+#elif defined(__sparc__)
+	machine->cpu_type = xstrdup("sparc");
+#elif defined(__arm__)
+	machine->cpu_type = xstrdup("arm");
+#endif
+
+#if defined(__leon__)
+	machine->manufacturer = xstrdup("leon");
+#else
+	machine->manufacturer = xstrdup("unknown");
+#endif
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+	machine->operating_system = xstrdup("win32");
+#elif defined(__APPLE__)
+	machine->operating_system = xstrdup("darwin");
+#elif defined(__gnu_linux__)
+	machine->operating_system = xstrdup("linux-gnu");
+#elif defined(__linux__)
+	machine->operating_system = xstrdup("linux");
+#elif defined(__ELF__)
+	machine->operating_system = xstrdup("elf");
+#else
+	machine->operating_system = xstrdup("unknown");
+#endif
+	return machine;
+#endif
+}
+
+static void determine_target_machine(void)
 {
 	if (target.machine == NULL)
 		target.machine = get_host_machine_triple();
@@ -499,8 +545,13 @@ bool target_setup(void)
 		free(target.machine->cpu_type);
 		target.machine->cpu_type = xstrdup("i686");
 	}
+}
 
-	init_defaults_for_target_machine();
+bool target_setup(void)
+{
+	determine_target_machine();
+
+	set_options_for_machine(target.machine);
 
 	bool res = setup_firm_isa();
 	res &= pass_options_to_firm_be();
