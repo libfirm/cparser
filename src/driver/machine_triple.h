@@ -19,14 +19,4 @@ machine_triple_t *parse_machine_triple(const char *triple_string);
 
 void free_machine_triple(machine_triple_t *triple);
 
-bool is_unixish_os(const char *operating_system);
-
-bool is_elf_os(const char *operating_system);
-
-bool is_darwin_os(const char *operating_system);
-
-bool is_windows_os(const char *operating_system);
-
-bool is_ia32_cpu(const char *architecture);
-
 #endif

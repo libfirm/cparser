@@ -37,6 +37,13 @@ typedef struct c_dialect_t {
 	bool               cpp            : 1;
 	bool               gnu            : 1;
 	bool               ms             : 1;
+	bool               long_double_x87_80bit_float : 1;
+	unsigned char      long_double_size;
+	unsigned char      long_long_and_double_struct_align;
+	unsigned char      long_long_size;
+	unsigned char      int_size;
+	unsigned char      pointer_size;
+	unsigned char      long_size;
 	lang_features_t    features;
 } c_dialect_t;
 

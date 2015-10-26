@@ -8,37 +8,6 @@
 #include "adt/strutil.h"
 #include "adt/xmalloc.h"
 
-bool is_unixish_os(const char *os)
-{
-	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
-	    || strstart(os, "solaris");
-}
-
-bool is_elf_os(const char *os)
-{
-	return is_unixish_os(os) || streq(os, "elf") || streq(os, "octopos")
-	    || streq(os, "irtss");
-}
-
-bool is_darwin_os(const char *os)
-{
-	return strstart(os, "darwin");
-}
-
-bool is_windows_os(const char *os)
-{
-	return strstart(os, "mingw") || streq(os, "win32");
-}
-
-bool is_ia32_cpu(const char *architecture)
-{
-	return streq(architecture, "i386")
-	    || streq(architecture, "i486")
-	    || streq(architecture, "i586")
-	    || streq(architecture, "i686")
-	    || streq(architecture, "i786");
-}
-
 machine_triple_t *get_host_machine_triple(void)
 {
 #ifdef HOST_TRIPLE

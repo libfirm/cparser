@@ -1041,12 +1041,21 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
 	if (flags & ATOMIC_TYPE_FLAG_FLOAT) {
+		if (kind == ATOMIC_TYPE_LONG_DOUBLE
+		 && dialect.long_double_x87_80bit_float) {
+			assert(size == 12 || size == 16);
+			return new_float_mode("F80", irma_x86_extended_float, 15, 64,
+			                      target.float_int_overflow);
+		}
 		switch (size) {
 		case 4:
 			return new_float_mode("F32", irma_ieee754, 8, 23,
 			                      target.float_int_overflow);
 		case 8:
 			return new_float_mode("F64", irma_ieee754, 11, 52,
+			                      target.float_int_overflow);
+		case 16:
+			return new_float_mode("F128", irma_ieee754, 15, 112,
 			                      target.float_int_overflow);
 		default: panic("unexpected kind");
 		}
