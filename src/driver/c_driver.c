@@ -53,11 +53,6 @@
 #define SYSTEM_INCLUDE_DIR NULL
 #endif
 
-c_dialect_t dialect = {
-	.features       = _C89 | _C99 | _GNUC, /* TODO/FIXME should not be inited */
-	.char_is_signed = true,
-};
-
 static const char *compiler_include_dir = COMPILER_INCLUDE_DIR;
 static const char *local_include_dir    = LOCAL_INCLUDE_DIR;
 static const char *system_include_dir   = SYSTEM_INCLUDE_DIR;

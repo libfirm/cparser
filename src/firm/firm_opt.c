@@ -696,6 +696,10 @@ void init_gen_firm(void)
 	ir_init();
 	enable_safe_defaults();
 
+#ifdef NO_DEFAULT_VERIFY
+	set_be_option("verify=off");
+#endif
+
 	FOR_EACH_OPT(i) {
 		i->timer = ir_timer_new();
 		timer_register(i->timer, i->description);

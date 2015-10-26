@@ -81,6 +81,8 @@ typedef struct target_t {
 	bool enable_main_collect2_hack : 1;
 	ENUMBF(object_format_t) object_format : 2;
 	target_define_t  *defines;
+	const char       *firm_isa;
+	const char       *firm_arch;
 	/** parsed machine-triple of target machine. Try not to use this if possible
 	 * but create specific variables for language/target features instead. */
 	machine_triple_t *machine;

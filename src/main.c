@@ -300,13 +300,22 @@ int main(int argc, char **argv)
 	memset(&state, 0, sizeof(state));
 	state.argc   = argc;
 	state.argv   = argv;
-	state.i      = 1;
 	state.action = action_compile;
 
-	options_parse_early(&state);
+	/* do early option parsing */
+	for (state.i = 1; state.i < argc; ++state.i) {
+		if (options_parse_early_target(&state)
+		 || options_parse_early_codegen(&state))
+			state.argv[state.i] = NULL;
+	}
+
+	/* Setup target so later options can override the target defaults */
+	target_set_defaults();
 
 	/* parse rest of options */
 	for (state.i = 1; state.i < argc; ++state.i) {
+		if (state.argv[state.i] == NULL)
+			continue;
 		if (options_parse_assembler(&state)
 		 || options_parse_c_dialect(&state)
 		 || options_parse_codegen(&state)
@@ -315,7 +324,6 @@ int main(int argc, char **argv)
 		 || options_parse_driver(&state)
 		 || options_parse_help(&state)
 		 || options_parse_linker(&state)
-		 || options_parse_meta(&state)
 		 || options_parse_preprocessor(&state)) {
 			continue;
 		}

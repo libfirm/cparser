@@ -31,7 +31,6 @@
 
 codegen_option_t  *codegen_options        = NULL;
 codegen_option_t **codegen_options_anchor = &codegen_options;
-char               firm_isa[16];
 bool               profile_generate;
 bool               profile_use;
 
@@ -398,13 +397,20 @@ bool options_parse_codegen(options_state_t *s)
 			set_default_visibility(visibility);
 		}
 	} else if (option[0] == 'b') {
-		if ((arg = equals_arg("bisa=", s)) != NULL) {
-			snprintf(firm_isa, sizeof(firm_isa), "%s", arg);
-		}
 		if (!be_parse_arg(&option[1])) {
 			errorf(NULL, "invalid backend option '%s' (unknown option or invalid argument)",
 			       full_option);
 			s->argument_errors = true;
+		} else if ((arg = equals_arg("bisa=", s)) != NULL) {
+			/* This is a quick and dirty option to try out new firm targets.
+			 * Sooner rather than later the new target should be added properly
+			 * to target.c! */
+			target.firm_isa = arg;
+			const backend_params *be_params = be_get_backend_param();
+			dialect.pointer_size = be_params->machine_size / 8;
+			dialect.long_size = dialect.pointer_size;
+			target.byte_order_big_endian = be_params->byte_order_big_endian;
+			target.float_int_overflow = be_params->float_int_overflow;
 		}
 	} else if (streq(option, "-unroll-loops")) {
 		/* ignore (gcc compatibility) */
@@ -631,7 +637,7 @@ static bool parse_target_triple(const char *arg)
 	return true;
 }
 
-bool options_parse_meta(options_state_t *s)
+bool options_parse_early_target(options_state_t *s)
 {
 	const char *full_option = s->argv[s->i];
 	if (full_option[0] != '-')
@@ -650,6 +656,14 @@ bool options_parse_meta(options_state_t *s)
 		} else {
 			s->argument_errors = true;
 		}
+		/* remove argument so we do not parse it again in later phases */
+		s->argv[s->i-1] = NULL;
+	} else if (streq(option, "m64") || streq(option, "m32")
+	        || streq(option, "m16")) {
+		driver_add_flag(&cppflags_obst, full_option);
+		driver_add_flag(&asflags_obst, full_option);
+		driver_add_flag(&ldflags_obst, full_option);
+		target_size_override = atoi(option+1);
 	} else {
 		bool truth_value;
 		const char *fopt;
@@ -665,44 +679,42 @@ bool options_parse_meta(options_state_t *s)
 			return false;
 		}
 	}
+	/* Remove argument so we do not parse it again in later phases */
+	s->argv[s->i] = NULL;
 	return true;
 }
 
-void options_parse_early(options_state_t *state)
+bool options_parse_early_codegen(options_state_t *s)
 {
-	// disable backend verifiaction
-#ifdef NO_DEFAULT_VERIFY
-	be_parse_arg("verify=off");
-#endif
+	const char *full_option = s->argv[s->i];
+	if (full_option[0] != '-')
+		return false;
+	const char *option = &full_option[1];
 
-	unsigned opt_level = 1;
-	bool     opt_size  = false;
-	for (int i = 1; i < state->argc; ++i) {
-		const char *arg = state->argv[i];
-		if (arg[0] != '-')
-			continue;
-
-		const char *option = &arg[1];
-		if (option[0] == 'O') {
-			char const *const opt = option + 1;
-			if ('0' <= opt[0] && opt[0] <= '9' && opt[1] == '\0') {
-				opt_level = opt[0] - '0';
-			} else if (opt[0] == '\0') {
-				opt_level = 1; /* '-O' is equivalent to '-O1'. */
-			} else if (streq(opt, "fast")) {
-				opt_level = 3; /* TODO stub. */
-			} else if (streq(opt, "g")) {
-				opt_level = 0; /* TODO stub. */
-			} else if (streq(opt, "s")) {
-				opt_level = 2; /* TODO For now, until we have a real '-Os'. */
-				opt_size  = true;
-			} else {
-				errorf(NULL, "invalid optimization option '%s'", arg);
-				state->argument_errors = true;
-			}
+	if (option[0] == 'O') {
+		char const *const opt = &option[1];
+		unsigned opt_level;
+		if ('0' <= opt[0] && opt[0] <= '9' && opt[1] == '\0') {
+			opt_level = opt[0] - '0';
+		} else if (opt[0] == '\0') {
+			opt_level = 1; /* '-O' is equivalent to '-O1'. */
+		} else if (streq(opt, "fast")) {
+			opt_level = 3; /* TODO stub. */
+		} else if (streq(opt, "g")) {
+			opt_level = 0; /* TODO stub. */
+		} else if (streq(opt, "s")) {
+			opt_level = 2; /* TODO For now, until we have a real '-Os'. */
+			predef_optimize_size = true;
+		} else {
+			errorf(NULL, "invalid optimization option '%s'", full_option);
+			s->argument_errors = true;
+			return false;
 		}
-	}
-	choose_optimization_pack(opt_level);
-	predef_optimize      = opt_level > 0;
-	predef_optimize_size = opt_size;
+		choose_optimization_pack(opt_level);
+		predef_optimize      = opt_level > 0;
+	} else
+		return false;
+	/* Remove argument so we do not parse it again in later phases */
+	s->argv[s->i] = NULL;
+	return true;
 }

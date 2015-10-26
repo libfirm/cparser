@@ -10,6 +10,7 @@
 #include "machine_triple.h"
 #include "options.h"
 
+void target_set_defaults(void);
 bool target_setup(void);
 void warn_experimental_target(void);
 
@@ -24,9 +25,9 @@ struct codegen_option_t {
 
 extern codegen_option_t  *codegen_options;
 extern codegen_option_t **codegen_options_anchor;
-extern char               firm_isa[16];
 extern bool               profile_generate;
 extern bool               profile_use;
 extern const char        *multilib_directory_target_triple;
+extern unsigned           target_size_override;
 
 #endif

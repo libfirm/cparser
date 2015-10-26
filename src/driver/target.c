@@ -18,10 +18,21 @@
 #include "target.h"
 #include "warning.h"
 
+c_dialect_t dialect = {
+	.features           = _C89 | _C99 | _GNUC, /* TODO: should not be inited */
+	.char_is_signed     = true,
+	.long_long_size     = 8,
+	.pointer_sized_int  = ATOMIC_TYPE_LONG,
+	.pointer_sized_uint = ATOMIC_TYPE_ULONG,
+	.wchar_atomic_kind  = ATOMIC_TYPE_INT,
+};
 target_t target = {
-	.pic_mode = -1,
+	.biggest_alignment = 16,
+	.pic_mode          = -1,
+	.user_label_prefix = "",
 };
 const char *multilib_directory_target_triple;
+unsigned target_size_override;
 static const char *experimental_backend;
 
 void target_adjust_types_and_dialect(void)
@@ -135,7 +146,6 @@ static void init_generic_elf(void)
 	set_create_ld_ident(create_name_elf);
 	target.object_format = OBJECT_FORMAT_ELF;
 	set_be_option("ia32-struct_in_reg=no");
-	set_be_option("amd64-x64abi=no");
 }
 
 static void init_unix(void)
@@ -169,6 +179,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	unsigned                              long_double_size;
 	unsigned                              modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
+	const char                           *firm_isa;
 	/* i386, i486, i586, i686, i786 */
 	if (is_ia32_cpu(cpu)) {
 		ppdefc("i386",     "1", cond_not_strict);
@@ -197,10 +208,12 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			ppdef("__pentium4__",   "1");
 			break;
 		}
+		firm_isa           = "ia32";
 		pointer_size       = 4;
 		modulo_shift       = 32;
 		long_double_size   = 12;
 		float_int_overflow = ir_overflow_indefinite;
+		target.firm_arch   = cpu;
 		/* long long and double has a 4 byte alignment inside structs, this odd
 		 * mode is everywhere except for windows OSes (they will revert it
 		 * below) */
@@ -217,6 +230,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 			ppdef("__leon__", "1");
 			set_be_option("sparc-cpu=leon");
 		}
+		firm_isa           = "sparc";
 		pointer_size       = 4;
 		modulo_shift       = 32;
 		long_double_size   = 16;
@@ -228,6 +242,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		ppdef("__arm__",   "1");
 		if (strstr(os, "eabi") != NULL)
 			ppdef("__ARM_EABI__", "1");
+		firm_isa           = "arm";
 		pointer_size       = 4;
 		modulo_shift       = 256;
 		long_double_size   = 8;
@@ -237,6 +252,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		ppdef("__x86_64__", "1");
 		ppdef("__amd64",    "1");
 		ppdef("__amd64__",  "1");
+		firm_isa           = "amd64";
 		pointer_size       = 8;
 		modulo_shift       = 32;
 		long_double_size   = 16;
@@ -247,19 +263,13 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		exit(EXIT_FAILURE);
 	}
 
-	target.enable_main_collect2_hack = false;
-	target.biggest_alignment         = 16;
-	target.modulo_shift              = modulo_shift;
-	target.float_int_overflow        = float_int_overflow;
-	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
+	target.firm_isa            = firm_isa;
+	target.modulo_shift        = modulo_shift;
+	target.float_int_overflow  = float_int_overflow;
 	dialect.pointer_size       = pointer_size;
 	dialect.int_size           = MIN(pointer_size, 4);
 	dialect.long_size          = MIN(pointer_size, 8);
 	dialect.long_double_size   = long_double_size;
-	dialect.long_long_size     = 8;
-	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
-	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
-	target.user_label_prefix   = "";
 
 	set_compilerlib_name_mangle(compilerlib_name_mangle);
 
@@ -281,9 +291,9 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		set_create_ld_ident(create_name_macho);
 		target.user_label_prefix = "_";
 		target.object_format = OBJECT_FORMAT_MACH_O;
+		target.pic_mode = 2;
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
-		set_be_option("amd64-x64abi=no");
 		dialect.long_double_size = 16;
 		ppdef( "__MACH__",               "1");
 		ppdef( "__APPLE__",              "1");
@@ -294,8 +304,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		ppdef( "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050");
 		ppdef( "__DYNAMIC__",            "1");
 		ppdefc("__LITTLE_ENDIAN__",      "1", cond_is_little_endian);
-		if (target.pic_mode == -1)
-			target.pic_mode = 2;
 	} else if (strstart(os, "mingw")) {
 		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		driver_default_exe_output = "a.exe";
@@ -353,32 +361,6 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		errorf(NULL, "unknown operating system '%s' in target-triple", os);
 		exit(EXIT_FAILURE);
 	}
-
-	if (target.pic_mode == -1)
-		target.pic_mode = 0;
-}
-
-static unsigned get_bitsize_codegen_opt(void)
-{
-	unsigned size = 0;
-	for (codegen_option_t *option = codegen_options; option != NULL;
-	     option = option->next) {
-		const char *opt = option->option;
-		if (opt[0] < '0' || opt[0] > '9')
-			continue;
-		size = atoi(opt);
-	}
-	return size;
-}
-
-static void setup_isa(const char *isa)
-{
-	char buf[64];
-	snprintf(buf, sizeof(buf), "isa=%s", isa);
-	set_be_option(buf);
-
-	if (firm_isa != isa)
-		strcpy(firm_isa, isa);
 }
 
 void warn_experimental_target(void)
@@ -387,39 +369,33 @@ void warn_experimental_target(void)
 		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental_backend);
 }
 
-static void setup_ia32(const char *firm_arch)
-{
-	set_be_option("isa=ia32");
-	char buf[64];
-	snprintf(buf, sizeof(buf), "ia32-arch=%s", firm_arch);
-	set_be_option(buf);
-
-	strcpy(firm_isa, "ia32");
-}
-
 static bool setup_firm_isa(void)
 {
-	if (firm_isa[0] != '\0') {
-		setup_isa(firm_isa);
-		return true;
+	const char *isa = target.firm_isa;
+	char buf[64];
+	snprintf(buf, sizeof(buf), "isa=%s", isa);
+	if (!be_parse_arg(buf)) {
+		errorf(NULL, "Couldn't select firm isa '%s'", isa);
+		return false;
 	}
 
-	const char *cpu = target.machine->cpu_type;
-	if (is_ia32_cpu(cpu)) {
-		setup_ia32(cpu);
-	} else if (streq(cpu, "x86_64")) {
+	const char *arch = target.firm_arch;
+	/* only pass down for ia32 for now */
+	if (arch != NULL && streq(isa, "ia32")) {
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%s-arch=%s", isa, arch);
+		if (!be_parse_arg(buf)) {
+			errorf(NULL, "Couldn't select firm arch '%s-arch=%s'", isa, arch);
+			return false;
+		}
+	}
+
+	if (streq(isa, "amd64")) {
 		experimental_backend
 			= "the x86_64 backend is highly experimental and unfinished (consider the -m32 switch)";
-		setup_isa("amd64");
-	} else if (streq(cpu, "sparc")) {
-		setup_isa("sparc");
-	} else if (streq(cpu, "arm")) {
+	} else if (streq(isa, "arm")) {
 		experimental_backend
 			= "the arm backend is highly experimental and unfinished";
-		setup_isa("arm");
-	} else {
-		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
-		return false;
 	}
 	return true;
 }
@@ -441,7 +417,7 @@ static bool pass_options_to_firm_be(void)
 	}
 	if (target.pic_mode > 0) {
 		set_be_option("pic=true");
-		if (streq(firm_isa, "ia32")) {
+		if (streq(target.firm_isa, "ia32")) {
 			const char *option;
 			if (target.object_format == OBJECT_FORMAT_MACH_O) {
 				option = "ia32-pic=mach-o";
@@ -464,19 +440,17 @@ static bool pass_options_to_firm_be(void)
 		char        buf[256];
 		const char *opt = option->option;
 		/* pass option along to firm backend (except the -m32, -m64 stuff) */
-		if (opt[0] < '0' || opt[0] > '9') {
-			snprintf(buf, sizeof(buf), "%s-%s", firm_isa, opt);
-			if (be_parse_arg(buf) == 0) {
-				errorf(NULL, "Unknown codegen option '-m%s'", opt);
-				res = false;
-				continue;
-			}
+		snprintf(buf, sizeof(buf), "%s-%s", target.firm_isa, opt);
+		if (be_parse_arg(buf) == 0) {
+			errorf(NULL, "Unknown codegen option '-m%s'", opt);
+			res = false;
+			continue;
 		}
 
 		/* hack to emulate the behaviour of some gcc spec files which filter
 		 * flags to pass to cpp/ld/as */
 		static char const *const pass_to_cpp_and_ld[] = {
-			"soft-float", "32", "64", "16"
+			"soft-float"
 		};
 		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
 			if (streq(pass_to_cpp_and_ld[i], option->option)) {
@@ -546,21 +520,23 @@ static void determine_target_machine(void)
 		target.machine = get_host_machine_triple();
 	/* adjust for -m32/-m64 flag */
 	const char *cpu = target.machine->cpu_type;
-	if (is_ia32_cpu(cpu) && get_bitsize_codegen_opt() == 64) {
+	if (is_ia32_cpu(cpu) && target_size_override == 64) {
 		free(target.machine->cpu_type);
 		target.machine->cpu_type = xstrdup("x86_64");
-	} else if (streq(cpu, "x86_64") && get_bitsize_codegen_opt() == 32) {
+	} else if (streq(cpu, "x86_64") && target_size_override == 32) {
 		free(target.machine->cpu_type);
 		target.machine->cpu_type = xstrdup("i686");
 	}
 }
 
-bool target_setup(void)
+void target_set_defaults(void)
 {
 	determine_target_machine();
-
 	set_options_for_machine(target.machine);
+}
 
+bool target_setup(void)
+{
 	bool res = setup_firm_isa();
 	res &= pass_options_to_firm_be();
 
