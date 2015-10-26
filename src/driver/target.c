@@ -253,6 +253,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	target.enable_main_collect2_hack = false;
 	target.biggest_alignment         = 16;
 	target.modulo_shift              = modulo_shift;
+	target.float_int_overflow        = float_int_overflow;
 	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
 	dialect.pointer_size       = pointer_size;
 	dialect.int_size           = MIN(pointer_size, 4);
