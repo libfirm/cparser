@@ -658,7 +658,8 @@ bool options_parse_early_target(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
-	} else if ((arg = spaced_arg("target", s, false)) != NULL) {
+	} else if ((arg = spaced_arg("target", s, false)) != NULL ||
+			   (arg = equals_arg("-target=", s)) != NULL) {
 		if (parse_target_triple(arg)) {
 			target.triple = arg;
 		} else {
