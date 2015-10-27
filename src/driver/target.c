@@ -486,6 +486,9 @@ static machine_triple_t *get_host_machine_triple(void)
 	machine->cpu_type = xstrdup("sparc");
 #elif defined(__arm__)
 	machine->cpu_type = xstrdup("arm");
+#else
+	/* Choose a widely used cpu_type; "unknown" would not be useful here. */
+	machine->cpu_type = xstrdup("i386");
 #endif
 
 #if defined(__leon__)
