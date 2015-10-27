@@ -9219,7 +9219,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 		if (*c == '%') {
 			/* scan forward to see if we can find a [] */
 			const char *b = c+1;
-			while (*b != '\0' && *b != '%' && *b != '[' && (*b < '0' || *b > '9')) {
+			while (*b != '\0' && *b != '%' && *b != '[' && !is_digit(*b)) {
 				++b;
 			}
 			if (*b == '[') {

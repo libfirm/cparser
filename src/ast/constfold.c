@@ -75,8 +75,7 @@ static bool is_valid_strold_input(const char *string)
 				return false;
 			/* hex number */
 			for (const char *c = string+2; *c != '\0'; ++c) {
-				if ((*c < '0' || *c > '9') && (*c < 'a' || *c > 'f')
-				    && (*c < 'A' || *c > 'F'))
+				if (!is_digit(*c) && (*c < 'a' || *c > 'f') && (*c < 'A' || *c > 'F'))
 				    return false;
 			}
 		} else {
@@ -89,7 +88,7 @@ static bool is_valid_strold_input(const char *string)
 	} else {
 		/* decimal number */
 		for (const char *c = string; *c != '\0'; ++c) {
-			if (*c < '0' || *c > '9')
+			if (!is_digit(*c))
 				return false;
 		}
 	}

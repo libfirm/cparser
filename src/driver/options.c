@@ -707,7 +707,7 @@ bool options_parse_early_codegen(options_state_t *s)
 	if (option[0] == 'O') {
 		char const *const opt = &option[1];
 		unsigned opt_level;
-		if ('0' <= opt[0] && opt[0] <= '9' && opt[1] == '\0') {
+		if (is_digit(opt[0]) && opt[1] == '\0') {
 			opt_level = opt[0] - '0';
 		} else if (opt[0] == '\0') {
 			opt_level = 1; /* '-O' is equivalent to '-O1'. */
