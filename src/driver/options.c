@@ -658,8 +658,7 @@ bool options_parse_early_target(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
-	} else if ((arg = spaced_arg("target", s, false)) != NULL ||
-			   (arg = equals_arg("-target=", s)) != NULL) {
+	} else if ((arg = spaced_arg("target", s, false)) != NULL) {
 		if (parse_target_triple(arg)) {
 			target.triple = arg;
 		} else {
@@ -667,6 +666,12 @@ bool options_parse_early_target(options_state_t *s)
 		}
 		/* remove argument so we do not parse it again in later phases */
 		s->argv[s->i-1] = NULL;
+	} else if ((arg = equals_arg("-target=", s)) != NULL) {
+		if (parse_target_triple(arg)) {
+			target.triple = arg;
+		} else {
+			s->argument_errors = true;
+		}
 	} else if (streq(option, "m64") || streq(option, "m32")
 	        || streq(option, "m16")) {
 		driver_add_flag(&cppflags_obst, full_option);
@@ -689,7 +694,6 @@ bool options_parse_early_target(options_state_t *s)
 		}
 	}
 	/* Remove argument so we do not parse it again in later phases */
-	s->argv[s->i] = NULL;
 	return true;
 }
 
@@ -724,6 +728,5 @@ bool options_parse_early_codegen(options_state_t *s)
 	} else
 		return false;
 	/* Remove argument so we do not parse it again in later phases */
-	s->argv[s->i] = NULL;
 	return true;
 }
