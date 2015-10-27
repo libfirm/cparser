@@ -53,8 +53,10 @@ typedef enum object_format_t {
 	OBJECT_FORMAT_PE_COFF,
 } object_format_t;
 
-/** Name+Value of a target specific preprocessor design. This is necessary to
- * avoid doing target specific decisions outside of target.c */
+/**
+ * Name+Value of a target specific preprocessor define. This is necessary to
+ * avoid doing target specific decisions outside of target.c
+ */
 typedef struct target_define_t target_define_t;
 struct target_define_t {
 	char      const *name;
