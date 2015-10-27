@@ -354,19 +354,12 @@ static void print_modifiers(decl_modifiers_t const modifiers)
 		{ DM_LEAF,              "leaf"              },
 		{ DM_PACKED,            "packed"            },
 	};
-	bool have_attribute = false;
+	separator_t sep = { " __attribute__((", ", " };
 	for (size_t i = 0; i < ARRAY_SIZE(modifiernames); ++i) {
-		if ((modifiers & modifiernames[i].bit) == 0)
-			continue;
-		if (!have_attribute) {
-			print_string(" __attribute__((");
-			have_attribute = true;
-		} else {
-			print_string(", ");
-		}
-		print_format("__%s__", modifiernames[i].name);
+		if (modifiers & modifiernames[i].bit)
+			print_format("%s__%s__", sep_next(&sep), modifiernames[i].name);
 	}
-	if (have_attribute)
+	if (!sep_at_first(&sep))
 		print_string("))");
 }
 
