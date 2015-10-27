@@ -327,6 +327,49 @@ restart:
 	}
 }
 
+static void print_modifiers(decl_modifiers_t const modifiers)
+{
+	if (modifiers == 0)
+		return;
+
+	static const struct {
+		unsigned bit;
+		const char *name;
+	} modifiernames[] = {
+		{ DM_NAKED,             "naked"             },
+		{ DM_NOTHROW,           "nothrow"           },
+		{ DM_NORETURN,          "noreturn"          },
+		{ DM_NOINLINE,          "noinline"          },
+		{ DM_NOALIAS,           "noalias"           },
+		{ DM_TRANSPARENT_UNION, "transparent_union" },
+		{ DM_CONST,             "const"             },
+		{ DM_PURE,              "pure"              },
+		{ DM_CONSTRUCTOR,       "constructor"       },
+		{ DM_DESTRUCTOR,        "destructor"        },
+		{ DM_UNUSED,            "unused"            },
+		{ DM_USED,              "used"              },
+		{ DM_RETURNS_TWICE,     "returns_twice"     },
+		{ DM_MALLOC,            "malloc"            },
+		{ DM_WEAK,              "weak"              },
+		{ DM_LEAF,              "leaf"              },
+		{ DM_PACKED,            "packed"            },
+	};
+	bool have_attribute = false;
+	for (size_t i = 0; i < ARRAY_SIZE(modifiernames); ++i) {
+		if ((modifiers & modifiernames[i].bit) == 0)
+			continue;
+		if (!have_attribute) {
+			print_string(" __attribute__((");
+			have_attribute = true;
+		} else {
+			print_string(", ");
+		}
+		print_format("__%s__", modifiernames[i].name);
+	}
+	if (have_attribute)
+		print_string("))");
+}
+
 /**
  * Print the second part (the postfix) of a type.
  *
@@ -366,6 +409,7 @@ static void print_function_type_post(const function_type_t *type,
 		print_string("void");
 	}
 	print_char(')');
+	print_modifiers(type->modifiers);
 
 	intern_print_type_post(type->return_type);
 }
@@ -514,9 +558,7 @@ void print_compound_definition(const compound_t *compound)
 	change_indent(-1);
 	print_indent();
 	print_char('}');
-	if (compound->modifiers & DM_TRANSPARENT_UNION) {
-		print_string("__attribute__((__transparent_union__))");
-	}
+	print_modifiers(compound->modifiers);
 }
 
 /**
