@@ -111,7 +111,7 @@ static void set_be_option(const char *arg)
 /** Add a target specific preprocessor define. */
 static target_define_t *ppdef(const char *name, const char *value)
 {
-	target_define_t *define = calloc(1, sizeof(*define));
+	target_define_t *define = XMALLOCZ(target_define_t);
 	define->name = name;
 	define->value = value;
 	define->next = target.defines;
