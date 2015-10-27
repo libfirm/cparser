@@ -87,11 +87,19 @@ const char *spaced_arg(const char *arg, options_state_t *s,
 static const char *equals_arg(const char *prefix, options_state_t *s)
 {
 	const char *option = &s->argv[s->i][1];
-	if (!strstart(option, prefix))
-		return NULL;
+	size_t prefix_len = strlen(prefix);
+	assert(prefix[prefix_len-1] == '=');
+	for (size_t i = 0; i < prefix_len; ++i) {
+		if (option[i] != prefix[i]) {
+			if (i == prefix_len-1 && option[i] == '\0')
+				goto expected_argument;
+			return NULL;
+		}
+	}
 
-	const char *arg = option + strlen(prefix);
+	const char *arg = option + prefix_len;
 	if (arg[0] == '\0') {
+expected_argument:
 		errorf(NULL, "expected argument after '-%s'", prefix);
 		s->argument_errors = true;
 		return NULL;
