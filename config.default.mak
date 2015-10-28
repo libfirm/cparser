@@ -5,10 +5,13 @@ FIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
 FIRM_LIBS     ?= -lm
 LIBFIRM_FILE_BASE ?= build/$(variant)/libfirm.a
 LIBFIRM_FILE  ?= $(FIRM_HOME)/$(LIBFIRM_FILE_BASE)
+LIBFIRM_FILE_DLL_BASE ?= build/$(variant)/libfirm$(DLLEXT)
+LIBFIRM_FILE_DLL ?= $(FIRM_HOME)/$(LIBFIRM_FILE_DLL_BASE)
 else
 FIRM_CPPFLAGS ?= `pkg-config --cflags libfirm`
 FIRM_LIBS     ?= `pkg-config --libs libfirm`
 LIBFIRM_FILE =
+LIBFIRM_FILE_DLL =
 endif
 
 ifeq ("$(shell uname)", "Darwin")

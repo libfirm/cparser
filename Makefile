@@ -12,6 +12,8 @@ srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
 
 AR ?= ar
+DLLEXT ?= .so
+LINK ?= $(CC)
 
 CPPFLAGS  = -I$(top_srcdir)/src -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
 CPPFLAGS += $(FIRM_CPPFLAGS)
@@ -31,6 +33,7 @@ libcparser_SOURCES := $(wildcard $(top_srcdir)/src/*/*.c)
 libcparser_OBJECTS = $(libcparser_SOURCES:%.c=$(builddir)/%.o)
 libcparser_DEPS    = $(libcparser_OBJECTS:%.o=%.d)
 libcparser_A       = $(builddir)/libcparser.a
+libcparser_DLL     = $(builddir)/libcparser$(DLLEXT)
 
 cparser_SOURCES = main.c $(libcparser_SOURCES)
 cparser_OBJECTS = $(cparser_SOURCES:%.c=$(builddir)/%.o)
@@ -73,11 +76,15 @@ QUICKCHECK_FLAGS ?= -Wno-shadow
 
 $(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo 'LD $@'
-	$(Q)$(CC) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $@ $(LINKFLAGS)
+	$(Q)$(LINK) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $@ $(LINKFLAGS)
 
 $(libcparser_A): $(libcparser_OBJECTS)
 	@echo 'AR $@'
 	$(Q)$(AR) -crsu $@ $^
+
+$(libcparser_DLL): $(libcparser_OBJECTS) $(LIBFIRM_FILE_DLL)
+	@echo 'LINK $@'
+	$(Q)$(LINK) -shared $^ $(LINKFLAGS) -o "$@"
 
 ifneq ("$(LIBFIRM_FILE)", "")
 ifneq ("$(MAKECMDGOALS)", "clean")
@@ -87,6 +94,10 @@ Makefile: libfirm_subdir
 # Build libfirm in subdirectory
 libfirm_subdir:
 	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE_BASE)
+
+$(LIBFIRM_FILE_DLL): libfirm_subdir_dll
+libfirm_subdir_dll:
+	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE_DLL_BASE)
 endif
 endif
 
