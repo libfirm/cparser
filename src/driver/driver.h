@@ -5,8 +5,8 @@
 #ifndef DRIVER_H
 #define DRIVER_H
 
+#include <stdbool.h>
 #include "adt/obst.h"
-#include "ast/ast.h"
 #include "tempfile.h"
 
 typedef enum compilation_unit_type_t {
