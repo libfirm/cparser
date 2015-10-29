@@ -2097,6 +2097,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	if (enter_jump_target(&true_target)) {
 		if (expression->true_expression) {
 			val = expression_to_value(expression->true_expression);
+		} else if (!mode) {
+			val = NULL;
 		} else if (cond_expr) {
 			val = cond_expr;
 		} else {
