@@ -4042,6 +4042,12 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 		return entity;
 	}
 
+	if (previous->kind == ENTITY_FUNCTION && previous->function.btk != BUILTIN_NONE) {
+		/* Silently allow redefining builtins. */
+		add_entity(entity);
+		return entity;
+	}
+
 	if (current_function != NULL
 	 && previous->base.parent_scope == &current_function->parameters
 	 && previous->base.parent_scope->depth+1 == current_scope->depth) {
@@ -4111,6 +4117,8 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	if (!types_compatible(type, prev_type)) {
 		errorf(pos, "declaration '%#N' is incompatible with '%#N'", entity, previous);
 		note_prev_decl(previous);
+		merge_into_decl(previous, entity);
+		return previous;
 	} else {
 		unsigned old_storage_class = prev_decl->storage_class;
 		maybe_warn_unnecessary_static_forward_declaration(previous, is_definition);
