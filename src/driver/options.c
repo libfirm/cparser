@@ -643,6 +643,7 @@ static bool parse_target_triple(const char *arg)
 		return false;
 	}
 	target.machine = triple;
+	target.triple  = arg;
 	return true;
 }
 
@@ -660,19 +661,13 @@ bool options_parse_early_target(options_state_t *s)
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
 	} else if ((arg = spaced_arg("target", s, false)) != NULL) {
-		if (parse_target_triple(arg)) {
-			target.triple = arg;
-		} else {
+		if (!parse_target_triple(arg))
 			s->argument_errors = true;
-		}
 		/* remove argument so we do not parse it again in later phases */
 		s->argv[s->i-1] = NULL;
 	} else if ((arg = equals_arg("-target", s)) != NULL) {
-		if (parse_target_triple(arg)) {
-			target.triple = arg;
-		} else {
+		if (!parse_target_triple(arg))
 			s->argument_errors = true;
-		}
 	} else if (streq(option, "m64") || streq(option, "m32")
 	        || streq(option, "m16")) {
 		driver_add_flag(&cppflags_obst, full_option);
