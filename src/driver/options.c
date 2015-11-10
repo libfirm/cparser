@@ -86,25 +86,21 @@ const char *spaced_arg(const char *arg, options_state_t *s,
 
 static const char *equals_arg(const char *prefix, options_state_t *s)
 {
-	const char *option = &s->argv[s->i][1];
-	size_t prefix_len = strlen(prefix);
-	assert(prefix[prefix_len-1] == '=');
-	for (size_t i = 0; i < prefix_len; ++i) {
-		if (option[i] != prefix[i]) {
-			if (i == prefix_len-1 && option[i] == '\0')
-				goto expected_argument;
-			return NULL;
+	char const *const option = &s->argv[s->i][1];
+	char const *const equals = strstart(option, prefix);
+	if (equals) {
+		if (equals[0] == '=') {
+			char const *const arg = equals + 1;
+			if (arg[0] != '\0')
+				return arg;
+			errorf(NULL, "expected argument after '-%s'", option);
+			s->argument_errors = true;
+		} else if (equals[0] == '\0') {
+			errorf(NULL, "expected '=' and argument after '-%s'", option);
+			s->argument_errors = true;
 		}
 	}
-
-	const char *arg = option + prefix_len;
-	if (arg[0] == '\0') {
-expected_argument:
-		errorf(NULL, "expected argument after '-%s'", prefix);
-		s->argument_errors = true;
-		return NULL;
-	}
-	return arg;
+	return NULL;
 }
 
 static const char *f_no_arg(bool *truth_value, options_state_t *s)
@@ -185,7 +181,7 @@ add_arg_opt:
 	} else if (streq(option, "nostdinc")) {
 		driver_no_stdinc = true;
 		driver_add_flag(&cppflags_obst, "-%s", option);
-	} else if ((arg = equals_arg("finput-charset=", s)) != NULL) {
+	} else if ((arg = equals_arg("finput-charset", s)) != NULL) {
 		input_decoder = input_get_decoder(arg);
 		if (input_decoder == NULL) {
 			errorf(NULL, "input encoding \"%s\" not supported", arg);
@@ -258,7 +254,7 @@ bool options_parse_driver(options_state_t *s)
 		}
 	} else if (streq(option, "pipe")) {
 		/* here for gcc compatibility */
-	} else if ((arg = equals_arg("std=", s)) != NULL) {
+	} else if ((arg = equals_arg("std", s)) != NULL) {
 		standard =
 			streq(arg, "c++")            ? STANDARD_CXX98   :
 			streq(arg, "c++98")          ? STANDARD_CXX98   :
@@ -311,9 +307,9 @@ bool options_parse_driver(options_state_t *s)
 	} else if (streq(option, "-statev")) {
 		do_timing      = true;
 		produce_statev = true;
-	} else if ((arg = equals_arg("-filtev=", s)) != NULL) {
+	} else if ((arg = equals_arg("-filtev", s)) != NULL) {
 		filtev = arg;
-	} else if ((arg = equals_arg("print-file-name=", s)) != NULL) {
+	} else if ((arg = equals_arg("print-file-name", s)) != NULL) {
 		print_file_name_file = arg;
 		s->action = action_print_file_name;
 	} else if (streq(option, "version") || streq(option, "-version")) {
@@ -391,12 +387,12 @@ bool options_parse_codegen(options_state_t *s)
 	const char *option = &full_option[1];
 
 	const char *arg;
-	if ((arg = equals_arg("falign-loops=", s)) != NULL
-	 || (arg = equals_arg("falign-jumps=", s)) != NULL
-	 || (arg = equals_arg("falign-functions=", s)) != NULL) {
+	if ((arg = equals_arg("falign-loops", s)) != NULL
+	 || (arg = equals_arg("falign-jumps", s)) != NULL
+	 || (arg = equals_arg("falign-functions", s)) != NULL) {
 		warningf(WARN_COMPAT_OPTION, NULL,
 		         "ignoring gcc option '%s'", full_option);
-	} else if ((arg = equals_arg("fvisibility=", s)) != NULL) {
+	} else if ((arg = equals_arg("fvisibility", s)) != NULL) {
 		elf_visibility_t visibility = get_elf_visibility_from_string(arg);
 		if (visibility == ELF_VISIBILITY_ERROR) {
 			errorf(NULL, "invalid visibility '%s' specified", arg);
@@ -409,7 +405,7 @@ bool options_parse_codegen(options_state_t *s)
 			errorf(NULL, "invalid backend option '%s' (unknown option or invalid argument)",
 			       full_option);
 			s->argument_errors = true;
-		} else if ((arg = equals_arg("bisa=", s)) != NULL) {
+		} else if ((arg = equals_arg("bisa", s)) != NULL) {
 			/* This is a quick and dirty option to try out new firm targets.
 			 * Sooner rather than later the new target should be added properly
 			 * to target.c! */
@@ -533,7 +529,7 @@ bool options_parse_diagnostics(options_state_t *s)
 	} else if (option[0] == 'f') {
 		const char *arg;
 
-		if ((arg = equals_arg("message-length=", s)) != NULL) {
+		if ((arg = equals_arg("message-length", s)) != NULL) {
 			(void)arg;
 			/* not supported yet */
 		} else {
@@ -666,7 +662,7 @@ bool options_parse_early_target(options_state_t *s)
 		}
 		/* remove argument so we do not parse it again in later phases */
 		s->argv[s->i-1] = NULL;
-	} else if ((arg = equals_arg("-target=", s)) != NULL) {
+	} else if ((arg = equals_arg("-target", s)) != NULL) {
 		if (parse_target_triple(arg)) {
 			target.triple = arg;
 		} else {
