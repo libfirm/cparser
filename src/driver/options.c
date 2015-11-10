@@ -65,23 +65,19 @@ static const char *prefix_arg(const char *prefix, options_state_t *s)
 const char *spaced_arg(const char *arg, options_state_t *s,
                        bool arg_may_be_option)
 {
-	const char *option = &s->argv[s->i][1];
-	if (!streq(option, arg))
-		return NULL;
-
-	if (s->i+1 >= s->argc) {
+	char const *const option = &s->argv[s->i][1];
+	if (streq(option, arg)) {
+		if (s->i + 1 < s->argc) {
+			char const *const res = s->argv[s->i + 1];
+			if (arg_may_be_option || res[0] != '-' || res[1] == '\0') {
+				++s->i;
+				return res;
+			}
+		}
 		errorf(NULL, "expected argument after '-%s'", arg);
 		s->argument_errors = true;
-		return NULL;
 	}
-	const char *res = s->argv[s->i+1];
-	if (!arg_may_be_option && res[0] == '-' && res[1] != '\0') {
-		errorf(NULL, "expected argument after '-%s'", arg);
-		s->argument_errors = true;
-		return NULL;
-	}
-	++s->i;
-	return res;
+	return NULL;
 }
 
 static const char *equals_arg(const char *prefix, options_state_t *s)
