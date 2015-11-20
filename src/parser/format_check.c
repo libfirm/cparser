@@ -195,7 +195,7 @@ static bool check_digits_or_star(format_env_t *const env, char const **const pc,
 			return false;
 		}
 		type_t *const arg_type = arg->base.type;
-		if (arg_type != type_int)
+		if (!types_compatible_ignore_qualifiers(skip_typeref(arg_type), type_int))
 			warningf(WARN_FORMAT, env->pos, "argument for '*' %s in conversion specification %u is not an 'int', but an '%T'", ctx, env->num_fmt, arg_type);
 	} else {
 		while (is_digit(**pc)) {
