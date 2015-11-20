@@ -186,6 +186,25 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 	warningf(WARN_FORMAT, apos, "conversion '%%%.*s' at position %u specifies type '%T' but the argument has type '%T'", slen, spec_begin, env->num_fmt, spec_type, arg_type);
 }
 
+static bool check_digits_or_star(format_env_t *const env, char const **const pc, char const *const ctx)
+{
+	if (accept(pc, '*')) {
+		expression_t const *const arg = get_next_arg(env);
+		if (!arg) {
+			warningf(WARN_FORMAT, env->pos, "missing argument for '*' %s in conversion specification %u", ctx, env->num_fmt);
+			return false;
+		}
+		type_t *const arg_type = arg->base.type;
+		if (arg_type != type_int)
+			warningf(WARN_FORMAT, env->pos, "argument for '*' %s in conversion specification %u is not an 'int', but an '%T'", ctx, env->num_fmt, arg_type);
+	} else {
+		while (is_digit(**pc)) {
+			++*pc;
+		}
+	}
+	return true;
+}
+
 /**
  * Check printf-style format. Returns number of expected arguments.
  */
@@ -245,42 +264,16 @@ static char const *check_printf_format(format_env_t *const env, char const *c)
 break_fmt_flags:
 
 		/* minimum field width */
-		if (accept(&c, '*')) {
-			expression_t const *const arg = get_next_arg(env);
-			if (!arg) {
-				warningf(WARN_FORMAT, env->pos, "missing argument for '*' field width in conversion specification %u", env->num_fmt);
-				return NULL;
-			}
-			type_t const *const arg_type = arg->base.type;
-			if (arg_type != type_int)
-				warningf(WARN_FORMAT, env->pos, "argument for '*' field width in conversion specification %u is not an 'int', but an '%T'", env->num_fmt, arg_type);
-		} else {
-			while (is_digit(*c)) {
-				++c;
-			}
-		}
+		if (!check_digits_or_star(env, &c, "field width"))
+			return NULL;
 	}
 
 	/* precision */
 	if (accept(&c, '.')) {
 		if (fmt_flags & FMT_FLAG_ZERO)
 			warningf(WARN_FORMAT, env->pos, "'0' flag ignored with precision in conversion specification %u", env->num_fmt);
-
-		if (accept(&c, '*')) {
-			expression_t const *const arg = get_next_arg(env);
-			if (!arg) {
-				warningf(WARN_FORMAT, env->pos, "missing argument for '*' precision in conversion specification %u", env->num_fmt);
-				return NULL;
-			}
-			type_t const *const arg_type = arg->base.type;
-			if (arg_type != type_int)
-				warningf(WARN_FORMAT, env->pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", env->num_fmt, arg_type);
-		} else {
-			/* digit string may be omitted */
-			while (is_digit(*c)) {
-				++c;
-			}
-		}
+		if (!check_digits_or_star(env, &c, "precision"))
+			return NULL;
 	}
 
 	char              const *const spec_begin = c;
