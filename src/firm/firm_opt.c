@@ -653,6 +653,7 @@ static void do_firm_lowering(void)
 		do_irg_opt(irg, "lower");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "deconv");
+		do_irg_opt(irg, "occults");
 		do_irg_opt(irg, "control-flow");
 		do_irg_opt(irg, "opt-load-store");
 		do_irg_opt(irg, "gcse");
