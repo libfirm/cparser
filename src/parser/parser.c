@@ -10118,11 +10118,11 @@ static void parse_namespace_definition(void)
 		symbol = token.base.symbol;
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
 		if (entity && entity->kind != ENTITY_NAMESPACE) {
-			entity = NULL;
 			if (entity->base.parent_scope == current_scope
 			 && is_entity_valid(entity)) {
 				error_redefined_as_different_kind(HERE, entity, ENTITY_NAMESPACE);
 			}
+			entity = NULL;
 		}
 		eat(T_IDENTIFIER);
 	}
