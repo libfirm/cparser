@@ -3683,7 +3683,7 @@ invalid_storage_class:
 	storage_class_t storage_class = specifiers->storage_class;
 	entity->declaration.declared_storage_class = storage_class;
 
-	if (storage_class == STORAGE_CLASS_NONE && current_function != NULL)
+	if (storage_class == STORAGE_CLASS_NONE && (current_function || flags & DECL_IS_PARAMETER))
 		storage_class = STORAGE_CLASS_AUTO;
 	entity->declaration.storage_class = storage_class;
 
