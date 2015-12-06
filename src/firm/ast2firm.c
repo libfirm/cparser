@@ -3350,7 +3350,7 @@ static ir_initializer_t *get_initializer_entry(type_path_t *path)
 	}
 }
 
-static void descend_into_subtype(type_path_t *path)
+static void descend_into_subtype(type_path_t *path, position_t const *const pos)
 {
 	type_t *orig_top_type = path->top_type;
 	type_t *top_type      = skip_typeref(orig_top_type);
@@ -3378,7 +3378,11 @@ static void descend_into_subtype(type_path_t *path)
 		}
 	} else {
 		assert(is_type_array(top_type));
-		assert(top_type->array.size > 0);
+		if (top_type->array.size == 0) {
+			errorf(pos,
+				   "code generation for flexible arrays initializers not supported");
+			panic("Cannot continue");
+		}
 
 		top->index     = 0;
 		path->top_type = top_type->array.element_type;
@@ -3469,9 +3473,8 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 		}
 		path->top_type = orig_type;
 
-		if (designator->next != NULL) {
-			descend_into_subtype(path);
-		}
+		if (designator->next != NULL)
+			descend_into_subtype(path, &designator->pos);
 	}
 
 	path->invalid  = false;
@@ -3582,7 +3585,7 @@ static ir_initializer_t *create_ir_initializer_list(
 	path.top_type = type;
 	path.path     = NEW_ARR_F(type_path_entry_t, 0);
 
-	descend_into_subtype(&path);
+	descend_into_subtype(&path, &initializer->base.pos);
 
 	for (size_t i = 0; i < initializer->len; ++i) {
 		const initializer_t *sub_initializer = initializer->initializers[i];
@@ -3602,7 +3605,7 @@ static ir_initializer_t *create_ir_initializer_list(
 
 				if (types_compatible(top_type, expr_type))
 					break;
-				descend_into_subtype(&path);
+				descend_into_subtype(&path, &sub_initializer->base.pos);
 			}
 		} else if (sub_initializer->kind == INITIALIZER_STRING) {
 			/* we might have to descend into types until we're at a scalar
@@ -3613,7 +3616,7 @@ static ir_initializer_t *create_ir_initializer_list(
 
 				if (is_string_type(top_type))
 					break;
-				descend_into_subtype(&path);
+				descend_into_subtype(&path, &sub_initializer->base.pos);
 			}
 		}
 
