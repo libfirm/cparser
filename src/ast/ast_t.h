@@ -418,6 +418,7 @@ typedef enum initializer_kind_t {
 
 struct initializer_base_t {
 	initializer_kind_t kind;
+	position_t         pos;
 };
 
 struct initializer_value_t {

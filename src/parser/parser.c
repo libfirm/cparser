@@ -59,6 +59,7 @@ typedef struct parse_initializer_env_t {
 	                         array type with unspecified size this gets
 	                         adjusted to the actual size. */
 	entity_t   *entity; /**< the variable that is initialized if any */
+	position_t  pos;
 	bool        must_be_constant;
 } parse_initializer_env_t;
 
@@ -430,11 +431,25 @@ static size_t get_initializer_size(initializer_kind_t kind)
  * Allocate an initializer node of given kind and initialize all
  * fields with zero.
  */
-static initializer_t *allocate_initializer_zero(initializer_kind_t kind)
+static initializer_t *allocate_initializer_zero(initializer_kind_t kind,
+                                                position_t const *const pos)
 {
 	initializer_t *result = allocate_ast_zero(get_initializer_size(kind));
 	result->kind          = kind;
+	result->base.pos      = *pos;
+	return result;
+}
 
+static initializer_t *allocate_initializer_list(size_t len,
+                                                position_t const *const pos)
+{
+	initializer_t *result;
+	size_t size = sizeof(initializer_list_t)
+	            + len * sizeof(result->list.initializers[0]);
+	result           = allocate_ast_zero(size);
+	result->kind     = INITIALIZER_LIST;
+	result->base.pos = *pos;
+	result->list.len = len;
 	return result;
 }
 
@@ -1472,7 +1487,9 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 			type_t *const init_type = expression->base.type->pointer.points_to;
 			if (types_compatible_ignore_qualifiers(element_type, init_type)) {
 make_string_init:;
-				initializer_t *const init = allocate_initializer_zero(INITIALIZER_STRING);
+				position_t const *const pos = &expression->base.pos;
+				initializer_t *const init
+					= allocate_initializer_zero(INITIALIZER_STRING, pos);
 				init->value.value = expression;
 				return init;
 			}
@@ -1484,10 +1501,12 @@ make_string_init:;
 	assign_error_t error = semantic_assign(type, expression);
 	if (error == ASSIGN_ERROR_INCOMPATIBLE)
 		return NULL;
-	report_assign_error(error, type, expression, "initializer",
-	                    &expression->base.pos);
+	position_t const *const pos = &expression->base.pos;
+	report_assign_error(error, type, expression, "initializer", pos);
 
-	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
+	initializer_t *const result
+		= allocate_initializer_zero(INITIALIZER_VALUE, pos);
+	result->base.pos = expression->base.pos;
 	result->value.value = create_implicit_cast(expression, type);
 
 	return result;
@@ -1844,13 +1863,6 @@ static void skip_initializers(void)
 	}
 }
 
-static initializer_t *create_empty_initializer(void)
-{
-	static initializer_t empty_initializer
-		= { .list = { { INITIALIZER_LIST }, 0 } };
-	return &empty_initializer;
-}
-
 /**
  * Parse a part of an initialiser for a struct or union,
  */
@@ -1859,7 +1871,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 {
 	/* empty initializer? */
 	if (token.kind == '}')
-		return create_empty_initializer();
+		return allocate_initializer_list(0, &env->pos);
 
 	initializer_t *result = NULL;
 
@@ -1897,8 +1909,9 @@ finish_designator:
 			if (!walk_designator(path, designator, false))
 				goto end_error;
 
+			position_t const *const pos = &designator->pos;
 			initializer_t *designator_initializer
-				= allocate_initializer_zero(INITIALIZER_DESIGNATOR);
+				= allocate_initializer_zero(INITIALIZER_DESIGNATOR, pos);
 			designator_initializer->designator.designator = designator;
 			ARR_APP1(initializer_t*, initializers, designator_initializer);
 
@@ -2033,11 +2046,8 @@ error_parse_next:
 		}
 	}
 
-	size_t len  = ARR_LEN(initializers);
-	size_t size = sizeof(initializer_list_t) + len * sizeof(initializers[0]);
-	result = allocate_ast_zero(size);
-	result->kind     = INITIALIZER_LIST;
-	result->list.len = len;
+	size_t const len = ARR_LEN(initializers);
+	result = allocate_initializer_list(len, &env->pos);
 	memcpy(&result->list.initializers, initializers,
 	       len * sizeof(initializers[0]));
 	goto out;
@@ -2045,7 +2055,7 @@ error_parse_next:
 end_error:
 	skip_initializers();
 	if (result == NULL)
-		result = create_empty_initializer();
+		result = allocate_initializer_list(0, &env->pos);
 out:
 	DEL_ARR_F(initializers);
 	ascend_to(path, top_path_level+1);
@@ -4164,6 +4174,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
 	env.entity           = entity;
+	env.pos              = *HERE;
 
 	initializer_t *initializer = parse_initializer(&env);
 
@@ -6161,6 +6172,7 @@ static expression_t *parse_compound_literal(position_t const *const pos,
 	parse_initializer_env_t env;
 	env.type             = type;
 	env.entity           = NULL;
+	env.pos              = *HERE;
 	env.must_be_constant = global_scope;
 	initializer_t *initializer = parse_initializer(&env);
 	type = env.type;
