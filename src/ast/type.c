@@ -1332,7 +1332,7 @@ unsigned get_atomic_type_alignment(atomic_type_kind_t kind)
 	return atomic_type_properties[kind].alignment;
 }
 
-unsigned get_atomic_type_flags(atomic_type_kind_t kind)
+atomic_type_flags_t get_atomic_type_flags(atomic_type_kind_t kind)
 {
 	assert(kind <= ATOMIC_TYPE_LAST);
 	return atomic_type_properties[kind].flags;
