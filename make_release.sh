@@ -1,39 +1,30 @@
 #!/bin/sh
-
 set -eu
-#set -x
+
+# Check that our git checkout is clean (remember that we use git archive
+# which will miss things uncommitted changes)
+if [ "$(git status --porcelain)" != "" ]; then
+	echo "Git checkout not clean!"
+	exit 1
+fi
+
 WORKDIR="release"
 VERSION_MAJOR="1"
 VERSION_MINOR="22"
-VERSION_PATCHLEVEL="0"
-VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}"
-RELEASEDIR="cparser-$VERSION"
-FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
-RELEASEFILE="cparser-$VERSION.tar.bz2"
-SOURCEDIRS="src src/adt src/ast src/driver src/firm src/parser src/wrappergen"
-ADDFILES="AUTHOR config.default.mak COPYING cparser.1 NEWS.md README.md CMakeLists.txt"
+VERSION_MICRO="0"
+VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}"
+RELEASEFILE="build/cparser-$VERSION.tar.bz2"
+VERSIONFILE=src/driver/version.h
 
 # test if versions match
-echo "Checking for version mismatch"
-egrep -q "#define CPARSER_MAJOR\\s*\"$VERSION_MAJOR\"" src/driver/version.h
-egrep -q "#define CPARSER_MINOR\\s*\"$VERSION_MINOR\"" src/driver/version.h
-egrep -q "#define CPARSER_PATCHLEVEL\\s*\"$VERSION_PATCHLEVEL\"" src/driver/version.h
-
-rm -rf "$FULLRELEASEDIR"
-
-echo "Preparing $FULLRELEASEDIR"
-mkdir -p "$WORKDIR"
-mkdir -p "$FULLRELEASEDIR"
-
-for dir in $SOURCEDIRS; do
-	mkdir -p "$FULLRELEASEDIR/$dir"
-	cp -p "$dir/"*.[ch] "$FULLRELEASEDIR/$dir"
-done
-cp $ADDFILES "$FULLRELEASEDIR"
-rm -f "$FULLRELEASEDIR/revision.h"
-echo "REVISION = \"\"" > "$FULLRELEASEDIR/Makefile"
-cat Makefile >> "$FULLRELEASEDIR/Makefile"
-echo "#define cparser_REVISION \"\"" > "$FULLRELEASEDIR/src/revision.h"
+echo "Checking version in $VERSIONFILE"
+egrep -q "#define CPARSER_MAJOR\\s*\"$VERSION_MAJOR\"" "$VERSIONFILE"
+egrep -q "#define CPARSER_MINOR\\s*\"$VERSION_MINOR\"" "$VERSIONFILE"
+egrep -q "#define CPARSER_PATCHLEVEL\\s*\"$VERSION_MICRO\"" "$VERSIONFILE"
+echo "Checking version in CMakeLists.txt"
+grep -q "set(cparser_VERSION \"${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}\")" CMakeLists.txt
+echo "Checking version in NEWS.md"
+egrep -q "$VERSION_MAJOR.$VERSION_MINOR.$VERSION_MICRO" NEWS.md
 
 echo "creating $RELEASEFILE"
-tar cjf "$RELEASEFILE" -C "$WORKDIR" "$RELEASEDIR"
+git archive --prefix cparser-$VERSION/ HEAD | bzip2 > "$RELEASEFILE"
