@@ -250,7 +250,8 @@ bool options_parse_driver(options_state_t *s)
 		}
 	} else if (streq(option, "pipe")) {
 		/* here for gcc compatibility */
-	} else if ((arg = equals_arg("std", s)) != NULL) {
+	} else if ((arg = equals_arg("std", s)) != NULL
+	        || (arg = equals_arg("-std", s)) != NULL) {
 		standard =
 			streq(arg, "c++")            ? STANDARD_CXX98   :
 			streq(arg, "c++98")          ? STANDARD_CXX98   :
