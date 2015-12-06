@@ -5,13 +5,13 @@ endif()
 if(POLICY CMP0028)
 	cmake_policy(SET CMP0028 NEW)
 endif()
-project(cparser)
+project(cparser C)
 set(cparser_VERSION "1.22.0")
 
 # Enable C99
 if(CMAKE_VERSION VERSION_LESS "3.1")
 	if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-		set(CMAKE_C_FLAGS "--std=gnu99 ${CMAKE_C_FLAGS}")
+		set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
 	endif()
 else()
 	set(CMAKE_C_STANDARD 99)
@@ -62,7 +62,8 @@ set(SOURCES
 )
 include_directories(src)
 
-find_package(libfirm REQUIRED)
+# Need libfirm of the same version as cparser
+find_package(libfirm ${cparser_VERSION} REQUIRED)
 include_directories(${libfirm_INCLUDE_DIRS})
 
 add_executable(cparser ${SOURCES})
