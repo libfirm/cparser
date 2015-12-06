@@ -3,14 +3,14 @@
 set -eu
 #set -x
 WORKDIR="release"
-VERSION_MAJOR="0"
-VERSION_MINOR="9"
-VERSION_PATCHLEVEL="14"
+VERSION_MAJOR="1"
+VERSION_MINOR="22"
+VERSION_PATCHLEVEL="0"
 VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}"
 RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
-SOURCEDIRS="src src/adt src/ast src/driver src/firm src/parser src/wrappergen win32"
+SOURCEDIRS="src src/adt src/ast src/driver src/firm src/parser src/wrappergen"
 ADDFILES="AUTHOR config.default.mak COPYING cparser.1 NEWS.md README.md CMakeLists.txt"
 
 # test if versions match
