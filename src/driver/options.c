@@ -339,9 +339,17 @@ bool options_parse_linker(options_state_t *s)
 	} else if ((arg = prefix_arg("L", s)) != NULL) {
 		driver_add_flag(&ldflags_obst, "-L%s", arg);
 	} else if (streq(option, "static")
-	        || streq(option, "shared")
+	        || streq(option, "no-pie")
+	        || streq(option, "nodefaultlibs")
+	        || streq(option, "nostartfiles")
 	        || streq(option, "nostdlib")
+	        || streq(option, "pie")
+	        || streq(option, "rdynamic")
 	        || streq(option, "s")
+	        || streq(option, "shared")
+	        || streq(option, "shared-libgcc")
+	        || streq(option, "static-libgcc")
+	        || streq(option, "symbolic")
 	        || strstart(option, "Wl,")) {
 	    driver_add_flag(&ldflags_obst, full_option);
 	} else if ((arg = spaced_arg("Xlinker", s, true)) != NULL) {
