@@ -11,7 +11,7 @@ RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
 SOURCEDIRS="src src/adt src/ast src/driver src/firm src/parser src/wrappergen win32"
-ADDFILES="AUTHOR config.default.mak COPYING cparser.1 NEWS.md README.md"
+ADDFILES="AUTHOR config.default.mak COPYING cparser.1 NEWS.md README.md CMakeLists.txt"
 
 # test if versions match
 echo "Checking for version mismatch"
@@ -33,6 +33,7 @@ cp $ADDFILES "$FULLRELEASEDIR"
 rm -f "$FULLRELEASEDIR/revision.h"
 echo "REVISION = \"\"" > "$FULLRELEASEDIR/Makefile"
 cat Makefile >> "$FULLRELEASEDIR/Makefile"
+echo "#define cparser_REVISION \"\"" > "$FULLRELEASEDIR/src/revision.h"
 
 echo "creating $RELEASEFILE"
 tar cjf "$RELEASEFILE" -C "$WORKDIR" "$RELEASEDIR"
