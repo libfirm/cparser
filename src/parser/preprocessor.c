@@ -2748,27 +2748,23 @@ static void update_counter(pp_definition_t *definition)
 static string_t *pp_date;
 static string_t *pp_time;
 
+static char const *const unknown_timestamp = "??? ??? ?? ??:??:?? ????";
+
 static void get_date_time(void)
 {
 	if (pp_date != NULL)
 		return;
 
+	char   const *str = unknown_timestamp;
 #ifdef HAVE_ASCTIME_R
-	time_t const now = time(NULL);
-	if (now == (time_t)-1)
-		goto unknown_time;
-	struct tm *const t = localtime(&now);
-	if (t == NULL)
-		goto unknown_time;
-	char        buf[32];
-	char const *str     = asctime_r(t, buf);
-#else
-	char const *str = NULL;
-#endif
-	if (str == NULL) {
-unknown_time:
-		str = "??? ??? ?? ??:??:?? ????";
+	char          buf[32];
+	time_t const  now = time(NULL);
+	if (now != (time_t)-1) {
+		struct tm *const t = localtime(&now);
+		if (t)
+			str = asctime_r(t, buf);
 	}
+#endif
 
 	begin_string_construction();
 	obstack_grow(&string_obst, str, 10); /* Extract date part. */
@@ -2793,31 +2789,29 @@ static void update_time(pp_definition_t *definition)
 
 static void update_timestamp(pp_definition_t *definition)
 {
+	char const *def  = unknown_timestamp;
 #if defined(HAVE_FILENO) && defined(HAVE_ASCTIME_R) && defined(HAVE_FSTAT)
-	FILE *const file = input_get_file(input.input);
-	if (file == NULL)
-		goto unknown_timestamp;
-	int const fd = fileno(file);
-	struct stat st;
-	if (fstat(fd, &st) != 0)
-		goto unknown_timestamp;
-	struct tm *const t = localtime(&st.st_mtime);
-	if (t == NULL)
-		goto unknown_timestamp;
 	char        buf[32];
-	char *const str = asctime_r(t, buf);
-	if (str == NULL)
-		goto unknown_timestamp;
-	/* remove trailing '\n' */
-	size_t const len = strlen(str);
-	str[len - 1] = '\0';
-	/* update definition */
-	update_definition_string(definition, str);
-	return;
-unknown_timestamp:
+	FILE *const file = input_get_file(input.input);
+	if (file) {
+		int   const fd = fileno(file);
+		struct stat st;
+		if (fstat(fd, &st) == 0) {
+			struct tm *const t = localtime(&st.st_mtime);
+			if (t) {
+				char *const str = asctime_r(t, buf);
+				if (str) {
+					/* remove trailing '\n' */
+					size_t const len = strlen(str);
+					str[len - 1] = '\0';
+					def = str;
+				}
+			}
+		}
+	}
 #endif
 
-	update_definition_string(definition, "??? ??? ?? ??:??:?? ????");
+	update_definition_string(definition, def);
 }
 
 static void init_dynamic_macros(void)
