@@ -70,7 +70,7 @@ UNUSED := $(shell \
 	echo "$$REV" | cmp -s - $(REVISIONH) 2> /dev/null || echo "$$REV" > $(REVISIONH) \
 )
 # determine if we can use "cparser-beta" as quickcheck
-QUICKCHECK_DEFAULT := $(shell which cparser-beta || echo true) -fsyntax-only
+QUICKCHECK_DEFAULT := $(shell which cparser-beta 2> /dev/null || echo true) -fsyntax-only
 QUICKCHECK ?= $(QUICKCHECK_DEFAULT)
 QUICKCHECK_FLAGS ?= -Wno-shadow
 
