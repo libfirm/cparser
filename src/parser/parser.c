@@ -1595,7 +1595,7 @@ struct type_path_t {
 	type_path_entry_t *path;      /**< An flexible array containing the current
 	                                   path. */
 	type_t            *top_type;  /**< type of the element the path points */
-	size_t             max_index; /**< largest index in outermost array */
+	size_t             size;      /**< size of outermost array */
 };
 
 /**
@@ -2024,7 +2024,7 @@ excess_elements:;
 		type_t                  *first_type = first->type;
 		first_type                          = skip_typeref(first_type);
 		if (is_type_array(first_type))
-			path->max_index = MAX(path->max_index, first->v.index);
+			path->size = MAX(path->size, first->v.index + 1);
 
 		/* append to initializers list */
 		ARR_APP1(initializer_t*, initializers, sub);
@@ -2080,8 +2080,8 @@ static expression_t *make_size_literal(size_t value)
  */
 static initializer_t *parse_initializer(parse_initializer_env_t *env)
 {
-	type_t        *type      = skip_typeref(env->type);
-	size_t         max_index = 0;
+	type_t        *type = skip_typeref(env->type);
+	size_t         size = 0;
 	initializer_t *result;
 
 	if (is_type_scalar(type)) {
@@ -2100,7 +2100,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		result = parse_sub_initializer(&path, env->type, env);
 		rem_anchor_token('}');
 
-		max_index = path.max_index;
+		size = path.size;
 		DEL_ARR_F(path.path);
 
 		expect('}');
@@ -2114,11 +2114,8 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	 * the array type size */
 	if (is_type_array(type) && type->array.size_expression == NULL
 	 && result != NULL) {
-		size_t size;
 		switch (result->kind) {
 		case INITIALIZER_LIST:
-			assert(max_index != 0xdeadbeaf);
-			size = max_index + 1;
 			break;
 
 		case INITIALIZER_STRING: {
@@ -2129,7 +2126,6 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		case INITIALIZER_DESIGNATOR:
 		case INITIALIZER_VALUE:
 			/* can happen for parse errors */
-			size = 0;
 			break;
 
 		default:

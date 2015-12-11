@@ -3378,15 +3378,16 @@ static void descend_into_subtype(type_path_t *path, position_t const *const pos)
 		}
 	} else {
 		assert(is_type_array(top_type));
-		if (top_type->array.size == 0) {
-			errorf(pos,
-				   "code generation for flexible arrays initializers not supported");
-			panic("Cannot continue");
-		}
+		array_type_t const *const arr = &top_type->array;
 
 		top->index     = 0;
-		path->top_type = top_type->array.element_type;
-		len            = top_type->array.size;
+		path->top_type = arr->element_type;
+		len            = arr->size;
+
+		if (len == 0 && !arr->has_implicit_size) {
+			errorf(pos, "code generation for flexible arrays initializers not supported");
+			panic("Cannot continue");
+		}
 	}
 	if (initializer == NULL
 	    || get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
