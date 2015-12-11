@@ -27,4 +27,5 @@ echo "Checking version in NEWS.md"
 egrep -q "$VERSION_MAJOR.$VERSION_MINOR.$VERSION_MICRO" NEWS.md
 
 echo "creating $RELEASEFILE"
+mkdir -p "$(dirname "$RELEASEFILE")"
 git archive --prefix cparser-$VERSION/ HEAD | bzip2 > "$RELEASEFILE"
