@@ -80,7 +80,7 @@ $(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 
 $(libcparser_A): $(libcparser_OBJECTS)
 	@echo 'AR $@'
-	$(Q)$(AR) -crsu $@ $^
+	$(Q)$(AR) -crs $@ $^
 
 $(libcparser_DLL): $(libcparser_OBJECTS) $(LIBFIRM_FILE_DLL)
 	@echo 'LINK $@'
