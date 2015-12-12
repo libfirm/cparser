@@ -1,6 +1,6 @@
 /* make sure we have some posix functions available. Include this file first! */
 
-#if defined(_WIN32) && !define(__CYGWIN__)
+#if defined(_WIN32) && !defined(__CYGWIN__)
 #include <fcntl.h>
 #include <io.h>
 
