@@ -18,7 +18,12 @@ LINK ?= $(CC)
 CPPFLAGS  = -I$(top_srcdir)/src -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes
+# With -std=c99 we get __STRICT_ANSI__ which disables all posix declarations
+# in cygwin, regardless of a set POSIX_C_SOURCE feature test macro.
+ifneq ("$(shell uname -o 2> /dev/null)", "Cygwin")
+CFLAGS += -std=c99 -pedantic
+endif
 CFLAGS_debug    = -O0 -g
 CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG -DNO_DEFAULT_VERIFY
 CFLAGS_profile  = -pg -O3 -fno-inline
