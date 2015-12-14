@@ -45,7 +45,6 @@ set(SOURCES
 	src/driver/timing.c
 	src/driver/warning.c
 	src/firm/ast2firm.c
-	src/firm/entitymap.c
 	src/firm/firm_opt.c
 	src/firm/jump_target.c
 	src/firm/mangle.c
