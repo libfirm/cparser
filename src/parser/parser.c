@@ -3899,6 +3899,7 @@ void merge_into_decl(entity_t *decl, const entity_t *other)
 	decl->declaration.modifiers |= other->declaration.modifiers;
 	if (decl->kind == ENTITY_FUNCTION) {
 		decl->function.is_inline |= other->function.is_inline;
+		decl->function.no_codegen |= other->function.no_codegen;
 		if (other->function.alias.symbol != NULL) {
 			assert(decl->function.alias.symbol == NULL);
 			decl->function.alias.symbol = other->function.alias.symbol;
@@ -5163,19 +5164,6 @@ static void parse_external_declaration(void)
 		return;
 	}
 
-	/* determine whether this function is purely used for inlining (§6.7.4) */
-	if (ndeclaration->function.is_inline) {
-		storage_class_t const storage_class
-			= ndeclaration->declaration.storage_class;
-		if (dialect.c99
-		 && !(ndeclaration->declaration.modifiers & DM_GNU_INLINE)) {
-			if (storage_class == STORAGE_CLASS_NONE)
-				ndeclaration->function.no_codegen = true;
-		} else if (storage_class == STORAGE_CLASS_EXTERN) {
-			ndeclaration->function.no_codegen = true;
-		}
-	}
-
 	assert(is_declaration(ndeclaration));
 	type_t *const orig_type = ndeclaration->declaration.type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -5265,6 +5253,17 @@ static void parse_external_declaration(void)
 	/* we have a fresh function. If there was a previous definition
 	 * record_entity() reported the error and returned the fresh one. */
 	assert(function->body == NULL);
+
+	/* determine whether this function is purely used for inlining (§6.7.4) */
+	if (function->is_inline) {
+		storage_class_t const storage_class = function->base.storage_class;
+		if (dialect.c99 && !(function->base.modifiers & DM_GNU_INLINE)) {
+			if (storage_class == STORAGE_CLASS_NONE)
+				function->no_codegen = true;
+		} else if (storage_class == STORAGE_CLASS_EXTERN) {
+			function->no_codegen = true;
+		}
+	}
 
 	/* parse function body */
 	int         label_stack_top      = label_top();
