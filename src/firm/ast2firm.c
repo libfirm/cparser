@@ -724,25 +724,25 @@ static ir_entity *get_function_entity(entity_t *entity)
 	assert(!entity->function.need_closure);
 	ir_type *ir_type_method = get_ir_type(entity->declaration.type);
 
+	storage_class_t  const storage_class  = entity->declaration.storage_class;
+	elf_visibility_t const elf_visibility = entity->function.elf_visibility;
+	ir_visibility visibility = get_ir_visibility(storage_class, elf_visibility);
+
 	ir_type *owner = get_glob_type();
 	if (entity->function.alias.entity != NULL) {
 		/* create alias entity but do not resolve alias just yet, phase 2 of
 		 * the main loop will do so. */
-		irentity = new_alias_entity(owner, ld_id, NULL, ir_type_method);
+		irentity = new_alias_entity(owner, ld_id, NULL, ir_type_method,
+		                            visibility);
 	} else {
-		irentity = new_entity(owner, ld_id, ir_type_method);
+		irentity = new_global_entity(owner, ld_id, ir_type_method, visibility,
+		                             IR_LINKAGE_DEFAULT);
 	}
-	set_entity_ld_ident(irentity, ld_id);
 	set_entity_ident(irentity, id);
 	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 	set_entity_dbg_info(irentity, dbgi);
 
 	handle_decl_modifiers(irentity, entity);
-
-	storage_class_t const storage_class = entity->declaration.storage_class;
-	elf_visibility_t const elf_visibility = entity->function.elf_visibility;
-	ir_visibility visibility = get_ir_visibility(storage_class, elf_visibility);
-	set_entity_visibility(irentity, visibility);
 
 	if (entity->function.no_codegen)
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
@@ -863,8 +863,9 @@ finish:;
 
 	ir_type   *const global_type = get_glob_type();
 	ident     *const id          = id_unique("str.%u");
-	entity = new_entity(global_type, id, type);
-	set_entity_ld_ident(   entity, id);
+	entity = new_global_entity(global_type, id, type,
+	                           ir_visibility_private,
+	                           IR_LINKAGE_CONSTANT | IR_LINKAGE_NO_IDENTITY);
 	set_entity_visibility( entity, ir_visibility_private);
 	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT|IR_LINKAGE_NO_IDENTITY);
 	set_entity_initializer(entity, initializer);
@@ -1988,12 +1989,13 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	type_t    *const skipped     = skip_typeref(type);
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
-	ir_entity *const entity      = new_entity(global_type, id, irtype);
+	ir_linkage linkage = (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
+		? IR_LINKAGE_CONSTANT : IR_LINKAGE_DEFAULT;
+	ir_entity *const entity      = new_global_entity(global_type, id, irtype,
+													 ir_visibility_private,
+													 linkage);
+
 	set_entity_dbg_info(entity, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	if (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
-		add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, irinitializer);
 	return entity;
 }
@@ -2024,7 +2026,6 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 
 		ir_entity *const entity = new_entity(frame_type, id, irtype);
 		set_entity_dbg_info(entity, dbgi);
-		set_entity_ld_ident(entity, id);
 
 		/* create initialisation code */
 		create_local_initializer(initializer, dbgi, entity, type);
@@ -3231,7 +3232,9 @@ static complex_value expression_to_complex(const expression_t *expression)
 
 static void create_variable_entity(entity_t *variable,
                                    declaration_kind_t declaration_kind,
-                                   ir_type *parent_type)
+                                   ir_type *parent_type,
+                                   ir_visibility visibility,
+                                   ir_linkage linkage)
 {
 	assert(variable->kind == ENTITY_VARIABLE);
 	ident *ld_id = create_ld_ident(variable);
@@ -3246,7 +3249,6 @@ static void create_variable_entity(entity_t *variable,
 	}
 
 	type_t   *const type   = skip_typeref(variable->declaration.type);
-	ident    *const id     = new_id_from_str(variable->base.symbol->string);
 	ir_type  *const irtype = get_ir_type(type);
 	dbg_info *const dbgi   = get_dbg_info(&variable->base.pos);
 	unsigned  const alignment
@@ -3255,12 +3257,14 @@ static void create_variable_entity(entity_t *variable,
 	if (variable->variable.alias.entity != NULL) {
 		/* create alias entity but do not set aliased yet as we can't resolved
 		 * it at this point yet. */
-		irentity = new_alias_entity(parent_type, ld_id, NULL, irtype);
+		irentity = new_alias_entity(parent_type, ld_id, NULL, irtype,
+		                            visibility);
+	} else if (is_segment_type(parent_type)) {
+		irentity = new_global_entity(parent_type, ld_id, irtype, visibility,
+		                             linkage);
 	} else {
 		irentity = new_entity(parent_type, ld_id, irtype);
 	}
-	set_entity_ld_ident(irentity, ld_id);
-	set_entity_ident(irentity, id);
 	set_entity_dbg_info(irentity, dbgi);
 	set_entity_alignment(irentity, alignment);
 
@@ -4042,7 +4046,9 @@ static void create_local_variable(entity_t *entity)
 	}
 
 	ir_type *const frame_type = get_irg_frame_type(current_ir_graph);
-	create_variable_entity(entity, DECLARATION_KIND_LOCAL_VARIABLE_ENTITY, frame_type);
+	create_variable_entity(entity, DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
+	                       frame_type, ir_visibility_private,
+	                       IR_LINKAGE_DEFAULT);
 }
 
 static void create_local_static_variable(entity_t *entity)
@@ -4060,7 +4066,9 @@ static void create_local_static_variable(entity_t *entity)
 	char   buf[l + sizeof(".%u")];
 	snprintf(buf, sizeof(buf), "%s.%%u", entity->base.symbol->string);
 	ident     *const id       = id_unique(buf);
-	ir_entity *const irentity = new_entity(var_type, id, irtype);
+	ir_entity *const irentity = new_global_entity(var_type, id, irtype,
+	                                              ir_visibility_local,
+	                                              IR_LINKAGE_DEFAULT);
 	set_entity_dbg_info(irentity, dbgi);
 
 	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
@@ -4069,9 +4077,6 @@ static void create_local_static_variable(entity_t *entity)
 
 	entity->declaration.kind  = DECLARATION_KIND_GLOBAL_VARIABLE;
 	entity->variable.v.entity = irentity;
-
-	set_entity_ld_ident(irentity, id);
-	set_entity_visibility(irentity, ir_visibility_local);
 
 	if (entity->variable.initializer == NULL) {
 		ir_initializer_t *null_init = get_initializer_null();
@@ -4180,13 +4185,12 @@ static void create_global_variable(entity_t *entity)
 	if (entity->variable.thread_local) {
 		var_type = get_tls_type();
 	}
-	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
-	ir_entity *irentity = entity->variable.v.entity;
-	add_entity_linkage(irentity, linkage);
-	set_entity_visibility(irentity, visibility);
+	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type,
+	                       visibility, linkage);
 	if (entity->variable.initializer == NULL
 	    && storage != STORAGE_CLASS_EXTERN) {
-		ir_initializer_t *null_init = get_initializer_null();
+		ir_initializer_t *const null_init = get_initializer_null();
+		ir_entity        *const irentity  = entity->variable.v.entity;
 		set_entity_initializer(irentity, null_init);
 	}
 }
@@ -4887,12 +4891,16 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	 * "" in ld_ident.
 	 * Note that we mustn't give these entities a name since for example
 	 * Mach-O doesn't allow them. */
-	ident     *ide          = id_unique(unique_template);
-	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
-	ir_graph  *irg          = get_const_code_irg();
-	ir_node   *val          = new_r_Address(irg, method);
+	ident     *ide = new_id_from_chars("", 0);
+	ir_entity *ptr
+		= new_global_entity(segment, ide, ptr_type, ir_visibility_private,
+		                    IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
+	ir_graph  *irg = get_const_code_irg();
+	ir_node   *val = new_r_Address(irg, method);
 
-	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
+	ident     *debug_name = id_unique(unique_template);
+	set_entity_ident(ptr, debug_name);
+
 	set_entity_visibility(ptr, ir_visibility_private);
 	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
 	set_atomic_ent_value(ptr, val);
