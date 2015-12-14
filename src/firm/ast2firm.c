@@ -32,7 +32,6 @@
 #include "driver/diagnostic.h"
 #include "driver/lang_features.h"
 #include "driver/warning.h"
-#include "entitymap_t.h"
 #include "firm/firm_opt.h"
 #include "jump_target.h"
 #include "mangle.h"
@@ -77,7 +76,6 @@ static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
 static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
-static entitymap_t         entitymap;
 
 static struct obstack asm_obst;
 
@@ -709,13 +707,19 @@ static ir_entity *get_function_entity(entity_t *entity)
 
 	symbol_t *symbol = entity->base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
+	ident    *ld_id  = create_ld_ident(entity);
 
-	/* already an entity defined? */
-	ir_entity *irentity = entitymap_get(&entitymap, symbol);
-	bool const has_body = entity->function.body != NULL;
-	if (irentity != NULL) {
+	/* In some corner cases cparser does not properly merge all entities
+	 * to a common entity_t object. (These corner cases include
+	 * (extern) function declarations inside functions, __builtin_xxx creating
+	 * xxx, ...)
+	 * FIXME: This is workaround to still generate correct code in these cases
+	 * even though we really should fix this in the parse/semantic phase to not
+	 * miss type compatibility checks.
+	 */
+	ir_entity *irentity = ir_get_global(ld_id);
+	if (irentity != NULL)
 		goto entity_created;
-	}
 
 	assert(!entity->function.need_closure);
 	ir_type *ir_type_method = get_ir_type(entity->declaration.type);
@@ -724,15 +728,14 @@ static ir_entity *get_function_entity(entity_t *entity)
 	if (entity->function.alias.entity != NULL) {
 		/* create alias entity but do not resolve alias just yet, phase 2 of
 		 * the main loop will do so. */
-		irentity = new_alias_entity(owner, id, NULL, ir_type_method);
+		irentity = new_alias_entity(owner, ld_id, NULL, ir_type_method);
 	} else {
-		irentity = new_entity(owner, id, ir_type_method);
+		irentity = new_entity(owner, ld_id, ir_type_method);
 	}
+	set_entity_ld_ident(irentity, ld_id);
+	set_entity_ident(irentity, id);
 	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 	set_entity_dbg_info(irentity, dbgi);
-
-	ident *ld_id = create_ld_ident(entity);
-	set_entity_ld_ident(irentity, ld_id);
 
 	handle_decl_modifiers(irentity, entity);
 
@@ -745,8 +748,8 @@ static ir_entity *get_function_entity(entity_t *entity)
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 
 	/* We should check for file scope here, but as long as we compile C only
-	   this is not needed. */
-	if (!dialect.freestanding && !has_body) {
+	 * this is not needed. */
+	if (!dialect.freestanding && entity->function.body == NULL) {
 		/* check for a known runtime function */
 		for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 			if (id != rts_idents[i])
@@ -775,8 +778,6 @@ static ir_entity *get_function_entity(entity_t *entity)
 			rts_entities[rts_data[i].id] = irentity;
 		}
 	}
-
-	entitymap_insert(&entitymap, symbol, irentity);
 
 entity_created:
 	entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
@@ -3233,36 +3234,45 @@ static void create_variable_entity(entity_t *variable,
                                    ir_type *parent_type)
 {
 	assert(variable->kind == ENTITY_VARIABLE);
-	type_t    *type = skip_typeref(variable->declaration.type);
+	ident *ld_id = create_ld_ident(variable);
+	/* See comment in get_function_entity() about why the check is needed. */
+	ir_entity *irentity;
+	if (is_segment_type(parent_type)) {
+		irentity = ir_get_global(ld_id);
+		if (irentity != NULL)
+			goto entity_created;
+	} else {
+		assert(is_frame_type(parent_type));
+	}
 
-	ident     *const id        = new_id_from_str(variable->base.symbol->string);
-	ir_type   *const irtype    = get_ir_type(type);
-	dbg_info  *const dbgi      = get_dbg_info(&variable->base.pos);
-	unsigned   const alignment
+	type_t   *const type   = skip_typeref(variable->declaration.type);
+	ident    *const id     = new_id_from_str(variable->base.symbol->string);
+	ir_type  *const irtype = get_ir_type(type);
+	dbg_info *const dbgi   = get_dbg_info(&variable->base.pos);
+	unsigned  const alignment
 		= get_declaration_alignment(&variable->declaration);
 
-	ir_entity *irentity;
 	if (variable->variable.alias.entity != NULL) {
 		/* create alias entity but do not set aliased yet as we can't resolved
 		 * it at this point yet. */
-		irentity = new_alias_entity(parent_type, id, NULL, irtype);
+		irentity = new_alias_entity(parent_type, ld_id, NULL, irtype);
 	} else {
-		irentity = new_entity(parent_type, id, irtype);
+		irentity = new_entity(parent_type, ld_id, irtype);
 	}
+	set_entity_ld_ident(irentity, ld_id);
+	set_entity_ident(irentity, id);
 	set_entity_dbg_info(irentity, dbgi);
 	set_entity_alignment(irentity, alignment);
 
 	handle_decl_modifiers(irentity, variable);
 
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
+		set_entity_volatility(irentity, volatility_is_volatile);
+
+entity_created:
 	variable->declaration.kind  = (unsigned char) declaration_kind;
 	variable->variable.v.entity = irentity;
-	set_entity_ld_ident(irentity, create_ld_ident(variable));
-
-	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		set_entity_volatility(irentity, volatility_is_volatile);
-	}
 }
-
 
 typedef struct type_path_entry_t type_path_entry_t;
 struct type_path_entry_t {
@@ -5094,7 +5104,6 @@ static void init_ast2firm(void)
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
 
-	entitymap_init(&entitymap);
 	init_mangle();
 }
 
@@ -5103,7 +5112,6 @@ void exit_ast2firm(void)
 	if (!ast2firm_initialized)
 		return;
 	exit_mangle();
-	entitymap_destroy(&entitymap);
 	obstack_free(&asm_obst, NULL);
 }
 
