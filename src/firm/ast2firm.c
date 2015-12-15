@@ -749,7 +749,7 @@ static ir_entity *get_function_entity(entity_t *entity)
 
 	/* We should check for file scope here, but as long as we compile C only
 	 * this is not needed. */
-	if (!dialect.freestanding && entity->function.body == NULL) {
+	if (!dialect.no_builtins && entity->function.body == NULL) {
 		/* check for a known runtime function */
 		for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 			if (id != rts_idents[i])

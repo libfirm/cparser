@@ -581,8 +581,12 @@ bool options_parse_c_dialect(options_state_t *s)
 			dialect.char_is_signed = !truth_value;
 		} else if (streq(fopt, "freestanding")) {
 			dialect.freestanding = truth_value;
+			dialect.no_builtins = truth_value;
 		} else if (streq(fopt, "hosted")) {
 			dialect.freestanding = !truth_value;
+			dialect.no_builtins = !truth_value;
+		} else if (streq(fopt, "builtin")) {
+			dialect.no_builtins = !truth_value;
 		} else {
 			return false;
 		}

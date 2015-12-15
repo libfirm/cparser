@@ -29,6 +29,7 @@ typedef struct c_dialect_t {
 	atomic_type_kind_t pointer_sized_int;
 	atomic_type_kind_t pointer_sized_uint;
 	bool               freestanding   : 1;
+	bool               no_builtins    : 1;
 	bool               char_is_signed : 1;
 	bool               strict         : 1;
 	bool               c89            : 1;
