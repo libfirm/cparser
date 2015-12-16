@@ -21,7 +21,9 @@ CPPFLAGS += $(FIRM_CPPFLAGS)
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes
 # With -std=c99 we get __STRICT_ANSI__ which disables all posix declarations
 # in cygwin, regardless of a set POSIX_C_SOURCE feature test macro.
-ifneq ("$(shell uname -o 2> /dev/null)", "Cygwin")
+ifneq ($(filter %cygwin %mingw32, $(shell $(CC) $(CFLAGS) -dumpmachine)),)
+CFLAGS += -std=gnu99
+else
 CFLAGS += -std=c99 -pedantic
 endif
 CFLAGS_debug    = -O0 -g
