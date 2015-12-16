@@ -62,10 +62,12 @@ static const char *get_tempdir(void)
 
 #ifndef HAVE_MKDTEMP
 /* cheap and nasty mkdtemp replacement */
-static int mkdtemp(char *templ)
+static char *mkdtemp(char *templ)
 {
-	mktemp(templ);
-	return mkdir(templ, 0700);
+	char *res = mktemp(templ);
+	if (res && mkdir(templ, 0700) != 0)
+		res = NULL;
+	return res;
 }
 #endif
 
