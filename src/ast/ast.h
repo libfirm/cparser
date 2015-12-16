@@ -67,18 +67,18 @@ typedef union  statement_t                           statement_t;
 typedef struct translation_unit_t                    translation_unit_t;
 
 /**
- * Initializes datastructures supporting the AST. You have to call this after
+ * Initializes data structures supporting the AST. You have to call this after
  * setting up target information.
  */
 void init_ast(void);
 
 /**
- * Frees datastructures supporting the AST.
+ * Frees data structures supporting the AST.
  */
 void exit_ast(void);
 
 /**
- * Initialize remaining AST datastructures after the language dialect is set.
+ * Initialize remaining AST data structures after the language dialect is set.
  */
 void init_ast_dialect(void);
 
