@@ -5022,6 +5022,15 @@ static ir_entity *get_irentity(entity_t *entity)
 	panic("invalid entity kind");
 }
 
+static bool is_decl_necessary(entity_t const *const entity)
+{
+	assert(is_declaration(entity));
+	declaration_t const *const decl = &entity->declaration;
+	return
+		decl->used ||
+		(declaration_is_definition(entity) && (decl->storage_class != STORAGE_CLASS_STATIC || decl->modifiers & DM_USED));
+}
+
 static void scope_to_firm(scope_t *scope)
 {
 	/* first pass: create declarations */
@@ -5040,7 +5049,7 @@ static void scope_to_firm(scope_t *scope)
 			 * This saves creating unnecessary IR nodes and allows compiling
 			 * programs with unused function declarations containing va_list
 			 * for backends without support for variadic functions. */
-			if (entity->declaration.used || declaration_is_definition(entity))
+			if (is_decl_necessary(entity))
 				(void)get_function_entity(entity);
 			break;
 		case ENTITY_VARIABLE:
@@ -5071,7 +5080,7 @@ static void scope_to_firm(scope_t *scope)
 			if (alias != NULL) {
 				ir_entity *aliased = get_irentity(alias);
 				set_entity_alias(entity->function.irentity, aliased);
-			} else {
+			} else if (is_decl_necessary(entity)) {
 				create_function(entity);
 			}
 			break;
