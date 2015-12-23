@@ -6879,7 +6879,7 @@ typeprop_expression:
 		}
 	}
 
-	if (wrong_type != NULL) {
+	if (wrong_type && is_type_valid(type)) {
 		char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 		errorf(&tp_expression->base.pos,
 		       "operand of %s expression must not be of %s type '%T'",
