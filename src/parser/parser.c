@@ -7599,7 +7599,8 @@ static expression_t *parse_throw(void)
 
 	expression_t *value = NULL;
 	switch (token.kind) {
-	case EXPRESSION_START: {
+	case EXPRESSION_START:
+	case T_IDENTIFIER: {
 		value = parse_assignment_expression();
 		/* ISO/IEC 14882:1998(E) §15.1:3 */
 		type_t *const orig_type = value->base.type;
