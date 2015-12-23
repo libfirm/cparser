@@ -1,4 +1,4 @@
-cparser 1.22.0 (2015-07-31)
+cparser 1.22.0 (2015-12-31)
 ---------------------------
 
 * Bump version number to somewhat match libfirm
@@ -8,6 +8,40 @@ cparser 1.22.0 (2015-07-31)
 * Improved commandline option handling emulating even more gcc options
 * Create libcparser to facilitate the creation of external tools
 * Bugfixes
+* Improved diagnostics
+* Support -Wa, -Xlinker, -Xpreprocessor, -Xassembler
+* Support -Wsystem
+* Partial support for C11 features
+* Support -pedantic and -pedantic-errors
+* Support __attribute__((alias()))
+* Support -Wnot-compound-assign
+* Support -Wcompat-option
+* Support -Wunknown-warning-option
+* Select the base type for enums like gcc
+* Support -no-integrated-cpp
+* Warn about /* within /**/ comments
+* Use integrated preprocessor by default
+* Improve auto-detection of host machine triple
+* Support -Wunused-option
+* Support -Wenum-conversion
+* Improve -Wsign-compare
+* Support -Wdistinct-pointer-types
+* Make semantic checks more strict
+* Add mechanism to optimize well-known libc functions
+* Support -dumpmachine
+* Support -Wpointer-sign
+* Stub support for -fasynchronous-unwind-tables, -funwind-tables, -frounding-math
+* Support -fexcess-precision
+* Support -nostdlib
+* Support Makefile dependency generation (-M, -MD, ...)
+* Support -fno-verbose-asm (-fverbose-asm is default)
+* Improve diagnostics for disabled language extensions
+* Support setting the mantissa with __builtin_nan
+* Recognize, but reject, MSC asm statements, i.e. __asm { ... }
+* Support attribute for custom printf-like format checks, e.g. int my_printf(char const* fmt, ...) __attribute__((custom_format(1, "#0", "%": void, "d": int, "ld": long, "s": char const*));
+* Show an explanation for each warning switch when printing the help
+* Improve PIC commandline options
+* Support -f[no-]builtin
 
 cparser 0.9.14 (2012-11-21)
 ---------------------------
