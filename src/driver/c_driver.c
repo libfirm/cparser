@@ -32,15 +32,15 @@
 #include "version.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "gcc -E"
+#define PREPROCESSOR "cc -E"
 #endif
 
 #ifndef LINKER
-#define LINKER    "gcc"
+#define LINKER    "cc"
 #endif
 
 #ifndef ASSEMBLER
-#define ASSEMBLER "gcc -c -xassembler"
+#define ASSEMBLER "cc -c -xassembler"
 #endif
 
 #ifndef COMPILER_INCLUDE_DIR
