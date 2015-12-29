@@ -4,11 +4,13 @@ cparser - A C99 parser (with gnu extensions)
 1. Introduction
 ---------------
 
-cparser is a recursive descent C99 parser written in C99. It contains lexer,
-parser, constructs an AST and does semantic analysis. It is currently used as
-a frontend to the libFirm intermediate representation, but can be used
-independently. cparser is able to bootstrap itself. It currently uses an
-external preprocessor.
+cparser is a recursive descent C99 parser written in C99. It contains
+preprocessor, lexer, parser, constructs an AST and does semantic analysis.  It
+acts as a frontend to the libFirm intermediate representation, optimization and
+code generation. It comes with typical compiler driver logic for parsing the
+commandline to setup the environment and code generator and calling assemblers
+and linkers. This allows it to be a drop-in replacement for gcc or clang in
+many situations.
 
 2. Building and Installation
 ----------------------------
