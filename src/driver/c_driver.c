@@ -117,8 +117,9 @@ static void decide_external_preprocessor(void)
 		return;
 	assert(obstack_object_size(&file_obst) == 0);
 	if (target.triple != NULL)
-		obstack_printf(&file_obst, "%s-", target.triple);
-	obstack_printf(&file_obst, "%s", PREPROCESSOR);
+		obstack_printf(&file_obst, "%s-gcc -E", target.triple);
+	else
+		obstack_printf(&file_obst, "%s", PREPROCESSOR);
 	driver_preprocessor = obstack_nul_finish(&file_obst);
 }
 
@@ -406,8 +407,9 @@ static void decide_assembler(void)
 		return;
 	assert(obstack_object_size(&file_obst) == 0);
 	if (target.triple != NULL)
-		obstack_printf(&file_obst, "%s-", target.triple);
-	obstack_printf(&file_obst, "%s", ASSEMBLER);
+		obstack_printf(&file_obst, "%s-gcc -c -xassembler", target.triple);
+	else
+		obstack_printf(&file_obst, "%s", ASSEMBLER);
 	driver_assembler = obstack_nul_finish(&file_obst);
 }
 
@@ -825,8 +827,9 @@ static void decide_linker(void)
 		return;
 	assert(obstack_object_size(&file_obst) == 0);
 	if (target.triple != NULL)
-		obstack_printf(&file_obst, "%s-", target.triple);
-	obstack_printf(&file_obst, "%s", LINKER);
+		obstack_printf(&file_obst, "%s-gcc", target.triple);
+	else
+		obstack_printf(&file_obst, "%s", LINKER);
 	driver_linker = obstack_nul_finish(&file_obst);
 }
 
