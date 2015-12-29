@@ -18,26 +18,17 @@ many situations.
 Requirements:
 
 * A C99 compiler (gcc and icc are known to work).
-* pkg-config (recommended)
-* libFirm-1.21 or later
+* libFirm-1.22
 
-Make sure you have installed libFirm and pkg-config can find the libfirm.pc
-files ("pkg-config --modversion libfirm" should work). Use (GNU)-make to build
-cparser.
+3. Further Information and Contact
+----------------------------------
 
-3. Troubleshooting
-------------------
+Official website: http://libfirm.org/
 
-x86\_64 Systems:
-libFirm uses a 32bit x86 backend by default, while it also uses the systems
-default preprocessor/linker. This results on a x86\_64 linker being used
-for 32bit assembly. If you see assembler errors like
-"suffix or operand invalid for 'push'", then you probably have this problem.
-Use the -m32 flag to force usage of system 32bit preprocessor/linker.
+Contact E-Mail: firm@ipd.info.uni-karlsruhe.de
 
-4. Contact
-----------
+Mailing list: https://lists.sourceforge.net/lists/listinfo/libfirm-user
 
-There's a Bugtracker at http://pp.info.uni-karlsruhe.de/~firm/bugs
-You can contact me at matze@braunis.de
-You might also visit the #firm channel on irc.freenode.net
+Bugtracker: http://pp.ipd.kit.edu/~firm/bugs
+
+Internet relay chat: irc://chat.freenode.net/#firm
