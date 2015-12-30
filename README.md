@@ -5,13 +5,13 @@ Introduction
 ------------
 
 cparser is a recursive descent C99 parser written in C99.  It contains a
-preprocessor, lexer and parser, constructs an AST and does semantic analysis.
-It acts as a frontend to the libFirm intermediate representation library.  This
-performs optimization and code generation for several backends, which can be
-selected at runtime of the compiler.  It comes with typical compiler driver
-logic for parsing the commandline to set up the environment and code generator
-as well as calling assemblers and linkers.  This allows it to be a drop-in
-replacement for gcc or clang in many situations.
+preprocessor, lexer, parser, constructs an AST and does semantic analysis.  It
+acts as a frontend to the libFirm intermediate representation library.  This
+way optimization and code generation is performed. The compiler supports cross
+compilation to multiple target architectures with a commandline switch.  It
+comes with driver logic for calling assemblers and linkers as well as parsing
+command line options.  This allows it to be a drop in replacement for gcc or
+clang in many situations.
 
 Building and Installation
 -------------------------
