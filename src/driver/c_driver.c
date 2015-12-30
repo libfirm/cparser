@@ -84,6 +84,10 @@ lang_standard_t standard;
 const char     *dumpfunction;
 const char     *print_file_name_file;
 
+/** The language standard, lexer, parser, ast, ... is setup for this compilation
+ * unit. */
+static compilation_unit_t *current_unit;
+
 static char const* str_lang_standard(lang_standard_t const standard)
 {
 	switch (standard) {
@@ -265,8 +269,12 @@ static void init_c_dialect(bool const is_cpp, compilation_unit_t const *const un
 	init_ast_dialect();
 }
 
-static void init_c_dialect_for_unit(compilation_unit_t *unit)
+static void init_parser_and_ast(compilation_unit_t *unit)
 {
+	if (current_unit == unit)
+		return;
+	current_unit = unit;
+
 	determine_unit_standard(unit);
 
 	compilation_unit_type_t type = unit->type;
@@ -311,7 +319,7 @@ static bool run_external_preprocessor(compilation_env_t *env,
                                       compilation_unit_t *unit)
 {
 	(void)env;
-	init_c_dialect_for_unit(unit);
+	init_parser_and_ast(unit);
 	init_external_preprocessor();
 
 	char const *const flags = obstack_nul_finish(&cppflags_obst);
@@ -504,7 +512,7 @@ static bool start_preprocessing(compilation_env_t *env,
 	if (!open_input(unit))
 		return false;
 
-	init_c_dialect_for_unit(unit);
+	init_parser_and_ast(unit);
 	if (!driver_no_stdinc)
 		append_standard_include_paths();
 	append_environment_include_paths();
@@ -681,7 +689,7 @@ bool do_parsing(compilation_env_t *env, compilation_unit_t *unit)
 	timer_register(t_parsing, "Frontend: Parsing");
 	timer_start(t_parsing);
 
-	init_c_dialect_for_unit(unit);
+	init_parser_and_ast(unit);
 
 	start_parsing();
 
