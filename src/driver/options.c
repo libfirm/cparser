@@ -135,10 +135,10 @@ bool options_parse_preprocessor(options_state_t *s)
 		append_include_path(&bracket_searchpath, arg);
 	} else if ((arg = prefix_arg("D", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-D%s", arg);
-		parse_define(arg);
+		record_cmdline_define(true, arg);
 	} else if ((arg = prefix_arg("U", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-U%s", arg);
-		undefine(arg);
+		record_cmdline_define(false, arg);
 	} else if (streq(option, "MMD") || streq(option, "MD")) {
 		construct_dep_target = true;
 		include_system_headers_in_dependencies = streq(option, "MD");

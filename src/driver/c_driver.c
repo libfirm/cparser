@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "adt/array.h"
 #include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
@@ -83,6 +84,34 @@ unsigned        features_off;
 lang_standard_t standard;
 const char     *dumpfunction;
 const char     *print_file_name_file;
+
+typedef struct define_t {
+	bool        is_define;
+	char const *define;
+} define_t;
+
+static define_t *cmdline_defines;
+
+void record_cmdline_define(bool const is_define, char const *const define)
+{
+	if (!cmdline_defines)
+		cmdline_defines = NEW_ARR_F(define_t, 0);
+	ARR_APP1(define_t, cmdline_defines, ((define_t){ is_define, define }));
+}
+
+static void process_cmdline_defines(void)
+{
+	if (!cmdline_defines)
+		return;
+	for (size_t i = 0, n = ARR_LEN(cmdline_defines); i != n; ++i) {
+		define_t const *const def = &cmdline_defines[i];
+		if (def->is_define) {
+			parse_define(def->define);
+		} else {
+			undefine(def->define);
+		}
+	}
+}
 
 /** The language standard, lexer, parser, ast, ... is setup for this compilation
  * unit. */
@@ -517,6 +546,7 @@ static bool start_preprocessing(compilation_env_t *env,
 		append_standard_include_paths();
 	append_environment_include_paths();
 	setup_preprocessor();
+	process_cmdline_defines();
 	if (driver_verbose)
 		print_include_paths();
 

@@ -45,6 +45,8 @@ extern bool            driver_no_stdinc;
 extern const char     *driver_default_exe_output;
 extern const char     *print_file_name_file;
 
+void record_cmdline_define(bool is_define, char const *define);
+
 void set_default_handlers(void);
 
 bool link_program(compilation_env_t *env, compilation_unit_t *units);
