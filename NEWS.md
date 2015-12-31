@@ -19,7 +19,7 @@ cparser 1.22.0 (2015-12-31)
 * Support -Wunknown-warning-option
 * Select the base type for enums like gcc
 * Support -no-integrated-cpp
-* Warn about /* within /**/ comments
+* Support -Wcomment (warn about /* within /**/ comments)
 * Use integrated preprocessor by default
 * Improve auto-detection of host machine triple
 * Support -Wunused-option
