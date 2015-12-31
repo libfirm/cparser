@@ -161,6 +161,11 @@ static bool is_ia32_cpu(const char *cpu)
 	    && cpu[1] >= '3' && cpu[1] <= '7';
 }
 
+static bool is_amd64_cpu(char const *const cpu)
+{
+	return streq(cpu, "x86_64") || streq(cpu, "amd64");
+}
+
 static void set_options_for_machine(machine_triple_t const *const machine)
 {
 	/* Note: Code here should only check the target triple! Querying other
@@ -246,7 +251,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		modulo_shift       = 256;
 		long_double_size   = 8;
 		float_int_overflow = ir_overflow_min_max;
-	} else if (streq(cpu, "x86_64")) {
+	} else if (is_amd64_cpu(cpu)) {
 		ppdef("__x86_64",   "1");
 		ppdef("__x86_64__", "1");
 		ppdef("__amd64",    "1");
@@ -525,7 +530,7 @@ static void determine_target_machine(void)
 	if (is_ia32_cpu(cpu) && target_size_override == 64) {
 		free(target.machine->cpu_type);
 		target.machine->cpu_type = xstrdup("x86_64");
-	} else if (streq(cpu, "x86_64") && target_size_override == 32) {
+	} else if (is_amd64_cpu(cpu) && target_size_override == 32) {
 		free(target.machine->cpu_type);
 		target.machine->cpu_type = xstrdup("i686");
 	}
