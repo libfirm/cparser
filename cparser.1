@@ -9,6 +9,7 @@
 .Op Fl c | S | E | -print-ast
 .Op Fl -print-implicit-cast
 .Op Fl -print-parenthesis
+.Op Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
 .Op Fl ansi
 .Op Fl std= Ns Ar standard
 .Op Fl - Ns Oo Cm no- Oc Ns Cm gcc
@@ -57,6 +58,23 @@ show casts, which are inserted by the semantic checks.
 When using
 .Fl -print-ast ,
 show all expressions fully parenthesized.
+.It Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
+Set target, for which code is generated.
+Supported
+.Ar architecture Ns s are
+.Cm amd64 , arm , i386 , i486 , i586 , i686 , i787 , sparc
+and
+.Cm x86_64.
+Supported
+.Ar vendor Ns s are
+.Cm leon
+(for sparc) and
+.Cm unknown.
+Supported
+.Ar system Ns s are
+.Cm *bsd*, darwin*, elf, irtss, *linux*, midipix*, mingw*
+and
+.Cm octopos .
 .It Fl ansi
 Same as -std=c90 (for C) or -std=c++98 (for C++).
 .It Fl std= Ns Ar standard
