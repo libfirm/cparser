@@ -10,7 +10,7 @@ acts as a frontend to the libFirm intermediate representation library.  This
 way optimization and code generation is performed. The compiler supports cross
 compilation to multiple target architectures with a command-line switch.  It
 comes with driver logic for calling assemblers and linkers as well as parsing
-command-line options.  This allows it to be a drop in replacement for gcc or
+command-line options.  This allows it to be a drop-in replacement for gcc or
 clang in many situations.
 
 Building and Installation
