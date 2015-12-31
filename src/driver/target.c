@@ -258,7 +258,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		float_int_overflow = ir_overflow_indefinite;
 		dialect.long_double_x87_80bit_float = true;
 	} else {
-		errorf(NULL, "unknown cpu '%s' in target-triple", os);
+		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		exit(EXIT_FAILURE);
 	}
 
