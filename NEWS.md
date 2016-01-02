@@ -13,13 +13,13 @@ cparser 1.22.0 (2015-12-31)
 * Support -Wsystem
 * Partial support for C11 features
 * Support -pedantic and -pedantic-errors
-* Support __attribute__((alias()))
+* Support `__attribute__((alias()))`
 * Support -Wnot-compound-assign
 * Support -Wcompat-option
 * Support -Wunknown-warning-option
 * Select the base type for enums like gcc
 * Support -no-integrated-cpp
-* Support -Wcomment (warn about /* within /**/ comments)
+* Support -Wcomment (warn about `/*` within `/**/` comments)
 * Use integrated preprocessor by default
 * Improve auto-detection of host machine triple
 * Support -Wunused-option
@@ -36,9 +36,9 @@ cparser 1.22.0 (2015-12-31)
 * Support Makefile dependency generation (-M, -MD, ...)
 * Support -fno-verbose-asm (-fverbose-asm is default)
 * Improve diagnostics for disabled language extensions
-* Support setting the mantissa with __builtin_nan
-* Recognize, but reject, MSC asm statements, i.e. __asm { ... }
-* Support attribute for custom printf-like format checks, e.g. int my_printf(char const* fmt, ...) __attribute__((custom_format(1, "#0", "%": void, "d": int, "ld": long, "s": char const*));
+* Support setting the mantissa with `__builtin_nan`
+* Recognize, but reject, MSC asm statements, i.e. `__asm { ... }`
+* Support attribute for custom printf-like format checks, e.g. `int my_printf(char const* fmt, ...) __attribute__((custom_format(1, "#0", "%": void, "d": int, "ld": long, "s": char const*));`
 * Show an explanation for each warning switch when printing the help
 * Improve PIC commandline options
 * Support -f[no-]builtin
