@@ -261,9 +261,7 @@ bool options_parse_driver(options_state_t *s)
 	++option;
 
 	const char *arg;
-	if (option[0] == 'O') {
-		/* -O flags have already been handled in early option parsing */
-	} else if ((arg = prefix_arg("o", s)) != NULL) {
+	if ((arg = prefix_arg("o", s)) != NULL) {
 		outname = arg;
 	} else if ((arg = prefix_arg("x", s)) != NULL) {
 		forced_unittype = get_unit_type_from_string(arg);
@@ -743,7 +741,7 @@ bool options_parse_early_codegen(options_state_t *s)
 		} else {
 			errorf(NULL, "invalid optimization option '%s'", full_option);
 			s->argument_errors = true;
-			return false;
+			return true;
 		}
 		choose_optimization_pack(opt_level);
 		predef_optimize = opt_level > 0;
