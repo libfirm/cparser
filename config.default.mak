@@ -1,4 +1,4 @@
-VERSION = 1.22.0
+VERSION = 1.22.1
 
 # Use libfirm subdir if it exists, otherwise use pkg-config
 ifneq ("$(wildcard $(top_srcdir)/libfirm)", "")

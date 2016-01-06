@@ -6,7 +6,7 @@ if(POLICY CMP0028)
 	cmake_policy(SET CMP0028 NEW)
 endif()
 project(cparser C)
-set(cparser_VERSION "1.22.0")
+set(cparser_VERSION "1.22.1")
 
 # Enable C99
 if(CMAKE_VERSION VERSION_LESS "3.1")
