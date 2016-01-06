@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd July 9, 2012
+.Dd January 15, 2016
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -9,6 +9,7 @@
 .Op Fl c | S | E | -print-ast
 .Op Fl -print-implicit-cast
 .Op Fl -print-parenthesis
+.Op Fl Oo Cm no- Oc Ns Cm integrated-cpp
 .Op Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
 .Op Fl ansi
 .Op Fl std= Ns Ar standard
@@ -60,6 +61,10 @@ show casts, which are inserted by the semantic checks.
 When using
 .Fl -print-ast ,
 show all expressions fully parenthesized.
+.It Fl Oo Cm no- Oc Ns Cm integrated-cpp
+Use the integrated preprocessor instead of an external one.
+.No This is the default if no Fl target No is specified .
+.No Otherwise the external preprocessor Ar architecture Ns Cm - Ns Ar vendor Ns Cm - Ns Ar system Ns Cm -gcc No is used .
 .It Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
 Set target, for which code is generated.
 Supported
