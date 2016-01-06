@@ -5,17 +5,33 @@ top_srcdir   ?= .
 top_builddir ?= build
 VPATH        ?= $(top_srcdir)/src
 
-include config.default.mak
-
 variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverage)
 srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
+
+include config.default.mak
 
 AR ?= ar
 DLLEXT ?= .so
 LINK ?= $(CC)
 
-CPPFLAGS  = -I$(top_srcdir)/src -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR) $(MULTILIB_INCLUDE_DIR) $(MULTILIB_M32_TRIPLE) $(MULTILIB_M64_TRIPLE) $(HOST_TRIPLE)
+CPPFLAGS += -I$(top_srcdir)/src -I$(builddir)
+ifneq ("$(SYSTEM_INCLUDE_DIR)","")
+	CPPFLAGS += -DSYSTEM_INCLUDE_DIR=\"$(SYSTEM_INCLUDE_DIR)\"
+endif
+ifneq ("$(LOCAL_INCLUDE_DIR)","")
+	CPPFLAGS += -DLOCAL_INCLUDE_DIR=\"$(LOCAL_INCLUDE_DIR)\"
+endif
+ifneq ("$(COMPILER_INCLUDE_DIR)","")
+	CPPFLAGS += -DCOMPILER_INCLUDE_DIR=\"$(COMPILER_INCLUDE_DIR)\"
+endif
+ifneq ("$(HOST_TRIPLE)","")
+	CPPFLAGS += -DHOST_TRIPLE=\"$(HOST_TRIPLE)\"
+endif
+ifneq ("$(MULTILIB_M32_TRIPLE)","")
+	CPPFLAGS += -DAPPEND_MULTILIB_DIRS -DMULTILIB_M32_TRIPLE=\"$(MULTILIB_M32_TRIPLE)\" -DMULTILIB_M64_TRIPLE=\"$(MULTILIB_M64_TRIPLE)\"
+endif
+
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes

@@ -1,3 +1,5 @@
+VERSION = 1.22.0
+
 # Use libfirm subdir if it exists, otherwise use pkg-config
 ifneq ("$(wildcard $(top_srcdir)/libfirm)", "")
 FIRM_HOME     ?= $(top_srcdir)/libfirm
@@ -15,32 +17,32 @@ LIBFIRM_FILE_DLL =
 endif
 
 ifeq ("$(shell uname)", "Darwin")
-# See if /usr/include exists (old darwin version)
-ifneq ("$(wildcard /usr/include)", "")
-SYSTEM_INCLUDE_DIR ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
-else
-# Use xcrun to get the include directory of the default toolchain
-SYSTEM_INCLUDE_DIR ?= -DSYSTEM_INCLUDE_DIR=\"$(shell xcrun -show-sdk-path)/usr/include\"
+# Query xcrun if /usr/include does not exist (new darwin versions)
+ifeq ("$(wildcard /usr/include)", "")
+SYSTEM_INCLUDE_DIR ?= "$(shell xcrun -show-sdk-path)/usr/include"
 endif
-else
-# location of the system/libc headers
-SYSTEM_INCLUDE_DIR   ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
-# if APPEND_MULTILIB_DIRS is defined, then we append a directory with the
-# machine triple to the system and local directory. i.e. if the target triple
-# is i386-linux-gnu we append $SYSTEM_INCLUDE_DIR/i386-linux-gnu and
-# $LOCAL_INCLUDE_DIR/i386-linux-gnu
-MULTILIB_INCLUDE_DIR ?= -DAPPEND_MULTILIB_DIRS
-# hardcoded machine triple for multiarch dir when just -m32 is given
-# (may be empty)
-MULTILIB_M32_TRIPLE ?= -DMULTILIB_M32_TRIPLE=\"i386-linux-gnu\"
-# hardcoded machine triple for multiarch dir when just -m64 is given
-# (may be empty)
-MULTILIB_M64_TRIPLE ?= -DMULTILIB_M64_TRIPLE=\"x86_64-linux-gnu\"
 endif
 
-# location of additional headers (may be undefined)
-LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
-# location of the compiler provided headers
-COMPILER_INCLUDE_DIR ?= -DCOMPILER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
-# hardcoded machine triple for the host machine (may be undefined)
-HOST_TRIPLE         ?=
+# location of the system/libc headers
+SYSTEM_INCLUDE_DIR ?= /usr/include
+# if MULTILIB_M32_TRIPLE is defined, then we append a directory with the
+# machine triple to the system and local directory. i.e. if the target triple
+# is i386-linux-gnu we append $SYSTEM_INCLUDE_DIR/i386-linux-gnu and
+ifneq ("$(wildcard $(SYSTEM_INCLUDE_DIR)/x86_64-linux-gnu)","")
+# $LOCAL_INCLUDE_DIR/i386-linux-gnu.
+# -m32 triple:
+MULTILIB_M32_TRIPLE ?= i386-linux-gnu
+# -m64 triple:
+MULTILIB_M64_TRIPLE ?= x86_64-linux-gnu
+endif
+
+# location of additional headers
+LOCAL_INCLUDE_DIR ?= /usr/local/include
+# location of the compiler provided headers. If PREFIX is not set we assume that
+# we have a developer who wants to run cparser from source/builddir without
+# installing it.
+ifndef PREFIX
+COMPILER_INCLUDE_DIR ?= "$(abspath $(srcdir))/include"
+else
+COMPILER_INCLUDE_DIR ?= $(PREFIX)/lib/cparser/$(VERSION)/include
+endif

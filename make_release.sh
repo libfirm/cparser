@@ -22,6 +22,8 @@ egrep -q "#define CPARSER_MINOR\\s*\"$VERSION_MINOR\"" "$VERSIONFILE"
 egrep -q "#define CPARSER_PATCHLEVEL\\s*\"$VERSION_MICRO\"" "$VERSIONFILE"
 echo "Checking version in CMakeLists.txt"
 grep -q "set(cparser_VERSION \"${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_MICRO}\")" CMakeLists.txt
+echo "Checking version in config.default.mak"
+egrep -q "VERSION\\s*=\\s*$VERSION_MAJOR\\.$VERSION_MINOR\\.$VERSION_MICRO" config.default.mak
 echo "Checking version in NEWS.md"
 egrep -q "$VERSION_MAJOR.$VERSION_MINOR.$VERSION_MICRO" NEWS.md
 
