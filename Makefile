@@ -158,3 +158,13 @@ $(builddir)/%.o: %.c
 clean:
 	@echo 'CLEAN'
 	$(Q)rm -rf $(builddir)
+
+.PHONY: install
+PREFIX ?= /usr/local
+INSTALL ?= install
+BINDIR = $(DESTDIR)$(PREFIX)/bin
+install: $(cparser_EXE)
+	$(INSTALL) -d $(DESTDIR)$(COMPILER_INCLUDE_DIR)
+	$(INSTALL) -m0644 include/*.h $(DESTDIR)$(COMPILER_INCLUDE_DIR)
+	$(INSTALL) -d $(BINDIR)
+	$(INSTALL) -m0755 $< $(BINDIR)

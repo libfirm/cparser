@@ -38,6 +38,17 @@ it can adapt the compiler and linker flags to build shared libraries for a
 wider range of systems, provides an installation target and is often more
 familiar for people preparing packages for distribution.
 
+### Notes for a cparser installation
+
+While cparser often runs fine from the source/build directory, a proper
+installation should be configured with correct system paths. For this a
+`config.mak` file should be created and the following variables set apropriately
+for the system: `PREFIX`, `SYSTEM_INCLUDE_DIR`, `LOCAL_INCLUDE_DIR`,
+`COMPILER_INCLUDE_DIR`, `MULTILIB_M32_TRIPLE`, `MULTILIB_M64_TRIPLE`,
+`variant=optimize`.
+The variable may be defined empty; See `config.default.mak` and `Makefile` for
+details.
+
 Further Information and Contact
 -------------------------------
 
