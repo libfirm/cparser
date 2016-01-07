@@ -83,6 +83,8 @@ unsigned        features_on;
 unsigned        features_off;
 lang_standard_t standard;
 const char     *dumpfunction;
+const char     *isysroot;
+const char     *lsysroot;
 const char     *print_file_name_file;
 
 typedef struct define_t {
@@ -503,7 +505,7 @@ bool assemble_intermediate(compilation_env_t *env, compilation_unit_t *unit)
 static void append_standard_include_paths(void)
 {
 	if (compiler_include_dir != NULL)
-		append_include_path(&system_searchpath, compiler_include_dir);
+		append_include_path(&system_searchpath, compiler_include_dir, false);
 #ifdef APPEND_MULTILIB_DIRS
 	assert(obstack_object_size(&file_obst) == 0);
 	const char *triple = multilib_directory_target_triple != NULL
@@ -511,20 +513,25 @@ static void append_standard_include_paths(void)
 	if (triple != NULL) {
 		obstack_printf(&file_obst, "%s/%s", local_include_dir, triple);
 		char *const path = obstack_nul_finish(&file_obst);
-		append_include_path(&system_searchpath, path);
+		append_include_path(&system_searchpath, path, true);
 	}
 #endif
 	if (local_include_dir != NULL)
-		append_include_path(&system_searchpath, local_include_dir);
+		append_include_path(&system_searchpath, local_include_dir, true);
 #ifdef APPEND_MULTILIB_DIRS
 	if (triple != NULL) {
 		obstack_printf(&file_obst, "%s/%s", system_include_dir, triple);
 		char *const path = obstack_nul_finish(&file_obst);
-		append_include_path(&system_searchpath, path);
+		append_include_path(&system_searchpath, path, true);
 	}
 #endif
 	if (system_include_dir != NULL)
-		append_include_path(&system_searchpath, system_include_dir);
+		append_include_path(&system_searchpath, system_include_dir, true);
+
+	if (isysroot) {
+		append_include_path(&system_searchpath, "/local/include", true);
+		append_include_path(&system_searchpath, "/include", true);
+	}
 }
 
 static void append_environment_include_paths(void)
@@ -893,6 +900,11 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 			continue;
 
 		driver_add_flag(&file_obst, "%s", unit->name);
+	}
+
+	if (lsysroot) {
+		obstack_grow(&file_obst," --sysroot=",11);
+		obstack_grow(&file_obst,isysroot,strlen(lsysroot));
 	}
 
 	driver_add_flag(&file_obst, "-o");

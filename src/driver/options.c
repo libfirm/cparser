@@ -156,7 +156,7 @@ bool options_parse_preprocessor(options_state_t *s)
 	bool is_MD = false;
 	if ((arg = prefix_arg("I", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-I%s", arg);
-		append_include_path(&bracket_searchpath, arg);
+		append_include_path(&bracket_searchpath, arg, false);
 	} else if ((arg = prefix_arg("D", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-D%s", arg);
 		record_cmdline_define(true, arg);
@@ -189,15 +189,15 @@ add_arg_opt:
 	} else if ((arg = prefix_arg("idirafter", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-idirafter");
 		driver_add_flag(&cppflags_obst, "%s", arg);
-		append_include_path(&after_searchpath, arg);
+		append_include_path(&after_searchpath, arg, false);
 	} else if ((arg = prefix_arg("isystem", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-isystem");
 		driver_add_flag(&cppflags_obst, "%s", arg);
-		append_include_path(&system_searchpath, arg);
+		append_include_path(&system_searchpath, arg, false);
 	} else if ((arg = prefix_arg("iquote", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-iquote");
 		driver_add_flag(&cppflags_obst, "%s", arg);
-		append_include_path(&quote_searchpath, arg);
+		append_include_path(&quote_searchpath, arg, false);
 	} else if (simple_arg("nostdinc", s)) {
 		driver_no_stdinc = true;
 		driver_add_flag(&cppflags_obst, "-%s", option);
@@ -748,5 +748,25 @@ bool options_parse_early_codegen(options_state_t *s)
 	} else
 		return false;
 	/* Remove argument so we do not parse it again in later phases */
+	return true;
+}
+
+bool options_parse_early_sysroot(options_state_t *const s)
+{
+	char const *arg;
+	if ((arg = spaced_arg("isysroot", s)) != NULL) {
+		isysroot = arg;
+		s->argv[s->i - 1] = NULL;
+	} else if ((arg = prefix_arg("isysroot", s)) != NULL) {
+		isysroot = arg;
+	} else if ((arg = spaced_arg("-sysroot", s)) != NULL) {
+		lsysroot = arg;
+		s->argv[s->i - 1] = NULL;
+	} else if ((arg = equals_arg("-sysroot", s)) != NULL) {
+		lsysroot = arg;
+	} else {
+		return false;
+	}
+
 	return true;
 }

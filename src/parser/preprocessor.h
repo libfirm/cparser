@@ -75,7 +75,7 @@ extern searchpath_t system_searchpath;  /**< system searchpath (appended to
 extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also
                                              system paths) */
 
-void append_include_path(searchpath_t *searchpath, const char *path);
+void append_include_path(searchpath_t *searchpath, const char *path, bool force_sysroot);
 void append_env_paths(searchpath_t *paths, const char *envvar);
 void print_include_paths(void);
 void print_defines(void);

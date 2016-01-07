@@ -104,6 +104,8 @@ static void print_help_preprocessor(void)
 	help_simple("-no-integrated-cpp",       "Use an external preprocessor");
 	help_simple("-nostdinc",                "Do not search standard system include directories");
 	help_simple("-trigraphs",               "Support ISO C trigraphs");
+	help_equals("--sysroot", "<dir>",       "set (default) root directory for (headers and) libraries");
+	help_prefix("-isysroot", "<dir>",       "set root directory for headers");
 	help_simple("-isystem",                 "");
 	help_simple("-include",                 "");
 	help_prefix("-I", "PATH",               "");

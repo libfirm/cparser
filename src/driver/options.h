@@ -20,6 +20,7 @@ typedef struct options_state_t {
 
 bool options_parse_early_target(options_state_t *state);
 bool options_parse_early_codegen(options_state_t *state);
+bool options_parse_early_sysroot(options_state_t *state);
 
 bool options_parse_assembler(options_state_t *state);
 bool options_parse_c_dialect(options_state_t *state);

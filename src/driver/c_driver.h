@@ -43,6 +43,8 @@ extern int             driver_use_integrated_preprocessor;
 extern bool            driver_verbose;
 extern bool            driver_no_stdinc;
 extern const char     *driver_default_exe_output;
+extern const char     *isysroot;
+extern const char     *lsysroot;
 extern const char     *print_file_name_file;
 
 void record_cmdline_define(bool is_define, char const *define);

@@ -30,6 +30,8 @@
 .Op Fl x Ar language
 .Op Fl Wl, Ns Ar option
 .Op Fl Wp, Ns Ar option
+.Op Fl -sysroot= Ns Ar dir
+.Op Fl isysroot Ar dir
 .Ar
 .Sh DESCRIPTION
 .Nm
@@ -369,6 +371,14 @@ to the linker.
 Pass
 .Ar option
 to the preprocessor.
+.It Fl -sysroot= Ns Ar dir , Fl -sysroot Ar dir
+.No Use Ar dir No as prefix for all implicit include and library paths of the compiler driver as well as for all include and library paths, which start with Sq = .
+.No For include paths this option is superseded by Fl isysroot .
+.No By default no prefix is used and So = Sc is not replaced.
+.It Fl isysroot Ns Ar dir , Fl isysroot Ar dir
+.No Use Ar dir No as prefix for all implicit include paths of the compiler driver as well as for all include paths, which start with Sq = .
+.No this supersedes Fl -sysroot .
+.No By default no prefix is used and So = Sc is not replaced.
 .El
 .Sh SEE ALSO
 .Xr gcc 1 ,

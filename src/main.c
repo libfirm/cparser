@@ -306,9 +306,13 @@ int main(int argc, char **argv)
 	/* do early option parsing */
 	for (state.i = 1; state.i < argc; ++state.i) {
 		if (options_parse_early_target(&state)
+		 || options_parse_early_sysroot(&state)
 		 || options_parse_early_codegen(&state))
 			state.argv[state.i] = NULL;
 	}
+
+	if (!isysroot)
+		isysroot = lsysroot;
 
 	/* Setup target so later options can override the target defaults */
 	target_set_defaults();

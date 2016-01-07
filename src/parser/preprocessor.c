@@ -28,6 +28,7 @@
 #include "ast/symbol_table_t.h"
 #include "ast/symbol_t.h"
 #include "driver/diagnostic.h"
+#include "driver/c_driver.h"
 #include "driver/lang_features.h"
 #include "input.h"
 
@@ -4106,11 +4107,24 @@ static void next_condition_token(void)
 	} while (start_expanding());
 }
 
-void append_include_path(searchpath_t *paths, const char *path)
+void append_include_path(searchpath_t *const paths, char const *path, bool const force_sysroot)
 {
-	searchpath_entry_t *entry = OALLOCZ(&config_obstack, searchpath_entry_t);
-	entry->path           = path;
-	entry->is_system_path = paths->is_system_path;
+	if (isysroot) {
+		if (*path == '=') {
+			++path;
+			goto prepend_sysroot;
+		} else if (force_sysroot) {
+prepend_sysroot:
+			obstack_printf(&config_obstack,  "%s%s", isysroot, path);
+			path = obstack_nul_finish(&config_obstack);
+		}
+	}
+
+	searchpath_entry_t *const entry = OALLOC(&config_obstack, searchpath_entry_t);
+	*entry = (searchpath_entry_t){
+		.path           = path,
+		.is_system_path = paths->is_system_path,
+	};
 
 	*paths->anchor = entry;
 	paths->anchor  = &entry->next;
@@ -4131,10 +4145,10 @@ void append_env_paths(searchpath_t *paths, const char *envvar)
 			if (len == 0) {
 				/* use "." for gcc compatibility (Matze: I would expect that
 				 * nothing happens for an empty entry...) */
-				append_include_path(paths, ".");
+				append_include_path(paths, ".", false);
 			} else {
 				char *const string = obstack_copy0(&config_obstack, begin, len);
-				append_include_path(paths, string);
+				append_include_path(paths, string, false);
 			}
 
 			begin = c+1;
