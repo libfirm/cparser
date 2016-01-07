@@ -569,7 +569,7 @@ bool options_parse_diagnostics(options_state_t *s)
 	} else if (option[0] == 'f') {
 		const char *arg;
 
-		if ((arg = equals_arg("message-length", s)) != NULL) {
+		if ((arg = equals_arg("fmessage-length", s)) != NULL) {
 			(void)arg;
 			/* not supported yet */
 		} else {
