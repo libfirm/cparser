@@ -751,6 +751,9 @@ bool options_parse_early_codegen(options_state_t *s)
 		} else if (streq(arg, "s")) {
 			opt_level = 2; /* TODO For now, until we have a real '-Os'. */
 			predef_optimize_size = true;
+		} else if (streq(arg, "z")) {
+			opt_level = 2; /* TODO For now until we have a real '-Oz'. */
+			predef_optimize_size = true;
 		} else {
 			errorf(NULL, "invalid optimization option '%s'", full_option);
 			s->argument_errors = true;

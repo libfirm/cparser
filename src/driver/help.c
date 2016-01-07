@@ -169,7 +169,14 @@ static void print_help_warnings(void)
 
 static void print_help_optimization(void)
 {
-	help_aprefix("-O", "LEVEL",              "Select optimization level (0-4)");
+	help_aprefix("-O", "LEVEL",              "Select optimization level");
+	put_choice("0",                          "Disable all optimizations");
+	put_choice("1",                          "Only perform fast basic optimizations");
+	put_choice("2",                          "Optimize in a way suitable for most software");
+	put_choice("3",                          "Aggressively optimize at the expense of compilation speed and code size");
+	put_choice("g",                          "Optimize without degrading the ability to debug");
+	put_choice("s",                          "Optimize for code size");
+	put_choice("z",                          "Aggressively optimize for code size");
 	firm_option_help(help_simple);
 	help_simple("-fexpensive-optimizations", "Ignored (gcc compatibility)");
 }
