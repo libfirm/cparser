@@ -120,10 +120,6 @@ static void print_help_warnings(void)
 {
 	put_help("-f[no-]diagnostics-show-option", "Show the switch, which controls a warning, after each warning");
 	put_help("-w",                             "Disable all warnings");
-	put_help("-Wno-trigraphs",                 "Warn if input contains trigraphs");
-	put_help("-Wundef",                        "Warn if an undefined macro is used in an #if");
-	put_help("-Wmissing-include-dirs",         "Warn about missing user-specified include directories");
-	put_help("-Wendif-labels",                 "Warn about stray text after #elif and #endif");
 	put_help("-Winit-self",                    "Ignored (gcc compatibility)");
 	put_help("-Wformat-y2k",                   "Ignored (gcc compatibility)");
 	put_help("-Wformat-security",              "Ignored (gcc compatibility)");
