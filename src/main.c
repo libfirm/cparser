@@ -237,7 +237,7 @@ static bool parse_compile_mode_options(options_state_t *s)
 		mode = MODE_PRINT_COMPOUND_SIZE;
 	} else if (simple_arg("-print-jna", s)) {
 		mode = MODE_PRINT_JNA;
-	} else if ((arg = spaced_arg("-dump-function", s, false)) != NULL) {
+	} else if ((arg = spaced_arg("-dump-function", s)) != NULL) {
 		dumpfunction = arg;
 		mode         = MODE_COMPILE_DUMP;
 	} else if (simple_arg("-export-ir", s)) {

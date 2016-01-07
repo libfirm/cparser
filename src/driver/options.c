@@ -59,28 +59,15 @@ static const char *prefix_arg(const char *prefix, options_state_t *s)
 		s->argument_errors = true;
 		return NULL;
 	}
-	def = s->argv[s->i+1];
-	if (def[0] == '-' && def[1] != '\0') {
-		errorf(NULL, "expected argument after '-%s'", prefix);
-		s->argument_errors = true;
-		return NULL;
-	}
-	++s->i;
-	return def;
+	return s->argv[++s->i];
 }
 
-const char *spaced_arg(const char *arg, options_state_t *s,
-                       bool arg_may_be_option)
+char const *spaced_arg(char const *const arg, options_state_t *const s)
 {
 	char const *const option = &s->argv[s->i][1];
 	if (streq(option, arg)) {
-		if (s->i + 1 < s->argc) {
-			char const *const res = s->argv[s->i + 1];
-			if (arg_may_be_option || res[0] != '-' || res[1] == '\0') {
-				++s->i;
-				return res;
-			}
-		}
+		if (s->i + 1 < s->argc)
+			return s->argv[s->i + 1];
 		errorf(NULL, "expected argument after '-%s'", arg);
 		s->argument_errors = true;
 	}
@@ -219,7 +206,7 @@ add_arg_opt:
 		if (input_decoder == NULL) {
 			errorf(NULL, "input encoding \"%s\" not supported", arg);
 		}
-	} else if ((arg = spaced_arg("Xpreprocessor", s, true)) != NULL) {
+	} else if ((arg = spaced_arg("Xpreprocessor", s)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-Xpreprocessor");
 		driver_add_flag(&cppflags_obst, arg);
 	} else if (accept_prefix(s, "-Wp,", true, &arg)) {
@@ -329,9 +316,9 @@ bool options_parse_driver(options_state_t *s)
 		print_implicit_casts = true;
 	} else if (simple_arg("-print-parenthesis", s)) {
 		print_parenthesis = true;
-	} else if ((arg = spaced_arg("-jna-limit", s, false)) != NULL) {
+	} else if ((arg = spaced_arg("-jna-limit", s)) != NULL) {
 		jna_limit_output(arg);
-	} else if ((arg = spaced_arg("-jna-libname", s, false)) != NULL) {
+	} else if ((arg = spaced_arg("-jna-libname", s)) != NULL) {
 		jna_set_libname(arg);
 	} else if (simple_arg("v", s)) {
 		driver_verbose = true;
@@ -389,7 +376,7 @@ bool options_parse_linker(options_state_t *s)
 	        || simple_arg("symbolic", s)
 	        || accept_prefix(s, "-Wl,", true, &arg)) {
 	    driver_add_flag(&ldflags_obst, full_option);
-	} else if ((arg = spaced_arg("Xlinker", s, true)) != NULL) {
+	} else if ((arg = spaced_arg("Xlinker", s)) != NULL) {
 		driver_add_flag(&ldflags_obst, "-Xlinker");
 		driver_add_flag(&ldflags_obst, arg);
 	} else if (simple_arg("pg", s)) {
@@ -410,7 +397,7 @@ bool options_parse_assembler(options_state_t *s)
 	const char *arg;
 	if (accept_prefix(s, "-Wa,", true, &arg)) {
 		driver_add_flag(&asflags_obst, "%s", full_option);
-	} else if ((arg = spaced_arg("Xassembler", s, true)) != NULL) {
+	} else if ((arg = spaced_arg("Xassembler", s)) != NULL) {
 		driver_add_flag(&asflags_obst, "-Xassembler");
 		driver_add_flag(&asflags_obst, arg);
 	} else {
@@ -697,7 +684,7 @@ bool options_parse_early_target(options_state_t *s)
 		driver_add_flag(&cppflags_obst, "-D_REENTRANT");
 		/* set flags for the linker */
 		driver_add_flag(&ldflags_obst, "-lpthread");
-	} else if ((arg = spaced_arg("target", s, false)) != NULL) {
+	} else if ((arg = spaced_arg("target", s)) != NULL) {
 		if (!parse_target_triple(arg))
 			s->argument_errors = true;
 		/* remove argument so we do not parse it again in later phases */

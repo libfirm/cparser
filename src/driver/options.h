@@ -33,8 +33,7 @@ bool options_parse_preprocessor(options_state_t *state);
 bool action_print_help(const char *argv0);
 void setup_target_machine(void);
 
-const char *spaced_arg(const char *arg, options_state_t *s,
-                       bool arg_may_be_option);
+char const *spaced_arg(char const *arg, options_state_t *s);
 bool simple_arg(const char *arg, options_state_t *s);
 
 #endif
