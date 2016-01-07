@@ -215,35 +215,36 @@ static bool parse_compile_mode_options(options_state_t *s)
 	const char *option = &full_option[1];
 
 	const char *arg;
-	if (streq(option, "M") || streq(option, "MM")) {
+	bool is_M = false;
+	if ((is_M = simple_arg("M", s)) || simple_arg("MM", s)) {
 		set_mode_gcc_prec(MODE_GENERATE_DEPENDENCIES, full_option);
 		driver_add_flag(&cppflags_obst, "-%s", option);
 		print_dependencies_instead_of_preprocessing = true;
-		include_system_headers_in_dependencies = streq(option, "M");
-	} else if (streq(option, "c")) {
+		include_system_headers_in_dependencies = is_M;
+	} else if (simple_arg("c", s)) {
 		set_mode_gcc_prec(MODE_COMPILE_ASSEMBLE, full_option);
-	} else if (streq(option, "E")) {
+	} else if (simple_arg("E", s)) {
 		set_mode_gcc_prec(MODE_PREPROCESS_ONLY, full_option);
-	} else if (streq(option, "S")) {
+	} else if (simple_arg("S", s)) {
 		set_mode_gcc_prec(MODE_COMPILE, full_option);
-	} else if (streq(option, "-benchmark")) {
+	} else if (simple_arg("-benchmark", s)) {
 		mode = MODE_BENCHMARK_PARSER;
-	} else if (streq(option, "-print-ast")) {
+	} else if (simple_arg("-print-ast", s)) {
 		mode = MODE_PRINT_AST;
-	} else if (streq(option, "-print-fluffy")) {
+	} else if (simple_arg("-print-fluffy", s)) {
 		mode = MODE_PRINT_FLUFFY;
-	} else if (streq(option, "-print-compound-sizes")) {
+	} else if (simple_arg("-print-compound-sizes", s)) {
 		mode = MODE_PRINT_COMPOUND_SIZE;
-	} else if (streq(option, "-print-jna")) {
+	} else if (simple_arg("-print-jna", s)) {
 		mode = MODE_PRINT_JNA;
 	} else if ((arg = spaced_arg("-dump-function", s, false)) != NULL) {
 		dumpfunction = arg;
 		mode         = MODE_COMPILE_DUMP;
-	} else if (streq(option, "-export-ir")) {
+	} else if (simple_arg("-export-ir", s)) {
 		mode = MODE_COMPILE_EXPORTIR;
-	} else if (streq(option, "fsyntax-only")) {
+	} else if (simple_arg("fsyntax-only", s)) {
 		set_mode_gcc_prec(MODE_PARSE_ONLY, full_option);
-	} else if (streq(option, "fno-syntax-only")) {
+	} else if (simple_arg("fno-syntax-only", s)) {
 	} else {
 		return false;
 	}

@@ -35,5 +35,6 @@ void setup_target_machine(void);
 
 const char *spaced_arg(const char *arg, options_state_t *s,
                        bool arg_may_be_option);
+bool simple_arg(const char *arg, options_state_t *s);
 
 #endif
