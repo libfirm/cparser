@@ -36,7 +36,7 @@ void print_warning_opt_help(void)
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
 		char buf[256];
 		snprintf(buf, sizeof(buf), "-W%s", i->name);
-		put_help(buf, i->explanation);
+		help_simple(buf, i->explanation);
 	}
 }
 

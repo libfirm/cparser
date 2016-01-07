@@ -14,9 +14,49 @@
 
 help_sections_t help;
 
-void put_help(const char *option, const char *explanation)
+/** Print help for a simpel_arg() option. */
+void help_simple(const char *option, const char *explanation)
 {
 	printf("\t%-15s  %s\n", option, explanation);
+}
+
+/** Print help for a prefix_arg() option. */
+static void help_prefix(const char *option, const char *optname,
+                        const char *explanation)
+{
+	char buf[128];
+	snprintf(buf, sizeof(buf), "%s %s", option, optname);
+	help_simple(buf, explanation);
+}
+
+/** Print help for an accept_prefix() option. */
+static void help_aprefix(const char *prefix, const char *optname,
+                         const char *explanation)
+{
+	char buf[128];
+	snprintf(buf, sizeof(buf), "%s%s", prefix, optname);
+	help_simple(buf, explanation);
+}
+
+/** Print help for a spaced_arg() option. */
+static void help_spaced(const char *option, const char *optname,
+                        const char *explanation)
+{
+	help_prefix(option, optname, explanation);
+}
+
+/** Print help for an equals_arg() option. */
+static void help_equals(const char *option, const char *optname,
+                        const char *explanation)
+{
+	char buf[128];
+	snprintf(buf, sizeof(buf), "%s=%s", option, optname);
+	help_simple(buf, explanation);
+}
+
+static void help_f_yesno(const char *option, const char *explanation)
+{
+	help_simple(option, explanation);
 }
 
 void put_choice(const char *choice, const char *explanation)
@@ -33,69 +73,69 @@ static void print_help_basic(const char *argv0)
 {
 	help_usage(argv0);
 	puts("");
-	put_help("--help",                   "Display this information");
-	put_help("--version",                "Display compiler version");
-	put_help("--help-preprocessor",      "Display information about preprocessor options");
-	put_help("--help-parser",            "Display information about parser options");
-	put_help("--help-warnings",          "Display information about warning options");
-	put_help("--help-codegen",           "Display information about code-generation options");
-	put_help("--help-optimization",      "Display information about optimization options");
-	put_help("--help-linker",            "Display information about linker options");
-	put_help("--help-language-tools",    "Display information about language tools options");
-	put_help("--help-debug",             "Display information about compiler debugging options");
-	put_help("--help-firm",              "Display information about direct firm options");
-	put_help("--help-all",               "Display information about all options");
-	put_help("-c",                       "Compile and assemble but do not link");
-	put_help("-E",                       "Preprocess only");
-	put_help("-S",                       "Compile but do not assembler or link");
-	put_help("-o",                       "Specify output file");
-	put_help("-v",                       "Verbose output (show invocation of sub-processes)");
-	put_help("-x",                       "Force input language:");
+	help_simple("--help",                   "Display this information");
+	help_simple("--version",                "Display compiler version");
+	help_simple("--help-preprocessor",      "Display information about preprocessor options");
+	help_simple("--help-parser",            "Display information about parser options");
+	help_simple("--help-warnings",          "Display information about warning options");
+	help_simple("--help-codegen",           "Display information about code-generation options");
+	help_simple("--help-optimization",      "Display information about optimization options");
+	help_simple("--help-linker",            "Display information about linker options");
+	help_simple("--help-language-tools",    "Display information about language tools options");
+	help_simple("--help-debug",             "Display information about compiler debugging options");
+	help_simple("--help-firm",              "Display information about direct firm options");
+	help_simple("--help-all",               "Display information about all options");
+	help_simple("-c",                       "Compile and assemble but do not link");
+	help_simple("-E",                       "Preprocess only");
+	help_simple("-S",                       "Compile but do not assembler or link");
+	help_simple("-o",                       "Specify output file");
+	help_simple("-v",                       "Verbose output (show invocation of sub-processes)");
+	help_prefix("-x", "LANGUAGE",           "Force input language:");
 	put_choice("c",                      "C");
 	put_choice("c++",                    "C++");
 	put_choice("assembler",              "Assembler (no preprocessing)");
 	put_choice("assembler-with-cpp",     "Assembler with preprocessing");
 	put_choice("none",                   "Autodetection");
-	put_help("-pipe",                    "Ignored (gcc compatibility)");
+	help_simple("-pipe",                    "Ignored (gcc compatibility)");
 }
 
 static void print_help_preprocessor(void)
 {
-	put_help("-no-integrated-cpp",       "Use an external preprocessor");
-	put_help("-nostdinc",                "Do not search standard system include directories");
-	put_help("-trigraphs",               "Support ISO C trigraphs");
-	put_help("-isystem",                 "");
-	put_help("-include",                 "");
-	put_help("-I PATH",                  "");
-	put_help("-D SYMBOL[=value]",        "");
-	put_help("-U SYMBOL",                "");
-	put_help("-Wp,OPTION",               "Pass option directly to preprocessor");
-	put_help("-Xpreprocessor OPTION",    "Pass option directly to preprocessor");
-	put_help("-M",                       "");
-	put_help("-MD",                      "");
-	put_help("-MMD",                     "");
-	put_help("-MM",                      "");
-	put_help("-MP",                      "");
-	put_help("-MT target",               "");
-	put_help("-MQ target",               "");
-	put_help("-MF file",                 "");
+	help_simple("-no-integrated-cpp",       "Use an external preprocessor");
+	help_simple("-nostdinc",                "Do not search standard system include directories");
+	help_simple("-trigraphs",               "Support ISO C trigraphs");
+	help_simple("-isystem",                 "");
+	help_simple("-include",                 "");
+	help_prefix("-I", "PATH",               "");
+	help_prefix("-D", "SYMBOL[=value]",     "");
+	help_prefix("-U", "SYMBOL",             "");
+	help_aprefix("-Wp,", "OPTION",          "Pass option directly to preprocessor");
+	help_spaced("-Xpreprocessor", "OPTION", "Pass option directly to preprocessor");
+	help_simple("-M",                       "");
+	help_simple("-MD",                      "");
+	help_simple("-MMD",                     "");
+	help_simple("-MM",                      "");
+	help_simple("-MP",                      "");
+	help_prefix("-MT", "target",            "");
+	help_prefix("-MQ", "target",            "");
+	help_prefix("-MF", "file",              "");
 }
 
 static void print_help_parser(void)
 {
-	put_help("-finput-charset=CHARSET",  "Select encoding of input files");
-	put_help("-fmessage-length=LEN",     "Ignored (gcc compatibility)");
-	put_help("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
-	put_help("-fshow-column",            "Show the column number in diagnostic messages");
-	put_help("-fcolor-diagnostics",      "Use colors in diagnostics");
-	put_help("-fdiagnostics-color",      "Use colors (gcc compatibility)");
-	put_help("-fsigned-char",            "Type \"char\" is a signed type");
-	put_help("-funsigned-char",          "Type \"char\" is an unsigned type");
-	put_help("--ms",                     "Enable msvc extensions");
-	put_help("--no-ms",                  "Disable msvc extensions");
-	put_help("--gcc",                    "Enable gcc extensions");
-	put_help("--no-gcc",                 "Disable gcc extensions");
-	put_help("-std=STANDARD",            "Specify language standard:");
+	help_equals("-finput-charset", "CHARSET", "Select encoding of input files");
+	help_equals("-fmessage-length", "LEN",  "Ignored (gcc compatibility)");
+	help_simple("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
+	help_simple("-fshow-column",            "Show the column number in diagnostic messages");
+	help_simple("-fcolor-diagnostics",      "Use colors in diagnostics");
+	help_simple("-fdiagnostics-color",      "Use colors (gcc compatibility)");
+	help_simple("-fsigned-char",            "Type \"char\" is a signed type");
+	help_simple("-funsigned-char",          "Type \"char\" is an unsigned type");
+	help_simple("--ms",                     "Enable msvc extensions");
+	help_simple("--no-ms",                  "Disable msvc extensions");
+	help_simple("--gcc",                    "Enable gcc extensions");
+	help_simple("--no-gcc",                 "Disable gcc extensions");
+	help_equals("-std", "STANDARD",         "Specify language standard:");
 	put_choice("c99",                    "ISO C99 standard");
 	put_choice("c89",                    "ISO C89 standard");
 	put_choice("c90",                    "Same as -std=c89");
@@ -111,49 +151,49 @@ static void print_help_parser(void)
 	put_choice("iso9899:199409",         "ISO C90");
 	put_choice("iso9899:1999",           "ISO C99");
 	put_choice("iso9899:199x",           "Deprecated");
-	put_help("-pedantic",                "be pedantic about C standard");
-	put_help("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
+	help_simple("-pedantic",                "be pedantic about C standard");
+	help_simple("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
 }
 
 static void print_help_warnings(void)
 {
-	put_help("-f[no-]diagnostics-show-option", "Show the switch, which controls a warning, after each warning");
-	put_help("-w",                             "Disable all warnings");
-	put_help("-Winit-self",                    "Ignored (gcc compatibility)");
-	put_help("-Wformat-y2k",                   "Ignored (gcc compatibility)");
-	put_help("-Wformat-security",              "Ignored (gcc compatibility)");
-	put_help("-Wold-style-declaration",        "Ignored (gcc compatibility)");
-	put_help("-Wtype-limits",                  "Ignored (gcc compatibility)");
+	help_f_yesno("-fdiagnostics-show-option", "Show the switch, which controls a warning, after each warning");
+	help_simple("-w",                         "Disable all warnings");
+	help_simple("-Winit-self",                "Ignored (gcc compatibility)");
+	help_simple("-Wformat-y2k",               "Ignored (gcc compatibility)");
+	help_simple("-Wformat-security",          "Ignored (gcc compatibility)");
+	help_simple("-Wold-style-declaration",    "Ignored (gcc compatibility)");
+	help_simple("-Wtype-limits",              "Ignored (gcc compatibility)");
 	print_warning_opt_help();
 }
 
 static void print_help_optimization(void)
 {
-	put_help("-O LEVEL",                 "Select optimization level (0-4)");
-	firm_option_help(put_help);
-	put_help("-fexpensive-optimizations","Ignored (gcc compatibility)");
+	help_aprefix("-O", "LEVEL",              "Select optimization level (0-4)");
+	firm_option_help(help_simple);
+	help_simple("-fexpensive-optimizations", "Ignored (gcc compatibility)");
 }
 
 static void print_help_codegeneration(void)
 {
-	put_help("-g",                       "Generate debug information");
-	put_help("-pg",                      "Instrument code for gnu gprof");
-	put_help("-fomit-frame-pointer",     "Produce code without frame pointer where possible");
-	put_help("-ffreestanding",           "Compile in freestanding mode (see ISO C standard)");
-	put_help("-fhosted",                 "Compile in hosted (not freestanding) mode");
-	put_help("-fprofile-generate",       "Generate instrumented code to collect profile information");
-	put_help("-fprofile-use",            "Use profile information generated by instrumented binaries");
-	put_help("-pthread",                 "Use pthread threading library");
-	put_help("-fverbose-asm",            "Ignored (gcc compatibility)");
-	put_help("-fjump-tables",            "Ignored (gcc compatibility)");
-	put_help("-fcommon",                 "Ignored (gcc compatibility)");
-	put_help("-foptimize-sibling-calls", "Ignored (gcc compatibility)");
-	put_help("-falign-loops",            "Ignored (gcc compatibility)");
-	put_help("-falign-jumps",            "Ignored (gcc compatibility)");
-	put_help("-falign-functions",        "Ignored (gcc compatibility)");
-	put_help("-fPIC",                    "Ignored (gcc compatibility)");
-	put_help("-ffast-math",              "Same as -ffp-fast (gcc compatibility)");
-	put_help("-target TARGET",           "Specify target architecture as CPU-manufacturer-OS triple");
+	help_aprefix("-g", "LEVEL",              "Generate debug information");
+	help_simple("-pg",                       "Instrument code for gnu gprof");
+	help_f_yesno("-fomit-frame-pointer",     "Produce code without frame pointer where possible");
+	help_f_yesno("-ffreestanding",           "Compile in freestanding mode (see ISO C standard)");
+	help_f_yesno("-fhosted",                 "Compile in hosted (not freestanding) mode");
+	help_f_yesno("-fprofile-generate",       "Generate instrumented code to collect profile information");
+	help_f_yesno("-fprofile-use",            "Use profile information generated by instrumented binaries");
+	help_simple("-pthread",                  "Use pthread threading library");
+	help_f_yesno("-fverbose-asm",            "Ignored (gcc compatibility)");
+	help_f_yesno("-fjump-tables",            "Ignored (gcc compatibility)");
+	help_f_yesno("-fcommon",                 "Ignored (gcc compatibility)");
+	help_f_yesno("-foptimize-sibling-calls", "Ignored (gcc compatibility)");
+	help_f_yesno("-falign-loops",            "Ignored (gcc compatibility)");
+	help_f_yesno("-falign-jumps",            "Ignored (gcc compatibility)");
+	help_f_yesno("-falign-functions",        "Ignored (gcc compatibility)");
+	help_f_yesno("-fPIC",                    "Ignored (gcc compatibility)");
+	help_f_yesno("-ffast-math",              "Same as -ffp-fast (gcc compatibility)");
+	help_spaced("-target", "TARGET",         "Specify target architecture as CPU-manufacturer-OS triple");
 	puts("");
 	puts("\tMost of these options can be used with a no- prefix to disable them");
 	puts("\te.g. -fno-omit-frame-pointer");
@@ -161,41 +201,41 @@ static void print_help_codegeneration(void)
 
 static void print_help_linker(void)
 {
-	put_help("-l LIBRARY",               "");
-	put_help("-L PATH",                  "");
-	put_help("-s",                       "Do not produce symbol table and relocation information");
-	put_help("-shared",                  "Produce a shared library");
-	put_help("-static",                  "Produce statically linked binary");
-	put_help("-Wa,OPTION",               "Pass option directly to assembler");
-	put_help("-Xassembler OPTION",       "Pass option directly to assembler");
-	put_help("-Wl,OPTION",               "Pass option directly to linker");
-	put_help("-Xlinker OPTION",          "Pass option directly to linker");
+	help_prefix("-l", "LIBRARY",            "");
+	help_prefix("-L", "PATH",               "");
+	help_simple("-s",                       "Do not produce symbol table and relocation information");
+	help_simple("-shared",                  "Produce a shared library");
+	help_simple("-static",                  "Produce statically linked binary");
+	help_aprefix("-Wa,", "OPTION",          "Pass option directly to assembler");
+	help_spaced("-Xassembler", "OPTION",    "Pass option directly to assembler");
+	help_aprefix("-Wl,", "OPTION",          "Pass option directly to linker");
+	help_spaced("-Xlinker", "OPTION",       "Pass option directly to linker");
 }
 
 static void print_help_debug(void)
 {
-	put_help("--print-ast",              "Preprocess, parse and print AST");
-	put_help("--print-implicit-cast",    "");
-	put_help("--print-parenthesis",      "");
-	put_help("--benchmark",              "Preprocess and parse, produces no output");
-	put_help("--time",                   "Measure time of compiler passes");
-	put_help("--statev",                 "Produce statev output");
-	put_help("--filtev=filter",          "Set statev filter regex");
-	put_help("--dump-function func",     "Preprocess, parse and output vcg graph of func");
-	put_help("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
+	help_simple("--print-ast",              "Preprocess, parse and print AST");
+	help_simple("--print-implicit-cast",    "");
+	help_simple("--print-parenthesis",      "");
+	help_simple("--benchmark",              "Preprocess and parse, produces no output");
+	help_simple("--time",                   "Measure time of compiler passes");
+	help_simple("--statev",                 "Produce statev output");
+	help_equals("--filtev", "FILTER",       "Set statev filter regex");
+	help_spaced("--dump-function", "FUNC",  "Preprocess, parse and output vcg graph of func");
+	help_simple("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
 }
 
 static void print_help_language_tools(void)
 {
-	put_help("--print-fluffy",           "Preprocess, parse and generate declarations for the fluffy language");
-	put_help("--print-jna",              "Preprocess, parse and generate declarations for JNA");
-	put_help("--jna-limit filename",     "");
-	put_help("--jna-libname name",       "");
+	help_simple("--print-fluffy",           "Preprocess, parse and generate declarations for the fluffy language");
+	help_simple("--print-jna",              "Preprocess, parse and generate declarations for JNA");
+	help_spaced("--jna-limit", "FILENAME",  "");
+	help_spaced("--jna-libname", "NAME",    "");
 }
 
 static void print_help_firm(void)
 {
-	put_help("-bOPTION",                 "Directly pass option to libFirm backend");
+	help_aprefix("-b", "OPTION",            "Directly pass option to libFirm backend");
 	int res = be_parse_arg("help");
 	(void) res;
 	assert(res);

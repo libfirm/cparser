@@ -8,7 +8,7 @@
 /**
  * Display information about a commandline option
  */
-void put_help(const char *option, const char *explanation);
+void help_simple(const char *option, const char *explanation);
 
 /**
  * Display a choice value for a multiple-choice option
