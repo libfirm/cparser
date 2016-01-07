@@ -113,7 +113,6 @@ static void print_help_parser(void)
 	put_choice("iso9899:199x",           "Deprecated");
 	put_help("-pedantic",                "be pedantic about C standard");
 	put_help("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
-	put_help("--strict",                 "Enable strict conformance checking");
 }
 
 static void print_help_warnings(void)
