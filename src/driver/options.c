@@ -132,6 +132,25 @@ static bool f_yesno_arg(char const *const arg, options_state_t const *const s)
 	return streq(&arg[2], &option[2]);
 }
 
+static bool accept_prefix(options_state_t *const s, char const *const prefix,
+                          bool expect_arg, char const **const arg)
+{
+	const char *option = s->argv[s->i];
+	assert(option[0] == '-');
+	assert(prefix[0] == '-');
+	if (!strstart(&option[1], &prefix[1]))
+		return false;
+
+	const size_t prefix_len = strlen(prefix);
+	*arg = option + prefix_len;
+	if (expect_arg && (*arg)[0] == '\0') {
+		errorf(NULL, "expected argument after '-%s'", prefix);
+		s->argument_errors = true;
+		return false;
+	}
+	return true;
+}
+
 static void set_be_option(const char *arg)
 {
 	int res = be_parse_arg(arg);
@@ -203,7 +222,7 @@ add_arg_opt:
 	} else if ((arg = spaced_arg("Xpreprocessor", s, true)) != NULL) {
 		driver_add_flag(&cppflags_obst, "-Xpreprocessor");
 		driver_add_flag(&cppflags_obst, arg);
-	} else if (strstart(option, "Wp,")) {
+	} else if (accept_prefix(s, "-Wp,", true, &arg)) {
 		driver_add_flag(&cppflags_obst, "%s", full_option);
 	} else if (simple_arg("integrated-cpp", s)) {
 		driver_use_integrated_preprocessor = true;
@@ -350,7 +369,6 @@ bool options_parse_linker(options_state_t *s)
 	const char *full_option = s->argv[s->i];
 	if (full_option[0] != '-')
 		return false;
-	const char *option = &full_option[1];
 
 	const char *arg;
 	if ((arg = prefix_arg("l", s)) != NULL) {
@@ -369,7 +387,7 @@ bool options_parse_linker(options_state_t *s)
 	        || simple_arg("shared-libgcc", s)
 	        || simple_arg("static-libgcc", s)
 	        || simple_arg("symbolic", s)
-	        || strstart(option, "Wl,")) {
+	        || accept_prefix(s, "-Wl,", true, &arg)) {
 	    driver_add_flag(&ldflags_obst, full_option);
 	} else if ((arg = spaced_arg("Xlinker", s, true)) != NULL) {
 		driver_add_flag(&ldflags_obst, "-Xlinker");
@@ -388,10 +406,9 @@ bool options_parse_assembler(options_state_t *s)
 	const char *full_option = s->argv[s->i];
 	if (full_option[0] != '-')
 		return false;
-	const char *option = &full_option[1];
 
 	const char *arg;
-	if (strstart(option, "Wa,")) {
+	if (accept_prefix(s, "-Wa,", true, &arg)) {
 		driver_add_flag(&asflags_obst, "%s", full_option);
 	} else if ((arg = spaced_arg("Xassembler", s, true)) != NULL) {
 		driver_add_flag(&asflags_obst, "-Xassembler");
@@ -423,8 +440,8 @@ bool options_parse_codegen(options_state_t *s)
 		} else {
 			set_default_visibility(visibility);
 		}
-	} else if (option[0] == 'b') {
-		if (!be_parse_arg(&option[1])) {
+	} else if (accept_prefix(s, "-b", true, &arg)) {
+		if (!be_parse_arg(arg)) {
 			errorf(NULL, "invalid backend option '%s' (unknown option or invalid argument)",
 			       full_option);
 			s->argument_errors = true;
@@ -444,15 +461,15 @@ bool options_parse_codegen(options_state_t *s)
 	} else if (simple_arg("fexcess-precision=standard", s)) {
 		/* ignore (gcc compatibility) we always adhere to the C99 standard
 		 * anyway in this respect */
-	} else if (simple_arg("g", s) || simple_arg("g0", s) || simple_arg("g1", s)
-	        || simple_arg("g2", s) || simple_arg("g3", s)) {
-		set_be_option("debug=frameinfo");
-		set_be_option("ia32-optcc=false");
-	} else if (option[0] == 'm') {
-		if (strstart(option, "mtarget")) {
-			errorf(NULL, "The -mtarget=X option has been changed to -target X");
-			s->argument_errors = true;
+	} else if (accept_prefix(s, "-g", false, &arg)) {
+		if (streq(arg, "0")) {
+			set_be_option("debug=none");
+			set_be_option("ia32-optcc=true");
+		} else {
+			set_be_option("debug=frameinfo");
+			set_be_option("ia32-optcc=false");
 		}
+	} else if (option[0] == 'm') {
 		arg = &option[1];
 		/* remember option for backend */
 		assert(obstack_object_size(&codegenflags_obst) == 0);
@@ -719,20 +736,19 @@ bool options_parse_early_codegen(options_state_t *s)
 	const char *full_option = s->argv[s->i];
 	if (full_option[0] != '-')
 		return false;
-	const char *option = &full_option[1];
 
-	if (option[0] == 'O') {
-		char const *const opt = &option[1];
+	const char *arg;
+	if (accept_prefix(s, "-O", false, &arg)) {
 		unsigned opt_level;
-		if (is_digit(opt[0]) && opt[1] == '\0') {
-			opt_level = opt[0] - '0';
-		} else if (opt[0] == '\0') {
+		if (arg[0] == '\0') {
 			opt_level = 1; /* '-O' is equivalent to '-O1'. */
-		} else if (streq(opt, "fast")) {
+		} else if (is_digit(arg[0])) {
+			opt_level = arg[0] - '0';
+		} else if (streq(arg, "fast")) {
 			opt_level = 3; /* TODO stub. */
-		} else if (streq(opt, "g")) {
+		} else if (streq(arg, "g")) {
 			opt_level = 0; /* TODO stub. */
-		} else if (streq(opt, "s")) {
+		} else if (streq(arg, "s")) {
 			opt_level = 2; /* TODO For now, until we have a real '-Os'. */
 			predef_optimize_size = true;
 		} else {
@@ -741,7 +757,7 @@ bool options_parse_early_codegen(options_state_t *s)
 			return false;
 		}
 		choose_optimization_pack(opt_level);
-		predef_optimize      = opt_level > 0;
+		predef_optimize = opt_level > 0;
 	} else
 		return false;
 	/* Remove argument so we do not parse it again in later phases */
