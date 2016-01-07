@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+if ! test -e .git; then
+	echo "Must be started from toplevel cparser dir"
+	exit 1
+fi
 # Check that our git checkout is clean (remember that we use git archive
 # which will miss things uncommitted changes)
 if [ "$(git status --porcelain)" != "" ]; then
