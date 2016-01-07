@@ -81,7 +81,7 @@ if(APPLE)
 endif()
 set(SYSTEM_INCLUDE_DIR ${DEFAULT_SYSTEM_INCLUDE_DIR} CACHE PATH "system include directory")
 set(LOCAL_INCLUDE_DIR /usr/local CACHE PATH "system local include directory")
-set(COMPILER_INCLUDE_DIR lib/cparser/${cparser_VERSION} CACHE STRING "compiler include dir (under CMAKE_INSTALL_PREFIX)")
+set(COMPILER_INCLUDE_DIR lib/cparser/${cparser_VERSION}/include CACHE STRING "compiler include dir (under CMAKE_INSTALL_PREFIX)")
 set(HOST_TRIPLE CACHE STRING "host machine triple (may be empty)")
 
 add_definitions(-DSYSTEM_INCLUDE_DIR=\"${SYSTEM_INCLUDE_DIR}\")
