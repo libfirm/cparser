@@ -163,8 +163,11 @@ clean:
 PREFIX ?= /usr/local
 INSTALL ?= install
 BINDIR = $(DESTDIR)$(PREFIX)/bin
+MANDIR = $(DESTDIR)$(PREFIX)/share/man
 install: $(cparser_EXE)
 	$(INSTALL) -d $(DESTDIR)$(COMPILER_INCLUDE_DIR)
 	$(INSTALL) -m0644 include/*.h $(DESTDIR)$(COMPILER_INCLUDE_DIR)
 	$(INSTALL) -d $(BINDIR)
 	$(INSTALL) -m0755 $< $(BINDIR)
+	$(INSTALL) -d $(MANDIR)/man1
+	$(INSTALL) -m0644 cparser.1 $(MANDIR)/man1

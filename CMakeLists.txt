@@ -118,4 +118,5 @@ set(INSTALL_HEADERS
 	include/stddef.h
 )
 install(FILES ${INSTALL_HEADERS} DESTINATION ${COMPILER_INCLUDE_DIR})
+install(FILES cparser.1 DESTINATION share/man/man1)
 install(TARGETS cparser DESTINATION bin)
