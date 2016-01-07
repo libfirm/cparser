@@ -122,6 +122,16 @@ static const char *f_no_arg(bool *truth_value, options_state_t *s)
 	return option;
 }
 
+static bool f_yesno_arg(char const *const arg, options_state_t const *const s)
+{
+	const char *option = s->argv[s->i];
+	assert(arg[0] == '-' && arg[1] == 'f');
+	assert(option[0] == '-' && option[1] == 'f');
+	if (option[2] == 'n' && option[3] == 'o' && option[4] == '-')
+		option += 3;
+	return streq(&arg[2], &option[2]);
+}
+
 static void set_be_option(const char *arg)
 {
 	int res = be_parse_arg(arg);
@@ -458,39 +468,39 @@ bool options_parse_codegen(options_state_t *s)
 		bool truth_value;
 		const char *fopt;
 		if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
-			if (streq(fopt, "fast-math")) {
+			if (f_yesno_arg("-ffast-math", s)) {
 				ir_allow_imprecise_float_transforms(truth_value);
-			} else if (streq(fopt, "omit-frame-pointer")) {
+			} else if (f_yesno_arg("-fomit-frame-pointer", s)) {
 				set_be_option(truth_value ? "omitfp" : "omitfp=no");
-			} else if (streq(fopt, "strength-reduce")) {
+			} else if (f_yesno_arg("-fstrength-reduce", s)) {
 				/* does nothing, for gcc compatibility (even gcc does
 				 * nothing for this switch anymore) */
 			} else if (!truth_value
-			           && (streq(fopt, "asynchronous-unwind-tables")
-			               || streq(fopt, "unwind-tables"))) {
+			           && (f_yesno_arg("-fasynchronous-unwind-tables", s)
+			               || f_yesno_arg("-funwind-tables", s))) {
 				/* do nothing: a gcc feature which we do not support
 				 * anyway was deactivated */
-			} else if (streq(fopt, "rounding-math")) {
+			} else if (f_yesno_arg("-frounding-math", s)) {
 				/* ignore for gcc compatibility: we don't have any unsafe
 				 * optimizations in that area */
-			} else if (streq(fopt, "verbose-asm")) {
+			} else if (f_yesno_arg("-fverbose-asm", s)) {
 				set_be_option(truth_value ? "verboseasm" : "verboseasm=no");
-			} else if (streq(fopt, "PIC")) {
+			} else if (f_yesno_arg("-fPIC", s)) {
 				target.pic_mode = truth_value ? 2 : 0;
-			} else if (streq(fopt, "pic")) {
+			} else if (f_yesno_arg("-fpic", s)) {
 				target.pic_mode = truth_value ? 1 : 0;
-			} else if (streq(fopt, "plt")) {
+			} else if (f_yesno_arg("-fplt", s)) {
 				target.pic_no_plt = !truth_value;
-			} else if (streq(fopt, "jump-tables")             ||
-			           streq(fopt, "expensive-optimizations") ||
-			           streq(fopt, "common")                  ||
-			           streq(fopt, "optimize-sibling-calls")  ||
-			           streq(fopt, "align-loops")             ||
-			           streq(fopt, "align-jumps")             ||
-			           streq(fopt, "align-functions")         ||
-			           streq(fopt, "PIC")                     ||
-			           streq(fopt, "stack-protector")         ||
-			           streq(fopt, "stack-protector-all")) {
+			} else if (f_yesno_arg("-fjump-tables", s)             ||
+			           f_yesno_arg("-fexpensive-optimizations", s) ||
+			           f_yesno_arg("-fcommon", s)                  ||
+			           f_yesno_arg("-foptimize-sibling-calls", s)  ||
+			           f_yesno_arg("-falign-loops", s)             ||
+			           f_yesno_arg("-falign-jumps", s)             ||
+			           f_yesno_arg("-falign-functions", s)         ||
+			           f_yesno_arg("-fPIC", s)                     ||
+			           f_yesno_arg("-fstack-protector", s)         ||
+			           f_yesno_arg("-fstack-protector-all", s)) {
 				/* better warn the user for these as he might have expected
 				 * that something happens */
 				warningf(WARN_COMPAT_OPTION, NULL,
@@ -549,12 +559,12 @@ bool options_parse_diagnostics(options_state_t *s)
 			bool truth_value;
 			const char *fopt;
 			if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
-				if (streq(fopt, "diagnostics-show-option")) {
+				if (f_yesno_arg("-fdiagnostics-show-option", s)) {
 					diagnostics_show_option = truth_value;
-				} else if (streq(fopt, "show-column")) {
+				} else if (f_yesno_arg("-fshow-column", s)) {
 					show_column = truth_value;
-				} else if (streq(fopt, "color-diagnostics")
-				        || streq(fopt, "diagnostics-color")) {
+				} else if (f_yesno_arg("-fcolor-diagnostics", s)
+				        || f_yesno_arg("-fdiagnostics-color", s)) {
 					diagnostic_enable_color(truth_value
 						? (colorterm != 0 ? colorterm : 8)
 						: 0);
@@ -580,20 +590,20 @@ bool options_parse_c_dialect(options_state_t *s)
 	bool truth_value;
 	const char *fopt;
 	if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
-		if (streq(fopt, "short-wchar")) {
+		if (f_yesno_arg("-fshort-wchar", s)) {
 			dialect.wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
 			                                        : ATOMIC_TYPE_INT;
-		} else if (streq(fopt, "signed-char")) {
+		} else if (f_yesno_arg("-fsigned-char", s)) {
 			dialect.char_is_signed = truth_value;
-		} else if (streq(fopt, "unsigned-char")) {
+		} else if (f_yesno_arg("-funsigned-char", s)) {
 			dialect.char_is_signed = !truth_value;
-		} else if (streq(fopt, "freestanding")) {
+		} else if (f_yesno_arg("-ffreestanding", s)) {
 			dialect.freestanding = truth_value;
 			dialect.no_builtins = truth_value;
-		} else if (streq(fopt, "hosted")) {
+		} else if (f_yesno_arg("-fhosted", s)) {
 			dialect.freestanding = !truth_value;
 			dialect.no_builtins = !truth_value;
-		} else if (streq(fopt, "builtin")) {
+		} else if (f_yesno_arg("-fbuiltin", s)) {
 			dialect.no_builtins = !truth_value;
 		} else {
 			return false;
@@ -689,9 +699,9 @@ bool options_parse_early_target(options_state_t *s)
 		bool truth_value;
 		const char *fopt;
 		if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
-			if (streq(fopt, "profile-generate")) {
+			if (f_yesno_arg("-fprofile-generate", s)) {
 				profile_generate = truth_value;
-			} else if (streq(fopt, "profile-use")) {
+			} else if (f_yesno_arg("-fprofile-use", s)) {
 				profile_use = truth_value;
 			} else {
 				return false;
