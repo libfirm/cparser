@@ -2,6 +2,7 @@ cparser 1.22.1 (2015-01-07)
 ---------------------------
 
 * Add make install target
+* Stub support for `-Oz`
 
 cparser 1.22.0 (2015-12-31)
 ---------------------------
