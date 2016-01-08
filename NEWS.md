@@ -1,4 +1,4 @@
-cparser 1.22.1 (2015-01-07)
+cparser 1.22.1 (2016-01-07)
 ---------------------------
 
 * Add make install target
