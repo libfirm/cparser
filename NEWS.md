@@ -3,6 +3,7 @@ cparser 1.22.1 (2015-01-07)
 
 * Add make install target
 * Stub support for `-Oz`
+* Accept `__attribute` as alias for `__attribute__`
 
 cparser 1.22.0 (2015-12-31)
 ---------------------------
