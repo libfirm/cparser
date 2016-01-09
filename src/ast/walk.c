@@ -97,6 +97,7 @@ static void walk_expression(expression_t *const expr,
 		return;
 
 	case EXPR_CALL:
+		walk_expression(expr->call.function, env);
 		for (call_argument_t *arg = expr->call.arguments; arg != NULL;
 		     arg = arg->next) {
 			walk_expression(arg->expression, env);
