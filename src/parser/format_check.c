@@ -354,7 +354,7 @@ eval_fmt_mod_unsigned:
 		if (fmt_mod != FMT_MOD_NONE)
 			goto bad_len_mod;
 		expected_type = type_wchar_t;
-		allowed_flags = FMT_FLAG_NONE;
+		allowed_flags = FMT_FLAG_MINUS;
 		break;
 
 	case 'c':
@@ -365,7 +365,7 @@ eval_fmt_mod_unsigned:
 		case FMT_MOD_w:    expected_type = type_wchar_t; break;
 		default:           goto bad_len_mod;
 		}
-		allowed_flags = FMT_FLAG_NONE;
+		allowed_flags = FMT_FLAG_MINUS;
 		break;
 
 	case 'S':
@@ -389,7 +389,7 @@ eval_fmt_mod_unsigned:
 		if (fmt_mod != FMT_MOD_NONE)
 			goto bad_len_mod;
 		expected_type = type_void_ptr;
-		allowed_flags = FMT_FLAG_NONE;
+		allowed_flags = FMT_FLAG_MINUS;
 		break;
 
 	case 'n':
