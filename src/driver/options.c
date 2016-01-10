@@ -515,7 +515,6 @@ bool options_parse_codegen(options_state_t *s)
 			           f_yesno_arg("-falign-loops", s)             ||
 			           f_yesno_arg("-falign-jumps", s)             ||
 			           f_yesno_arg("-falign-functions", s)         ||
-			           f_yesno_arg("-fPIC", s)                     ||
 			           f_yesno_arg("-fstack-protector", s)         ||
 			           f_yesno_arg("-fstack-protector-all", s)) {
 				/* better warn the user for these as he might have expected
