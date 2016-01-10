@@ -885,6 +885,9 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s ", driver_linker);
 
+	/* Workaround for systems that expect PIE code when no flags are given. */
+	driver_add_flag(&file_obst, "-fno-PIE");
+
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		if (unit->type != COMPILATION_UNIT_OBJECT)
 			continue;
