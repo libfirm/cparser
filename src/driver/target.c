@@ -420,24 +420,19 @@ static bool pass_options_to_firm_be(void)
 		set_be_option("profileuse");
 	}
 	bool res = true;
+	const char *pic_option;
 	if (target.pic_mode > 0) {
-		/* Enable PIC code generation */
-		set_be_option("pic=true");
-		/* Select specific PIC mode for ia32 */
-		if (streq(target.firm_isa, "ia32")) {
-			const char *option;
-			if (target.object_format == OBJECT_FORMAT_MACH_O) {
-				option = "ia32-pic=mach-o";
-			} else {
-				option = target.pic_no_plt ? "ia32-pic=elf-noplt"
-					                       : "ia32-pic=elf";
-			}
-			set_be_option(option);
+		/* Select correct PIC mode */
+		if (target.object_format == OBJECT_FORMAT_MACH_O) {
+			pic_option = "pic=mach-o";
+		} else {
+			pic_option = target.pic_no_plt ? "pic=elf-noplt"
+			                               : "pic=elf";
 		}
 	} else {
-		set_be_option("pic=false");
-		set_be_option("ia32-pic=none");
+		pic_option = "pic=none";
 	}
+	set_be_option(pic_option);
 
 	/* pass options to firm backend (this happens delayed because we first
 	 * had to decide which backend is actually used) */
