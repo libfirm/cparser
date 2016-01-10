@@ -421,12 +421,6 @@ static bool pass_options_to_firm_be(void)
 	}
 	bool res = true;
 	if (target.pic_mode > 0) {
-		if (!be_get_backend_param()->pic_supported) {
-			errorf(NULL, "Selected backend '%s' does not support position independent code (PIC)",
-			       target.firm_isa);
-			res = false;
-		}
-
 		/* Enable PIC code generation */
 		set_be_option("pic=true");
 		/* Select specific PIC mode for ia32 */
@@ -473,6 +467,13 @@ static bool pass_options_to_firm_be(void)
 				break;
 			}
 		}
+	}
+
+	/* We can initialize the backend at this point and call be_get_backend_param() */
+	if (target.pic_mode > 0 && !be_get_backend_param()->pic_supported) {
+		errorf(NULL, "Selected backend '%s' does not support position independent code (PIC)",
+			   target.firm_isa);
+		res = false;
 	}
 
 	return res;
