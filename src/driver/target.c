@@ -554,11 +554,11 @@ bool target_setup(void)
 	multilib_directory_target_triple = NULL;
 	if (target.triple == NULL) {
 #ifdef MULTILIB_M32_TRIPLE
-		if (dialect.pointer_size == 32)
+		if (dialect.pointer_size == 4)
 			multilib_directory_target_triple = MULTILIB_M32_TRIPLE;
 #endif
 #ifdef MULTILIB_M64_TRIPLE
-		if (dialect.pointer_size == 64)
+		if (dialect.pointer_size == 8)
 			multilib_directory_target_triple = MULTILIB_M64_TRIPLE;
 #endif
 	}
