@@ -419,8 +419,17 @@ static bool pass_options_to_firm_be(void)
 	if (profile_use) {
 		set_be_option("profileuse");
 	}
+	bool res = true;
 	if (target.pic_mode > 0) {
+		if (!be_get_backend_param()->pic_supported) {
+			errorf(NULL, "Selected backend '%s' does not support position independent code (PIC)",
+			       target.firm_isa);
+			res = false;
+		}
+
+		/* Enable PIC code generation */
 		set_be_option("pic=true");
+		/* Select specific PIC mode for ia32 */
 		if (streq(target.firm_isa, "ia32")) {
 			const char *option;
 			if (target.object_format == OBJECT_FORMAT_MACH_O) {
@@ -436,7 +445,6 @@ static bool pass_options_to_firm_be(void)
 		set_be_option("ia32-pic=none");
 	}
 
-	bool res = true;
 	/* pass options to firm backend (this happens delayed because we first
 	 * had to decide which backend is actually used) */
 	for (codegen_option_t *option = codegen_options; option != NULL;
