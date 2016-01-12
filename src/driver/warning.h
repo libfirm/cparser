@@ -76,13 +76,13 @@ void print_warning_opt_help(void);
 	M(WARN_UNINITIALIZED,                 ON,  "uninitialized",                 "Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call.") \
 	M(WARN_UNKNOWN_PRAGMAS,               ON,  "unknown-pragmas",               "Warn when a #pragma directive is encountered which is not understood") \
 	M(WARN_UNKNOWN_WARNING_OPTION,        ON,  "unknown-warning-option",        "Warn whenever an unknown warning is requested") \
-	M(WARN_UNREACHABLE_CODE,              OFF, "unreachable-code",              "Warn if the compiler detects that code will never be executed") \
-	M(WARN_UNUSED_FUNCTION,               OFF, "unused-function",               "Warn whenever a static function is declared but not defined or a non-inline static function is unused") \
-	M(WARN_UNUSED_LABEL,                  OFF, "unused-label",                  "Warn whenever a label is declared but not used") \
+	M(WARN_UNREACHABLE_CODE,              ON,  "unreachable-code",              "Warn if the compiler detects that code will never be executed") \
+	M(WARN_UNUSED_FUNCTION,               ON,  "unused-function",               "Warn whenever a static function is declared but not defined or a non-inline static function is unused") \
+	M(WARN_UNUSED_LABEL,                  ON,  "unused-label",                  "Warn whenever a label is declared but not used") \
 	M(WARN_UNUSED_OPTION,                 ON,  "unused-option",                 "Warn whenever a commandline option was not used") \
-	M(WARN_UNUSED_PARAMETER,              OFF, "unused-parameter",              "Warn whenever a function parameter is unused aside from its declaration") \
+	M(WARN_UNUSED_PARAMETER,              ON,  "unused-parameter",              "Warn whenever a function parameter is unused aside from its declaration") \
 	M(WARN_UNUSED_VALUE,                  ON,  "unused-value",                  "Warn whenever a statement computes a result that is explicitly not used") \
-	M(WARN_UNUSED_VARIABLE,               OFF, "unused-variable",               "Warn whenever a local variable or non-constant static variable is unused aside from its declaration") \
+	M(WARN_UNUSED_VARIABLE,               ON,  "unused-variable",               "Warn whenever a local variable or non-constant static variable is unused aside from its declaration") \
 	M(WARN_WRITE_STRINGS,                 OFF, "write-strings",                 "Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char*' pointer will get a warning")
 
 typedef enum warning_t {

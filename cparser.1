@@ -221,12 +221,28 @@ Show warnings in system headers.
 By default, no warnings in system headers are shown.
 .It Fl Wunreachable-code
 .No Warn when the compiler determines that a statement Po or in some cases a part thereof Pc will never be executed .
+Enabled by default.
 .It Fl Wunused
 .No Activate Fl Wunused-function , Wunused-label , Wunused-parameter , Wunused-value , Wunused-variable .
+.It Fl Wunused-label
+Warn whenever a label is declared but not used.
+Enabled by default.
+.It Fl Wunused-function
+Warn whenever a static function is declared but not defined or a non-inline static function is unused.
+.No To suppress this warning, cast the function to So Ft void Sc , e.g. Sq (void)fun .
+Enabled by default.
 .It Fl Wunused-parameter
 .No Warn when a parameter is never used or only ever read to calculate its own new value, e.g. Sq x\ =\ x\ +\ 1 .
+.No To suppress this warning, cast the parameter to So Ft void Sc , e.g. Sq (void)x .
+Enabled by default.
+.It Fl Wunused-value
+Warn whenever a statement computes a result that is explicitly not used.
+.No To suppress this warning, cast the expression to So Ft void Sc , e.g. Sq (void)(x\ +\ 1) .
+Enabled by default.
 .It Fl Wunused-variable
 .No Warn when a variable is never used or only ever read to calculate its own new value, e.g. Sq x\ =\ x\ +\ 1 .
+.No To suppress this warning, cast the variable to So Ft void Sc , e.g. Sq (void)x .
+Enabled by default.
 .It Fl w
 Suppress all warnings.
 .It Fl I Ns Ar dir , Fl I Ar dir
