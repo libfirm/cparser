@@ -67,7 +67,7 @@ char const *spaced_arg(char const *const arg, options_state_t *const s)
 	char const *const option = &s->argv[s->i][1];
 	if (streq(option, arg)) {
 		if (s->i + 1 < s->argc)
-			return s->argv[s->i + 1];
+			return s->argv[++s->i];
 		errorf(NULL, "expected argument after '-%s'", arg);
 		s->argument_errors = true;
 	}
