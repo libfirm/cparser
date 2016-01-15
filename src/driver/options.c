@@ -25,8 +25,6 @@
 #include "parser/preprocessor.h"
 #include "predefs.h"
 #include "target.h"
-#include "wrappergen/write_compoundsizes.h"
-#include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 
 codegen_option_t  *codegen_options        = NULL;
