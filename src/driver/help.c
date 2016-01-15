@@ -217,15 +217,25 @@ static void print_help_codegeneration(void)
 
 static void print_help_linker(void)
 {
-	help_prefix("-l", "LIBRARY",            "");
-	help_prefix("-L", "DIR",                "");
+	help_prefix("-l", "LIBRARY",            "Link with specified library");
+	help_prefix("-L", "DIR",                "Append to library search path");
 	help_simple("-s",                       "Do not produce symbol table and relocation information");
 	help_simple("-shared",                  "Produce a shared library");
 	help_simple("-static",                  "Produce statically linked binary");
+	help_simple("-nodefaultlibs",           "Do not link compiler default libraries");
+	help_simple("-nostartfiles",            "Do not link startup files");
+	help_simple("-nostdlib",                "Do not link default language library");
+	help_simple("-pie",                     "Produce position independent executable");
+	help_simple("-no-pie",                  "Do not produce a position independent executable");
+	help_simple("-rdynamic",                "Export all dynamic symbols");
+	help_simple("-shared-libgcc",           "Link to shared libgcc library");
+	help_simple("-static-libgcc",           "Link to libgcc statically");
+	help_simple("-symbolic",                "Bind reference to global symbols");
 	help_aprefix("-Wa,", "OPTION",          "Pass option directly to assembler");
 	help_spaced("-Xassembler", "OPTION",    "Pass option directly to assembler");
 	help_aprefix("-Wl,", "OPTION",          "Pass option directly to linker");
 	help_spaced("-Xlinker", "OPTION",       "Pass option directly to linker");
+	help_equals("-print-file-name", "LIB",  "Print full path to library LIB");
 }
 
 static void print_help_debug(void)
