@@ -87,6 +87,9 @@ UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIR
 REVISIONH = $(builddir)/revision.h
 REVISION ?= $(shell git --git-dir $(top_srcdir)/.git describe --abbrev=40 --always --dirty --match '')
 
+# Flags to be used when cparser checks its own sourcecode for warnings
+SELFCHECK_FLAGS ?= -Wall -Wno-shadow -Werror
+
 # Update revision.h if necessary
 UNUSED := $(shell \
 	REV="\#define cparser_REVISION \"$(REVISION)\""; \
@@ -95,7 +98,6 @@ UNUSED := $(shell \
 # determine if we can use "cparser-beta" as quickcheck
 QUICKCHECK_DEFAULT := $(shell which cparser-beta 2> /dev/null || echo true) -fsyntax-only
 QUICKCHECK ?= $(QUICKCHECK_DEFAULT)
-QUICKCHECK_FLAGS ?= -Wno-shadow
 
 $(cparser_EXE): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo 'LD $@'
@@ -125,6 +127,8 @@ endif
 endif
 
 check: $(CPARSERS)
+	@echo 'CHECK OPTIONS'
+	$(Q)cd $(top_srcdir) ; support/check_options.py
 
 bootstrap: cparser.bootstrap
 
@@ -132,7 +136,7 @@ bootstrap2: cparser.bootstrap2
 
 %.c.check: %.c $(cparser_EXE)
 	@echo 'CHECK $<'
-	$(Q)$(cparser_EXE) $(CPPFLAGS) -Wall -Wno-shadow -fsyntax-only $<
+	$(Q)$(cparser_EXE) $(CPPFLAGS) $(SELFCHECK_FLAGS) -fsyntax-only $<
 
 $(builddir)/cpb/%.o: %.c $(cparser_EXE)
 	@echo 'CPARSER $<'
@@ -152,7 +156,7 @@ cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 
 $(builddir)/%.o: %.c
 	@echo 'CC $@'
-	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(QUICKCHECK_FLAGS) $<
+	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(SELFCHECK_FLAGS) $<
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
 
 clean:
