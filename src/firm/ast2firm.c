@@ -3751,7 +3751,7 @@ static void create_dynamic_initializer_sub(dbg_info *dbgi,
 		ir_mode *mode = get_type_mode(type);
 		ir_node *node = new_d_Const(dbgi, get_mode_null(mode));
 		goto store;
-	case IR_INITIALIZER_CONST:;
+	case IR_INITIALIZER_CONST:
 		node = get_initializer_const_value(initializer);
 		if (is_compound_type(type)) {
 			ir_node *mem = get_store();
@@ -3797,9 +3797,9 @@ compound_init:;
 					create_dynamic_bitfield_init(dbgi, member_addr, member,
 					                             subinit);
 				} else {
-					ir_type *type = get_entity_type(member);
-					create_dynamic_initializer_sub(dbgi, member_addr, type,
-					                               subinit);
+					ir_type *entity_type = get_entity_type(member);
+					create_dynamic_initializer_sub(dbgi, member_addr,
+					                               entity_type, subinit);
 				}
 			}
 		} else {

@@ -386,7 +386,6 @@ static bool setup_firm_isa(void)
 	const char *arch = target.firm_arch;
 	/* only pass down for ia32 for now */
 	if (arch != NULL && streq(isa, "ia32")) {
-		char buf[64];
 		snprintf(buf, sizeof(buf), "%s-arch=%s", isa, arch);
 		if (!be_parse_arg(buf)) {
 			errorf(NULL, "Couldn't select firm arch '%s-arch=%s'", isa, arch);
