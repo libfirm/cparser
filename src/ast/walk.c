@@ -56,9 +56,12 @@ static void walk_type(type_t *const type, const walk_env_t *const env)
 		}
 		walk_type(type->function.return_type, env);
 		return;
-	case TYPE_TYPEOF:
-		walk_expression(type->typeoft.expression, env);
+	case TYPE_TYPEOF: {
+		expression_t *const expr = type->typeoft.expression;
+		if (expr)
+			walk_expression(expr, env);
 		return;
+	}
 	case TYPE_TYPEDEF:
 		walk_entity((entity_t*)type->typedeft.typedefe, env);
 		return;
