@@ -101,18 +101,16 @@ static void print_help_basic(const char *argv0)
 
 static void print_help_preprocessor(void)
 {
-	help_simple("-no-integrated-cpp",       "Use an external preprocessor");
+	help_prefix("-I", "DIR",                "Append to header searchpath");
+	help_prefix("-D", "SYMBOL[=value]",     "Define preprocessor symbol");
+	help_prefix("-U", "SYMBOL",             "Undefine preprocessor symbol");
+	help_equals("--sysroot", "DIR" ,        "set (default) root directory for (headers and) libraries");
+	help_prefix("-isysroot", "DIR",         "set root directory for headers");
+	help_simple("-include",                 "");
+	help_simple("-no-integrated-cpp",       "Force use of external preprocessor");
+	help_simple("-integrated-cpp",          "Force use of integrated preprocessor");
 	help_simple("-nostdinc",                "Do not search standard system include directories");
 	help_simple("-trigraphs",               "Support ISO C trigraphs");
-	help_equals("--sysroot", "<dir>",       "set (default) root directory for (headers and) libraries");
-	help_prefix("-isysroot", "<dir>",       "set root directory for headers");
-	help_simple("-isystem",                 "");
-	help_simple("-include",                 "");
-	help_prefix("-I", "PATH",               "");
-	help_prefix("-D", "SYMBOL[=value]",     "");
-	help_prefix("-U", "SYMBOL",             "");
-	help_aprefix("-Wp,", "OPTION",          "Pass option directly to preprocessor");
-	help_spaced("-Xpreprocessor", "OPTION", "Pass option directly to preprocessor");
 	help_simple("-M",                       "");
 	help_simple("-MD",                      "");
 	help_simple("-MMD",                     "");
@@ -121,11 +119,20 @@ static void print_help_preprocessor(void)
 	help_prefix("-MT", "target",            "");
 	help_prefix("-MQ", "target",            "");
 	help_prefix("-MF", "file",              "");
+	help_prefix("-idirafter", "DIR",        "Append to header searchpath (after -I dirs)");
+	help_prefix("-iquote", "DIR",           "Append to header searchpath for #include with quoted argument");
+	help_prefix("-isystem", "DIR",          "Append to system header searchpath");
+	help_aprefix("-Wp,", "OPTION",          "Pass option directly to preprocessor");
+	help_spaced("-Xpreprocessor", "OPTION", "Pass option directly to preprocessor");
+	help_equals("-finput-charset", "CHARSET", "Select encoding of input files");
+	help_f_yesno("-fdollars-in-identifiers", "Accept dollar symbol in identifiers");
+	/* Undocumented:
+	 * help_simple("-fno-dollars-in-identifiers", "");
+	 */
 }
 
 static void print_help_parser(void)
 {
-	help_equals("-finput-charset", "CHARSET", "Select encoding of input files");
 	help_equals("-fmessage-length", "LEN",  "Ignored (gcc compatibility)");
 	help_simple("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
 	help_simple("-fshow-column",            "Show the column number in diagnostic messages");
@@ -211,7 +218,7 @@ static void print_help_codegeneration(void)
 static void print_help_linker(void)
 {
 	help_prefix("-l", "LIBRARY",            "");
-	help_prefix("-L", "PATH",               "");
+	help_prefix("-L", "DIR",                "");
 	help_simple("-s",                       "Do not produce symbol table and relocation information");
 	help_simple("-shared",                  "Produce a shared library");
 	help_simple("-static",                  "Produce statically linked binary");
