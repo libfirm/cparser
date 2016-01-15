@@ -1,10 +1,11 @@
-cparser 1.22.1 (2016-01-11)
+cparser 1.22.1 (2016-01-15)
 ---------------------------
 
 * Add make install target
 * Stub support for `-Oz`
 * Accept `__attribute` as alias for `__attribute__`
 * Update online help
+* Support `--sysroot` and `-isysroot`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
