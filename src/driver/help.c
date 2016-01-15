@@ -160,7 +160,6 @@ static void print_help_parser(void)
 	put_choice("iso9899:199409",         "ISO C90");
 	put_choice("iso9899:1999",           "ISO C99");
 	put_choice("iso9899:199x",           "Deprecated");
-	help_simple("-pedantic",                "be pedantic about C standard");
 	help_simple("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
 }
 
@@ -168,6 +167,8 @@ static void print_help_warnings(void)
 {
 	help_f_yesno("-fdiagnostics-show-option", "Show the switch, which controls a warning, after each warning");
 	help_simple("-w",                         "Disable all warnings");
+	help_simple("-pedantic",                  "Enable pedantic warnings (equivalent to -Wpedantic)");
+	help_simple("-pedantic-errors",           "Error on pedantic warnings (equivalent to -Werror=pedantic)");
 	help_simple("-Winit-self",                "Ignored (gcc compatibility)");
 	help_simple("-Wformat-y2k",               "Ignored (gcc compatibility)");
 	help_simple("-Wformat-security",          "Ignored (gcc compatibility)");
