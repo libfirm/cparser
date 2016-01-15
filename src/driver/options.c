@@ -328,9 +328,6 @@ bool options_parse_driver(options_state_t *s)
 		produce_statev = true;
 	} else if ((arg = equals_arg("-filtev", s)) != NULL) {
 		filtev = arg;
-	} else if ((arg = equals_arg("print-file-name", s)) != NULL) {
-		print_file_name_file = arg;
-		s->action = action_print_file_name;
 	} else if (simple_arg("version", s) || simple_arg("-version", s)) {
 		s->action = action_version;
 	} else if (simple_arg("dumpversion", s)) {
@@ -380,6 +377,9 @@ bool options_parse_linker(options_state_t *s)
 	} else if (simple_arg("pg", s)) {
 		set_be_option("gprof");
 		driver_add_flag(&ldflags_obst, "-pg");
+	} else if ((arg = equals_arg("print-file-name", s)) != NULL) {
+		print_file_name_file = arg;
+		s->action = action_print_file_name;
 	} else {
 		return false;
 	}
@@ -454,7 +454,7 @@ bool options_parse_codegen(options_state_t *s)
 			set_be_option("debug=frameinfo");
 			set_be_option("ia32-optcc=false");
 		}
-	} else if (option[0] == 'm') {
+	} else if (accept_prefix(s, "-m", false, &arg)) {
 		arg = &option[1];
 		/* remember option for backend */
 		assert(obstack_object_size(&codegenflags_obst) == 0);
