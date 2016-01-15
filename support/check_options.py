@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import re
+import sys
+import collections
 
 # Search for defined options
 optionsfile = open("src/driver/options.c").readlines() + open("src/main.c").readlines()
@@ -23,7 +25,7 @@ for line in optionsfile:
 # Search for help strings
 helpfile = open("src/driver/help.c")
 functions = [ 'help_simple', 'help_prefix', 'help_spaced', 'help_equals',
-              'help_aprefix' ]
+              'help_aprefix', 'help_f_yesno' ]
 regex = '(?P<function>' + "|".join(functions) + ')'
 regex += '\s*\(\s*"(?P<option>[^"]+)"'
 help_options = []
@@ -32,14 +34,28 @@ for line in helpfile:
         help_options.append(m.group('option'))
 
 # See which options lack a help string
-print "Options lacking help:",
-for x in parsed_options:
-    if x not in help_options:
-        print x,
-print "\n"
+found_a_problem = False
 
-print "Help for nonexistant option:",
-for x in help_options:
-    if x not in parsed_options:
+def print_list(prefix, l):
+    global found_a_problem
+    intro = False
+    for x in l:
+        if not intro:
+            print prefix,
+            intro = True
+            found_a_problem = True
         print x,
-print ""
+    if intro:
+        print ""
+
+duplicates = [item for (item, count) in collections.Counter(help_options).items() if count > 1]
+print_list("Duplicate help:", duplicates)
+
+no_help = set(parsed_options) - set(help_options)
+print_list("Options lacking help:", no_help)
+
+no_option = set(help_options) - set(parsed_options)
+print_list("Help for nonexistant option:", no_option)
+
+if found_a_problem:
+    sys.exit(1)
