@@ -112,7 +112,7 @@ UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIR
 
 $(GOAL): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LINKFLAGS)
+	$(Q)$(CXX) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LINKFLAGS)
 
 ifneq ("$(LIBFIRM_FILE)", "")
 ifneq ("$(MAKECMDGOALS)", "clean")
