@@ -5403,12 +5403,11 @@ static expression_t *find_create_select(const position_t *pos,
 
 		symbol_t *iter_symbol = iter->base.symbol;
 		if (iter_symbol == NULL) {
-			type_t *type = iter->declaration.type;
+			type_t *type = skip_typeref(iter->declaration.type);
 			if (!is_type_compound(type))
 				continue;
 
 			compound_t *sub_compound = type->compound.compound;
-
 			if (find_compound_entry(sub_compound, symbol) == NULL)
 				continue;
 
