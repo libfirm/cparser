@@ -7665,6 +7665,7 @@ static bool is_lvalue(const expression_t *expression)
 	case EXPR_COMPOUND_LITERAL:
 	case EXPR_REFERENCE:
 	case EXPR_SELECT:
+	case EXPR_STRING_LITERAL:
 	case EXPR_UNARY_DEREFERENCE:
 		return true;
 

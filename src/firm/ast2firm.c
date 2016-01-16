@@ -876,6 +876,11 @@ make_address:;
 	return new_d_Address(dbgi, entity);
 }
 
+static ir_node *string_literal_to_firm(string_literal_expression_t const *const expr)
+{
+	return string_to_firm(&expr->base.pos, expr->value);
+}
+
 /**
  * Dereference an address.
  *
@@ -2351,6 +2356,8 @@ static ir_node *expression_to_addr(const expression_t *expression)
 		return reference_addr(&expression->reference);
 	case EXPR_SELECT:
 		return select_addr(&expression->select);
+	case EXPR_STRING_LITERAL:
+		return string_literal_to_firm(&expression->string_literal);
 	case EXPR_UNARY_DEREFERENCE:
 		return dereference_addr(&expression->unary);
 	default:
@@ -2475,7 +2482,7 @@ incdec:
 	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
 	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
 	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
-	case EXPR_STRING_LITERAL:             return string_to_firm(                  &expr->base.pos, expr->string_literal.value);
+	case EXPR_STRING_LITERAL:             return string_literal_to_firm(          &expr->string_literal);
 	case EXPR_UNARY_ASSUME:               return handle_assume(                    expr->unary.value);
 	case EXPR_UNARY_COMPLEMENT:           return complement_to_firm(              &expr->unary);
 	case EXPR_UNARY_DEREFERENCE:          return dereference_to_firm(             &expr->unary);
