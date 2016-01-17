@@ -74,13 +74,23 @@ void target_adjust_types_and_dialect(void)
 		had_cpp_warning = true;
 	}
 
-	/* The frontend should do all decisions and should not be influenced by
-	 * outside influences like the firm backend. So we just check here that
-	 * our decisions match the firm backend. */
-	assert(be_get_backend_param()->machine_size % 8 == 0);
-	assert(dialect.pointer_size == be_get_backend_param()->machine_size / BITS_PER_BYTE);
-	assert(target.byte_order_big_endian == be_get_backend_param()->byte_order_big_endian);
-	assert(target.float_int_overflow    == be_get_backend_param()->float_int_overflow);
+	if (target.firm_isa_specified) {
+		backend_params const *const p = be_get_backend_param();
+		target.float_int_overflow    = p->float_int_overflow;
+		target.byte_order_big_endian = p->byte_order_big_endian;
+		dialect.pointer_size         = p->machine_size / BITS_PER_BYTE;
+	} else {
+		/* The frontend should do all decisions and should not be influenced by
+		 * outside influences like the firm backend. So we just check here that
+		 * our decisions match the firm backend. */
+		assert(be_get_backend_param()->machine_size % BITS_PER_BYTE == 0);
+		assert(dialect.pointer_size
+		       == be_get_backend_param()->machine_size / BITS_PER_BYTE);
+		assert(target.byte_order_big_endian
+		       == be_get_backend_param()->byte_order_big_endian);
+		assert(target.float_int_overflow
+		       == be_get_backend_param()->float_int_overflow);
+	}
 }
 
 static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
@@ -170,8 +180,19 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	unsigned                              modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
 	const char                           *firm_isa;
+	if (target.firm_isa_specified) {
+		/* Firm ISA was specified on the commandline, this may be used to
+		 * experiment with new firm backends. */
+		firm_isa = target.firm_isa;
+		unsigned size = target_size_override != 0
+		              ? target_size_override/BITS_PER_BYTE : 4;
+		pointer_size       = size;
+		long_double_size   = 8;
+		modulo_shift       = size * BITS_PER_BYTE;
+		float_int_overflow = ir_overflow_indefinite;
+
 	/* i386, i486, i586, i686, i786 */
-	if (is_ia32_cpu(cpu)) {
+	} else if (is_ia32_cpu(cpu)) {
 		ppdefc("i386",     "1", cond_not_strict);
 		ppdef( "__i386",   "1");
 		ppdef( "__i386__", "1");

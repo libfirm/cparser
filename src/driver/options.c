@@ -425,12 +425,8 @@ bool options_parse_codegen(options_state_t *s)
 			/* This is a quick and dirty option to try out new firm targets.
 			 * Sooner rather than later the new target should be added properly
 			 * to target.c! */
+			target.firm_isa_specified = true;
 			target.firm_isa = arg;
-			const backend_params *be_params = be_get_backend_param();
-			dialect.pointer_size = be_params->machine_size / 8;
-			dialect.long_size = dialect.pointer_size;
-			target.byte_order_big_endian = be_params->byte_order_big_endian;
-			target.float_int_overflow = be_params->float_int_overflow;
 		}
 	} else if (simple_arg("-unroll-loops", s)) {
 		/* ignore (gcc compatibility) */

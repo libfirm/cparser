@@ -35,7 +35,7 @@ typedef struct target_t {
 	 * whether architecture shift instructions usually perform modulo bit_size
 	 * on the shift amount, if yes this equals to the machine_size.
 	 */
-	unsigned int modulo_shift;
+	unsigned int      modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
 	const char       *user_label_prefix;
 	unsigned char     biggest_alignment;
@@ -44,6 +44,8 @@ typedef struct target_t {
 	bool              pic_no_plt : 1;
 	/** byte-order: true = big-endian, false = little-endian */
 	bool byte_order_big_endian : 1;
+	/** firm_isa was explicitely specified on the commandline */
+	bool firm_isa_specified    : 1;
 	ENUMBF(object_format_t) object_format : 2;
 	target_define_t  *defines;
 	const char       *firm_isa;
