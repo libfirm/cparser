@@ -12,7 +12,7 @@
 #include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast_t.h"
-#include "driver/lang_features.h"
+#include "dialect.h"
 #include "driver/target.h"
 #include "type_t.h"
 #include "types.h"

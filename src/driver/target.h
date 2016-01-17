@@ -6,9 +6,56 @@
 #define TARGET_H
 
 #include <stdbool.h>
+#include <libfirm/irmode.h>
 
+#include "adt/util.h"
 #include "machine_triple.h"
 #include "options.h"
+
+typedef enum object_format_t {
+	OBJECT_FORMAT_ELF,
+	OBJECT_FORMAT_MACH_O,
+	OBJECT_FORMAT_PE_COFF,
+} object_format_t;
+
+/**
+ * Name+Value of a target specific preprocessor define. This is necessary to
+ * avoid doing target specific decisions outside of target.c
+ */
+typedef struct target_define_t target_define_t;
+struct target_define_t {
+	char      const *name;
+	char      const *value;
+	target_define_t *next;
+	bool (*condition)(void);
+};
+
+typedef struct target_t {
+	/**
+	 * whether architecture shift instructions usually perform modulo bit_size
+	 * on the shift amount, if yes this equals to the machine_size.
+	 */
+	unsigned int modulo_shift;
+	float_int_conversion_overflow_style_t float_int_overflow;
+	const char       *user_label_prefix;
+	unsigned char     biggest_alignment;
+	/** position independent code generation mode */
+	int               pic_mode : 4;
+	bool              pic_no_plt : 1;
+	/** byte-order: true = big-endian, false = little-endian */
+	bool byte_order_big_endian : 1;
+	ENUMBF(object_format_t) object_format : 2;
+	target_define_t  *defines;
+	const char       *firm_isa;
+	const char       *firm_arch;
+	/** parsed machine-triple of target machine. Try not to use this if possible
+	 * but create specific variables for language/target features instead. */
+	machine_triple_t *machine;
+	/** target triple as a string */
+	const char       *triple;
+} target_t;
+
+extern target_t target;
 
 void target_set_defaults(void);
 bool target_setup(void);

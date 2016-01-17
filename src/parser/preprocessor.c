@@ -23,13 +23,13 @@
 #include "adt/unicode.h"
 #include "adt/util.h"
 #include "ast/ast_t.h"
+#include "ast/dialect.h"
 #include "ast/string_hash.h"
 #include "ast/string_rep.h"
 #include "ast/symbol_table_t.h"
 #include "ast/symbol_t.h"
 #include "driver/diagnostic.h"
 #include "driver/c_driver.h"
-#include "driver/lang_features.h"
 #include "input.h"
 
 #define MAX_PUTBACK   3

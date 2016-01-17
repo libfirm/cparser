@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 #include "driver.h"
-#include "lang_features.h"
 #include "machine_triple.h"
+#include "target.h"
 #include "version.h"
 #include <revision.h>
 

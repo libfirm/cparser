@@ -9,10 +9,10 @@
 
 #include "adt/panic.h"
 #include "adt/obst.h"
+#include "ast/dialect.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
-#include "driver/lang_features.h"
 
 static struct obstack obst;
 

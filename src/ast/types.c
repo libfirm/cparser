@@ -6,10 +6,10 @@
 
 #include <libfirm/be.h>
 
-#include "driver/lang_features.h"
 #include "ast/entity_t.h"
 #include "ast/position.h"
 #include "ast/symbol.h"
+#include "dialect.h"
 #include "parser/parser.h"
 #include "type_t.h"
 

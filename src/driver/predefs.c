@@ -10,13 +10,14 @@
 #include "adt/panic.h"
 #include "adt/strutil.h"
 #include "ast/constfoldbits.h"
+#include "ast/dialect.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
-#include "lang_features.h"
 #include "machine_triple.h"
 #include "parser/preprocessor.h"
+#include "target.h"
 #include "version.h"
 
 bool predef_optimize;

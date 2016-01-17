@@ -28,7 +28,7 @@
 #include "adt/separator_t.h"
 #include "adt/util.h"
 #include "constfold.h"
-#include "driver/lang_features.h"
+#include "dialect.h"
 #include "driver/warning.h"
 #include "printer.h"
 #include "string_hash.h"
@@ -36,6 +36,11 @@
 #include "type_hash.h"
 #include "type_t.h"
 #include "types.h"
+
+c_dialect_t dialect = {
+	.char_is_signed = true,
+	.long_long_size = 8,
+};
 
 struct obstack ast_obstack;
 

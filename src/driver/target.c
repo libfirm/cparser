@@ -8,6 +8,7 @@
 #include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
+#include "ast/dialect.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "c_driver.h"
@@ -15,18 +16,9 @@
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
 #include "firm/mangle.h"
-#include "lang_features.h"
 #include "target.h"
 #include "warning.h"
 
-c_dialect_t dialect = {
-	.features           = _C89 | _C99 | _GNUC, /* TODO: should not be inited */
-	.char_is_signed     = true,
-	.long_long_size     = 8,
-	.pointer_sized_int  = ATOMIC_TYPE_LONG,
-	.pointer_sized_uint = ATOMIC_TYPE_ULONG,
-	.wchar_atomic_kind  = ATOMIC_TYPE_INT,
-};
 target_t target = {
 	.biggest_alignment = 16,
 	.pic_mode          = -1,
@@ -268,6 +260,9 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	dialect.int_size           = MIN(pointer_size, 4);
 	dialect.long_size          = MIN(pointer_size, 8);
 	dialect.long_double_size   = long_double_size;
+	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
+	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
+	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
 
 	set_compilerlib_name_mangle(compilerlib_name_mangle);
 
@@ -307,7 +302,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		driver_default_exe_output = "a.exe";
 		target.object_format = OBJECT_FORMAT_PE_COFF;
 		set_be_option("ia32-struct_in_reg=no");
-		target.enable_main_collect2_hack = true;
+		dialect.enable_main_collect2_hack = true;
 		ppdef("__MINGW32__", "1");
 		dialect.long_long_and_double_struct_align = 0;
 		ppdef( "__MSVCRT__", "1");

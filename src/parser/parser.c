@@ -17,6 +17,7 @@
 #include "ast/attribute_t.h"
 #include "ast/constfoldbits.h"
 #include "ast/constfold.h"
+#include "ast/dialect.h"
 #include "ast/printer.h"
 #include "ast/string_hash.h"
 #include "ast/symbol_table.h"
@@ -27,7 +28,6 @@
 #include "ast/walk.h"
 #include "builtins.h"
 #include "driver/diagnostic.h"
-#include "driver/lang_features.h"
 #include "driver/warning.h"
 #include "format_check.h"
 #include "preprocessor.h"
@@ -5304,7 +5304,7 @@ static void parse_external_declaration(void)
 			entity->declaration.type   = identify_new_type(new_type);
 		}
 
-		if (target.enable_main_collect2_hack)
+		if (dialect.enable_main_collect2_hack)
 			prepare_main_collect2(entity);
 	}
 

@@ -5,13 +5,13 @@
 #include "builtins.h"
 
 #include "adt/strutil.h"
+#include "ast/dialect.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/symbol_table.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "driver/diagnostic.h"
-#include "driver/lang_features.h"
 #include "driver/warning.h"
 #include "parser_t.h"
 

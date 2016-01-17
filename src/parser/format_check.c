@@ -11,12 +11,12 @@
 #include "ast/ast_t.h"
 #include "ast/attribute_t.h"
 #include "ast/constfold.h"
+#include "ast/dialect.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
 #include "ast/types.h"
 #include "driver/diagnostic.h"
-#include "driver/lang_features.h"
 #include "driver/warning.h"
 #include "parser.h"
 
