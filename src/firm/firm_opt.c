@@ -697,7 +697,7 @@ void set_be_option(char const *const arg)
 {
 	int res = be_parse_arg(arg);
 	if (!res)
-		panic("setting firm backend option failed");
+		panic("setting firm backend option '%s' failed (maybe an outdated version of firm is used)", arg);
 }
 
 void init_gen_firm(void)
