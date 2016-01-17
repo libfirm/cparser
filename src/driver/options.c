@@ -136,13 +136,6 @@ static bool accept_prefix(options_state_t *const s, char const *const prefix,
 	return true;
 }
 
-static void set_be_option(const char *arg)
-{
-	int res = be_parse_arg(arg);
-	if (!res)
-		panic("setting firm backend option failed");
-}
-
 bool options_parse_preprocessor(options_state_t *s)
 {
 	const char *full_option = s->argv[s->i];

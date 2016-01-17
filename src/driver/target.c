@@ -13,6 +13,7 @@
 #include "c_driver.h"
 #include "diagnostic.h"
 #include "firm/ast2firm.h"
+#include "firm/firm_opt.h"
 #include "firm/mangle.h"
 #include "lang_features.h"
 #include "target.h"
@@ -99,13 +100,6 @@ static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
 		assert (streq(target.user_label_prefix, "_"));
 		return new_id_fmt("_%s", id);
 	}
-}
-
-static void set_be_option(const char *arg)
-{
-	int res = be_parse_arg(arg);
-	if (!res)
-		panic("setting firm backend option failed");
 }
 
 /** Add a target specific preprocessor define. */

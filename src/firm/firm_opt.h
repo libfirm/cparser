@@ -131,4 +131,6 @@ void choose_optimization_pack(int level);
  */
 void init_implicit_optimizations(void);
 
+void set_be_option(char const *arg);
+
 #endif

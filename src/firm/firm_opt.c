@@ -16,6 +16,7 @@
 #include <libfirm/firm.h>
 
 #include "firm_opt.h"
+#include "adt/panic.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "driver/timing.h"
@@ -692,11 +693,11 @@ static void do_firm_lowering(void)
 	dump_all("low-opt");
 }
 
-static void set_be_option(const char *arg)
+void set_be_option(char const *const arg)
 {
 	int res = be_parse_arg(arg);
-	(void)res;
-	assert(res);
+	if (!res)
+		panic("setting firm backend option failed");
 }
 
 void init_gen_firm(void)
