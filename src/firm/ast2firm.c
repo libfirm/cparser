@@ -4571,6 +4571,9 @@ static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const sta
 
 static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 {
+	if (!currently_reachable())
+		return NULL;
+
 	bool           needs_memory = statement->is_volatile;
 	size_t         n_clobbers   = 0;
 	asm_clobber_t *clobber      = statement->clobbers;
