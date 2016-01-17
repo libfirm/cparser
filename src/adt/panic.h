@@ -5,15 +5,8 @@
 #ifndef ADT_ERROR_H
 #define ADT_ERROR_H
 
-#include <stdio.h>
-#include <stdlib.h>
+void __attribute__((noreturn)) panic(char const *file, int line, char const *func, char const *msg, ...);
 
-static inline __attribute__((noreturn)) void panic(char const *const file, int const line, char const *const func, char const *const msg)
-{
-	fprintf(stderr, "%s:%d: panic in %s: %s\n", file, line, func, msg);
-	abort();
-}
-
-#define panic(msg) panic(__FILE__, __LINE__, __func__, (msg))
+#define panic(...) panic(__FILE__, __LINE__, __func__, __VA_ARGS__)
 
 #endif
