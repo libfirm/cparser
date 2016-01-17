@@ -69,7 +69,7 @@ void print_warning_opt_help(void);
 	M(WARN_STRICT_PROTOTYPES,             ON,  "strict-prototypes",             "Warn if a function declaration has an unspecified parameter list") \
 	M(WARN_SWITCH_DEFAULT,                OFF, "switch-default",                "Warn whenever a 'switch' statement does not have a 'default' case") \
 	M(WARN_SWITCH_ENUM,                   OFF, "switch-enum",                   "Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch?") \
-	M(WARN_SYSTEM,                        OFF, "system",                        "Show warnings in system headers.") \
+	M(WARN_SYSTEM_HEADERS,                OFF, "system-headers",                "Show warnings in system headers.") \
 	M(WARN_TRADITIONAL,                   OFF, "traditional",                   "Warn about certain constructs that behave differently in traditional and ISO C") \
 	M(WARN_TRIGRAPHS,                     OFF, "trigraphs",                     "" /* TODO explanation */) \
 	M(WARN_UNDEF,                         OFF, "undef",                         "Warn if an undefined identifier is evaluated in an '#if' directive") \

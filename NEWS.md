@@ -7,6 +7,7 @@ cparser 1.22.1 (2016-01-15)
 * Update online help
 * Support `--sysroot` and `-isysroot`
 * Enable `-Wunreachable-code`, `-Wunused-function`, `-Wunused-label`, `-Wunused-parameter` and `-Wunused-variable` by default
+* Rename `-Wsystem` to `-Wsystem-headers` for gcc/clang compatibility
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
