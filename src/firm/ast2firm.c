@@ -4058,16 +4058,27 @@ static void create_local_variable(entity_t *entity)
 	                       IR_LINKAGE_DEFAULT);
 }
 
+static ir_type *get_glob_var_type(entity_t const *const entity)
+{
+	if (entity->variable.thread_local) {
+		if (!be_get_backend_param()->thread_local_storage_supported) {
+			errorf(&entity->base.pos,
+			       "Thread local storage not supported by backend");
+		}
+		return get_tls_type();
+	}
+	return get_glob_type();
+}
+
 static void create_local_static_variable(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
 	type_t   *type           = skip_typeref(entity->declaration.type);
-	ir_type  *const var_type = entity->variable.thread_local ?
-		get_tls_type() : get_glob_type();
 	ir_type  *const irtype   = get_ir_type(type);
 	dbg_info *const dbgi     = get_dbg_info(&entity->base.pos);
+	ir_type  *const var_type = get_glob_var_type(entity);
 
 	size_t l = strlen(entity->base.symbol->string);
 	char   buf[l + sizeof(".%u")];
@@ -4188,10 +4199,7 @@ static void create_global_variable(entity_t *entity)
 		linkage |= IR_LINKAGE_MERGE;
 	}
 
-	ir_type *var_type = get_glob_type();
-	if (entity->variable.thread_local) {
-		var_type = get_tls_type();
-	}
+	ir_type *const var_type = get_glob_var_type(entity);
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type,
 	                       visibility, linkage);
 	if (entity->variable.initializer == NULL
