@@ -3405,7 +3405,7 @@ static void descend_into_subtype(type_path_t *path, position_t const *const pos)
 		path->top_type = arr->element_type;
 		len            = arr->size;
 
-		if (len == 0 && !arr->has_implicit_size) {
+		if (len == 0 && !arr->size_expression) {
 			errorf(pos, "code generation for flexible arrays initializers not supported");
 			panic("Cannot continue");
 		}
