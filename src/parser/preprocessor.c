@@ -3994,7 +3994,7 @@ static bool start_expanding(void)
 						bool         may_pop    = !pp_token.base.expansion_forbidden;
 						token_kind_t next_token = peek_expansion(may_pop);
 						if (next_token != '(') {
-							if (may_pop)
+							if (next_token == T_EOF && may_pop)
 								goto try_input;
 							goto have_token;
 						}
