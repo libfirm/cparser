@@ -235,6 +235,42 @@ static compilation_unit_type_t get_unit_type_from_string(const char *string)
 	return COMPILATION_UNIT_UNKNOWN;
 }
 
+static void set_language_standard(char const *const name)
+{
+	typedef struct name_std_t {
+		char const     *name;
+		lang_standard_t std;
+	} name_std_t;
+	static name_std_t const stds[] = {
+		{ "c++",            STANDARD_CXX98   },
+		{ "c++98",          STANDARD_CXX98   },
+		{ "c11",            STANDARD_C11     },
+		{ "c1x",            STANDARD_C11     }, // deprecated
+		{ "c89",            STANDARD_C89     },
+		{ "c90",            STANDARD_C89     },
+		{ "c99",            STANDARD_C99     },
+		{ "c9x",            STANDARD_C99     }, // deprecated
+		{ "gnu++98",        STANDARD_GNUXX98 },
+		{ "gnu11",          STANDARD_GNU11   },
+		{ "gnu1x",          STANDARD_GNU11   }, // deprecated
+		{ "gnu89",          STANDARD_GNU89   },
+		{ "gnu99",          STANDARD_GNU99   },
+		{ "gnu9x",          STANDARD_GNU99   }, // deprecated
+		{ "iso9899:1990",   STANDARD_C89     },
+		{ "iso9899:199409", STANDARD_C89AMD1 },
+		{ "iso9899:1999",   STANDARD_C99     },
+		{ "iso9899:199x",   STANDARD_C99     }, // deprecated
+		{ "iso9899:2011",   STANDARD_C11     },
+	};
+	for (name_std_t const *i = stds; i != endof(stds); ++i) {
+		if (streq(i->name, name)) {
+			standard = i->std;
+			return;
+		}
+	}
+	warningf(WARN_COMPAT_OPTION, NULL, "ignoring gcc option '-%s'", name);
+}
+
 bool options_parse_driver(options_state_t *s)
 {
 	const char *option = s->argv[s->i];
@@ -265,28 +301,7 @@ bool options_parse_driver(options_state_t *s)
 		/* here for gcc compatibility */
 	} else if ((arg = equals_arg("std", s)) != NULL
 	        || (arg = equals_arg("-std", s)) != NULL) {
-		standard =
-			streq(arg, "c++")            ? STANDARD_CXX98   :
-			streq(arg, "c++98")          ? STANDARD_CXX98   :
-			streq(arg, "c11")            ? STANDARD_C11     :
-			streq(arg, "c1x")            ? STANDARD_C11     : // deprecated
-			streq(arg, "c89")            ? STANDARD_C89     :
-			streq(arg, "c90")            ? STANDARD_C89     :
-			streq(arg, "c99")            ? STANDARD_C99     :
-			streq(arg, "c9x")            ? STANDARD_C99     : // deprecated
-			streq(arg, "gnu++98")        ? STANDARD_GNUXX98 :
-			streq(arg, "gnu11")          ? STANDARD_GNU11   :
-			streq(arg, "gnu1x")          ? STANDARD_GNU11   : // deprecated
-			streq(arg, "gnu89")          ? STANDARD_GNU89   :
-			streq(arg, "gnu99")          ? STANDARD_GNU99   :
-			streq(arg, "gnu9x")          ? STANDARD_GNU99   : // deprecated
-			streq(arg, "iso9899:1990")   ? STANDARD_C89     :
-			streq(arg, "iso9899:199409") ? STANDARD_C89AMD1 :
-			streq(arg, "iso9899:1999")   ? STANDARD_C99     :
-			streq(arg, "iso9899:199x")   ? STANDARD_C99     : // deprecated
-			streq(arg, "iso9899:2011")   ? STANDARD_C11     :
-			(warningf(WARN_COMPAT_OPTION, NULL,
-			          "ignoring gcc option '-%s'", option), standard);
+		set_language_standard(arg);
 	} else if (simple_arg("ansi", s)) {
 		standard = STANDARD_ANSI;
 	} else if (simple_arg("-gcc", s)) {
