@@ -268,7 +268,7 @@ static void set_language_standard(char const *const name)
 			return;
 		}
 	}
-	warningf(WARN_COMPAT_OPTION, NULL, "ignoring gcc option '-%s'", name);
+	errorf(NULL, "unknown language standard '%s' for '-std'", name);
 }
 
 bool options_parse_driver(options_state_t *s)
