@@ -3864,7 +3864,7 @@ static void parse_line_directive(void)
 	expect_directive_end(WARN_OTHER, "#line directive");
 }
 
-static void parse_error_directive(void)
+static void parse_diagnostic_directive(bool const is_error)
 {
 	if (skip_mode) {
 		eat_pp_directive();
@@ -3910,7 +3910,11 @@ string:;
 	resolve_escape_sequences = old_resolve_escape_sequences;
 
 	char *const str = obstack_nul_finish(&pp_obstack);
-	errorf(&pos, "#%s", str);
+	if (is_error) {
+		errorf(&pos, "#%s", str);
+	} else {
+		warningf(WARN_CPP, &pos, "#%s", str);
+	}
 	obstack_free(&pp_obstack, str);
 }
 
@@ -3934,7 +3938,7 @@ static void parse_preprocessing_directive(void)
 		case TP_elif:         parse_elif_directive();              break;
 		case TP_else:         parse_else_directive();              break;
 		case TP_endif:        parse_endif_directive();             break;
-		case TP_error:        parse_error_directive();             break;
+		case TP_error:        parse_diagnostic_directive(true);    break;
 		case TP_if:           parse_if_directive();                break;
 		case TP_ifdef:        parse_ifdef_ifndef_directive(true);  break;
 		case TP_ifndef:       parse_ifdef_ifndef_directive(false); break;
@@ -3943,6 +3947,7 @@ static void parse_preprocessing_directive(void)
 		case TP_line:         next_input_token(); goto line_directive;
 		case TP_pragma:       parse_pragma_directive();            break;
 		case TP_undef:        parse_undef_directive();             break;
+		case TP_warning:      parse_diagnostic_directive(false);   break;
 		default:              goto skip;
 		}
 	} else if (pp_token.kind == T_NUMBER) {

@@ -25,6 +25,7 @@ void print_warning_opt_help(void);
 	M(WARN_COMMENT,                       OFF, "comment",                       "Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment.") \
 	M(WARN_COMPAT_OPTION,                 ON,  "compat-option",                 "Warn when gcc switches are specified which cparser ignores.") \
 	M(WARN_CONVERSION,                    OFF, "conversion",                    "Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype") \
+	M(WARN_CPP,                           ON,  "cpp",                           "Show warning messages emitted by '#warning' directives") \
 	M(WARN_DECLARATION_AFTER_STATEMENT,   OFF, "declaration-after-statement",   "Warn when a declaration is found after a statement in a block") \
 	M(WARN_DEPRECATED_DECLARATIONS,       ON,  "deprecated-declarations",       "Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute") /* TODO implement for types */ \
 	M(WARN_DISTINCT_POINTER_TYPES,        ON,  "distinct-pointer-types",        "warn when comparing pointers to incompatible types") \

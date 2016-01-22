@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd January 15, 2016
+.Dd January 22, 2016
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -157,6 +157,9 @@ In particular these are
 .No Warn whenever a pointer cast removes qualifiers from the pointed-to type, e.g. casting a So const char* Sc to Sq char* .
 .It Fl Wchar-subscripts
 .No Warn about using an expression of type char as array subscript, e.g. Sq char\ c; arr[c] .
+.It Fl Wcpp
+.No Show warning messages emitted by So #warning Sc directives.
+Default is on.
 .It Fl Wdeclaration-after-statement
 Warn about mixing declarations and statements, which is not allowed prior to C99.
 .It Fl Wdiv-by-zero
