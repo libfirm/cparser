@@ -1,4 +1,4 @@
-cparser 1.22.1 (2016-01-22)
+cparser 1.22.1 (2016-01-23)
 ---------------------------
 
 * Add make install target
@@ -9,6 +9,7 @@ cparser 1.22.1 (2016-01-22)
 * Enable `-Wunreachable-code`, `-Wunused-function`, `-Wunused-label`, `-Wunused-parameter` and `-Wunused-variable` by default
 * Rename `-Wsystem` to `-Wsystem-headers` for gcc/clang compatibility
 * Support `-Wcpp`
+* Stub support for `#ident` and `#sccs`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)

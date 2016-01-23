@@ -3918,6 +3918,25 @@ string:;
 	obstack_free(&pp_obstack, str);
 }
 
+static void parse_ident_directive(char const *const ctx)
+{
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
+
+	next_input_token();
+	if (pp_token.kind == T_STRING_LITERAL && pp_token.literal.string->encoding == STRING_ENCODING_CHAR) {
+		/* TODO gcc documentation says, it's ok to ignore this, but we should put
+		 * the string as '.ident' into the assembler, when possible. */
+		eat_token(T_STRING_LITERAL);
+		expect_directive_end(WARN_OTHER, ctx);
+	} else {
+		errorf(&pp_token.base.pos, "expected string literal in %s directive, got %K", ctx, &pp_token);
+		eat_pp_directive();
+	}
+}
+
 static void parse_preprocessing_directive(void)
 {
 	if (current_call.macro != NULL) {
@@ -3939,6 +3958,7 @@ static void parse_preprocessing_directive(void)
 		case TP_else:         parse_else_directive();              break;
 		case TP_endif:        parse_endif_directive();             break;
 		case TP_error:        parse_diagnostic_directive(true);    break;
+		case TP_ident:        parse_ident_directive("#ident");     break;
 		case TP_if:           parse_if_directive();                break;
 		case TP_ifdef:        parse_ifdef_ifndef_directive(true);  break;
 		case TP_ifndef:       parse_ifdef_ifndef_directive(false); break;
@@ -3946,6 +3966,7 @@ static void parse_preprocessing_directive(void)
 		case TP_include_next: parse_include_directive(true);       break;
 		case TP_line:         next_input_token(); goto line_directive;
 		case TP_pragma:       parse_pragma_directive();            break;
+		case TP_sccs:         parse_ident_directive("#sccs");      break;
 		case TP_undef:        parse_undef_directive();             break;
 		case TP_warning:      parse_diagnostic_directive(false);   break;
 		default:              goto skip;
