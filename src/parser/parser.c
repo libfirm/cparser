@@ -2530,6 +2530,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			errorf(&pos,
 				   "expected put or get in property declspec, but got '%Y'",
 				   prop_sym);
+			prop = &property->get_symbol;
 		}
 
 		add_anchor_token(T_IDENTIFIER);
