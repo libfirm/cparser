@@ -3651,9 +3651,10 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			orig_type = semantic_parameter(&env.pos, orig_type, specifiers, entity);
 		} else if (is_type_function(type)) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
-			entity->function.is_inline      = specifiers->is_inline;
-			entity->function.elf_visibility = default_visibility;
-			entity->function.parameters     = env.parameters;
+			entity->function.is_inline        = specifiers->is_inline;
+			entity->function.all_decls_inline = specifiers->is_inline;
+			entity->function.elf_visibility   = default_visibility;
+			entity->function.parameters       = env.parameters;
 
 			if (env.symbol != NULL) {
 				/* this needs fixes for C++ */
@@ -3905,7 +3906,8 @@ void merge_into_decl(entity_t *decl, const entity_t *other)
 	assert(decl->kind == other->kind);
 	decl->declaration.modifiers |= other->declaration.modifiers;
 	if (decl->kind == ENTITY_FUNCTION) {
-		decl->function.is_inline |= other->function.is_inline;
+		decl->function.is_inline        |= other->function.is_inline;
+		decl->function.all_decls_inline &= other->function.all_decls_inline;
 		if (other->function.alias.symbol != NULL) {
 			assert(decl->function.alias.symbol == NULL);
 			decl->function.alias.symbol = other->function.alias.symbol;

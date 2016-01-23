@@ -206,15 +206,17 @@ struct variable_t {
 struct function_t {
 	declaration_t  base;
 	/** builtin kind */
-	ENUMBF(builtin_kind_t)   btk            : 8;
-	bool                     is_inline      : 1;
+	ENUMBF(builtin_kind_t)   btk              : 8;
+	bool                     is_inline        : 1;
+	/** All declarations of this function were marked inline */
+	bool                     all_decls_inline : 1;
 	/** Inner function needs closure. */
-	bool                     need_closure   : 1;
+	bool                     need_closure     : 1;
 	/** Inner function has goto to outer function. */
-	bool                     goto_to_outer  : 1;
-	ENUMBF(elf_visibility_t) elf_visibility : 3;
+	bool                     goto_to_outer    : 1;
+	ENUMBF(elf_visibility_t) elf_visibility   : 3;
 	/** builtin is library, this means you can safely take its address */
-	bool                     builtin_in_lib : 1;
+	bool                     builtin_in_lib   : 1;
 	scope_t        parameters;
 	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */

@@ -2009,7 +2009,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 
 bool function_is_inline_only(function_t const *const function)
 {
-	if (!function->is_inline || (function->base.modifiers & DM_NOINLINE))
+	if (!function->all_decls_inline || (function->base.modifiers & DM_NOINLINE))
 		return false;
 
 	storage_class_t const storage_class = function->base.declared_storage_class;
@@ -2018,7 +2018,7 @@ bool function_is_inline_only(function_t const *const function)
 		goto gnu_c90_inline;
 
 	if (dialect.c99) {
-		/* C99 inline behaviour */
+		/* C99 inline behaviour, see §6.7.4.6  */
 		return storage_class == STORAGE_CLASS_NONE;
 	} else {
 gnu_c90_inline:
