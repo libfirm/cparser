@@ -357,6 +357,9 @@ static ir_tarval *char_literal_to_tarval(string_literal_expression_t const *lite
 
 void determine_enum_values(enum_t *const enume)
 {
+	if (enume->error)
+		return;
+
 	ir_mode   *const mode    = atomic_modes[enume->akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);

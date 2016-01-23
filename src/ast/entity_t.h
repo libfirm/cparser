@@ -121,6 +121,7 @@ struct enum_t {
 	atomic_type_kind_t akind;
 	entity_t          *first_value;
 	bool               complete : 1;
+	bool               error    : 1;
 };
 
 struct enum_value_t {

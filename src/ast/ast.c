@@ -1719,7 +1719,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	switch (expression->kind) {
 	case EXPR_LITERAL_CHARACTER:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-	case EXPR_ENUM_CONSTANT:
 	case EXPR_LITERAL_BOOLEAN:
 	case EXPR_LITERAL_MS_NOOP:
 		return EXPR_CLASS_INTEGER_CONSTANT;
@@ -1751,6 +1750,10 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 check_type:
 		return is_type_valid(type) ? EXPR_CLASS_INTEGER_CONSTANT : EXPR_CLASS_ERROR;
 	}
+
+	case EXPR_ENUM_CONSTANT:
+		return expression->reference.entity->enum_value.enume->error
+		       ? EXPR_CLASS_ERROR : EXPR_CLASS_INTEGER_CONSTANT;
 
 	case EXPR_LITERAL_FLOATINGPOINT: {
 		type_t *const type = skip_typeref(expression->base.type);

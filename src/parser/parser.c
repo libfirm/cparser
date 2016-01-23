@@ -2254,8 +2254,11 @@ static void parse_enum_entries(enum_t *const enume)
 		if (accept('=')) {
 			expression_t *value
 				= parse_integer_constant_expression("enumeration value");
-			if (value->base.type != type_error_type)
+			if (value->base.type != type_error_type) {
 				value = create_implicit_cast(value, type_int);
+			} else {
+				enume->error = true;
+			}
 			entity->enum_value.value = value;
 		}
 
