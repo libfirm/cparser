@@ -208,8 +208,6 @@ struct function_t {
 	/** builtin kind */
 	ENUMBF(builtin_kind_t)   btk            : 8;
 	bool                     is_inline      : 1;
-	/** function used purely for inlining, no extra code generated */
-	bool                     no_codegen     : 1;
 	/** Inner function needs closure. */
 	bool                     need_closure   : 1;
 	/** Inner function has goto to outer function. */

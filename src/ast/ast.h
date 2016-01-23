@@ -127,4 +127,10 @@ type_t *revert_automatic_type_conversion(const expression_t *expression);
 
 type_t *get_string_type(string_encoding_t const encoding);
 
+/**
+ * Returns true if the function body should only be used for inlining into other
+ * functions but not to produce an externally visible definition.
+ */
+bool function_is_inline_only(function_t const *function);
+
 #endif

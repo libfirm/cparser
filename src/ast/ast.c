@@ -2007,6 +2007,26 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	return expression->base.type;
 }
 
+bool function_is_inline_only(function_t const *const function)
+{
+	if (!function->is_inline || (function->base.modifiers & DM_NOINLINE))
+		return false;
+
+	storage_class_t const storage_class = function->base.declared_storage_class;
+
+	if (function->base.modifiers & DM_GNU_INLINE)
+		goto gnu_c90_inline;
+
+	if (dialect.c99) {
+		/* C99 inline behaviour */
+		return storage_class == STORAGE_CLASS_NONE;
+	} else {
+gnu_c90_inline:
+		/* GNU C90 inline behaviour */
+		return storage_class == STORAGE_CLASS_EXTERN;
+	}
+}
+
 void init_ast(void)
 {
 	obstack_init(&ast_obstack);

@@ -744,7 +744,7 @@ static ir_entity *get_function_entity(entity_t *entity)
 
 	handle_decl_modifiers(irentity, entity);
 
-	if (entity->function.no_codegen)
+	if (function_is_inline_only(&entity->function))
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 
 	/* We should check for file scope here, but as long as we compile C only
