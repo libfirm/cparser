@@ -3904,6 +3904,8 @@ void merge_into_decl(entity_t *decl, const entity_t *other)
 	if (decl->kind == ENTITY_FUNCTION) {
 		decl->function.is_inline |= other->function.is_inline;
 		decl->function.no_codegen |= other->function.no_codegen;
+		if (decl->declaration.modifiers & DM_NOINLINE)
+			decl->function.no_codegen = false;
 		if (other->function.alias.symbol != NULL) {
 			assert(decl->function.alias.symbol == NULL);
 			decl->function.alias.symbol = other->function.alias.symbol;
@@ -5267,6 +5269,8 @@ static void parse_external_declaration(void)
 		} else if (storage_class == STORAGE_CLASS_EXTERN) {
 			function->no_codegen = true;
 		}
+		if (function->base.modifiers & DM_NOINLINE)
+			function->no_codegen = false;
 	}
 
 	/* parse function body */
