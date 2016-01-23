@@ -71,7 +71,7 @@ static ir_node   **ijmp_blocks;
 #define POP_IRG() \
 	(assert(current_ir_graph == new_irg), (void)(current_ir_graph = old_irg))
 
-static const entity_t     *current_function_entity;
+static const function_t   *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
 static ir_graph           *current_function;
@@ -662,7 +662,7 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	}
 }
 
-static bool is_main(entity_t *entity)
+static bool is_main(entity_t const *const entity)
 {
 	static symbol_t *sym_main = NULL;
 	if (sym_main == NULL) {
@@ -691,23 +691,19 @@ static ir_visibility get_ir_visibility(storage_class_t const storage_class,
 }
 
 /**
- * Creates an entity representing a function.
- *
- * @param entity       the function declaration/definition
+ * Creates a firm entity representing a function.
  */
-static ir_entity *get_function_entity(entity_t *entity)
+static ir_entity *get_function_entity(function_t *const function)
 {
-	assert(entity->kind == ENTITY_FUNCTION);
-	if (entity->function.irentity != NULL)
-		return entity->function.irentity;
+	if (function->irentity != NULL)
+		return function->irentity;
 
-	if (entity->function.btk != BUILTIN_NONE
-	    && !entity->function.builtin_in_lib)
+	if (function->btk != BUILTIN_NONE && !function->builtin_in_lib)
 	    return NULL;
 
-	symbol_t *symbol = entity->base.symbol;
+	symbol_t *symbol = function->base.base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
-	ident    *ld_id  = create_ld_ident(entity);
+	ident    *ld_id  = create_ld_ident((entity_t*)function);
 
 	/* In some corner cases cparser does not properly merge all entities
 	 * to a common entity_t object. (These corner cases include
@@ -721,15 +717,15 @@ static ir_entity *get_function_entity(entity_t *entity)
 	if (irentity != NULL)
 		goto entity_created;
 
-	assert(!entity->function.need_closure);
-	ir_type *ir_type_method = get_ir_type(entity->declaration.type);
+	assert(!function->need_closure);
+	ir_type *ir_type_method = get_ir_type(function->base.type);
 
-	storage_class_t  const storage_class  = entity->declaration.storage_class;
-	elf_visibility_t const elf_visibility = entity->function.elf_visibility;
+	storage_class_t  const storage_class  = function->base.storage_class;
+	elf_visibility_t const elf_visibility = function->elf_visibility;
 	ir_visibility visibility = get_ir_visibility(storage_class, elf_visibility);
 
 	ir_type *owner = get_glob_type();
-	if (entity->function.alias.entity != NULL) {
+	if (function->alias.entity != NULL) {
 		/* create alias entity but do not resolve alias just yet, phase 2 of
 		 * the main loop will do so. */
 		irentity = new_alias_entity(owner, ld_id, NULL, ir_type_method,
@@ -739,24 +735,23 @@ static ir_entity *get_function_entity(entity_t *entity)
 		                             IR_LINKAGE_DEFAULT);
 	}
 	set_entity_ident(irentity, id);
-	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
+	dbg_info *const dbgi = get_dbg_info(&function->base.base.pos);
 	set_entity_dbg_info(irentity, dbgi);
 
-	handle_decl_modifiers(irentity, entity);
+	handle_decl_modifiers(irentity, (entity_t*)function);
 
-	if (function_is_inline_only(&entity->function))
+	if (function_is_inline_only(function))
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 
 	/* We should check for file scope here, but as long as we compile C only
 	 * this is not needed. */
-	if (!dialect.no_builtins && entity->function.body == NULL) {
+	if (!dialect.no_builtins && function->body == NULL) {
 		/* check for a known runtime function */
 		for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 			if (id != rts_idents[i])
 				continue;
 
-			function_type_t *function_type
-				= &entity->declaration.type->function;
+			function_type_t *function_type = &function->base.type->function;
 			/* rts_entities code can't handle a "wrong" number of parameters */
 			if (function_type->unspecified_parameters)
 				continue;
@@ -780,8 +775,8 @@ static ir_entity *get_function_entity(entity_t *entity)
 	}
 
 entity_created:
-	entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
-	entity->function.irentity = irentity;
+	function->base.kind = DECLARATION_KIND_FUNCTION;
+	function->irentity  = irentity;
 
 	return irentity;
 }
@@ -932,7 +927,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 
 	if (entity->kind == ENTITY_FUNCTION
 	    && entity->function.btk != BUILTIN_NONE) {
-		ir_entity *irentity = get_function_entity(entity);
+		ir_entity *irentity = get_function_entity(&entity->function);
 		/* for gcc compatibility we have to produce (dummy) addresses for some
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
@@ -2185,7 +2180,8 @@ static ir_node *function_name_to_firm(const funcname_expression_t *const expr)
 	case FUNCNAME_FUNCDNAME:
 		if (current_function_name == NULL) {
 			position_t const *const src_pos = &expr->base.pos;
-			char       const *const name    = current_function_entity->base.symbol->string;
+			char       const *const name
+				= current_function_entity->base.base.symbol->string;
 			begin_string_construction();
 			obstack_grow(&string_obst, name, strlen(name));
 			string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
@@ -4112,7 +4108,8 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 		return NULL;
 
 	dbg_info *const dbgi = get_dbg_info(&statement->base.pos);
-	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
+	type_t   *const type
+		= skip_typeref(current_function_entity->base.type->function.return_type);
 
 	ir_node *in[1];
 	int in_len;
@@ -4223,7 +4220,7 @@ static void create_local_declaration(entity_t *entity)
 	switch (entity->declaration.storage_class) {
 	case STORAGE_CLASS_STATIC:
 		if (entity->kind == ENTITY_FUNCTION) {
-			(void)get_function_entity(entity);
+			(void)get_function_entity(&entity->function);
 		} else {
 			create_local_static_variable(entity);
 		}
@@ -4231,7 +4228,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_EXTERN:
 		if (entity->kind == ENTITY_FUNCTION) {
 			assert(entity->function.body == NULL);
-			(void)get_function_entity(entity);
+			(void)get_function_entity(&entity->function);
 		} else {
 			create_global_variable(entity);
 			create_variable_initializer(entity);
@@ -4247,7 +4244,7 @@ static void create_local_declaration(entity_t *entity)
 					   "code generation does not support nested functions (at '%N')", entity);
 				return;
 			}
-			(void)get_function_entity(entity);
+			(void)get_function_entity(&entity->function);
 		} else {
 			create_local_variable(entity);
 		}
@@ -4784,10 +4781,10 @@ jump:
 	panic("statement not implemented");
 }
 
-static int count_local_variables(const entity_t *entity,
-                                 const entity_t *const last)
+static unsigned count_local_variables(const entity_t *entity,
+                                      const entity_t *const last)
 {
-	int count = 0;
+	unsigned count = 0;
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
 		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
@@ -4823,9 +4820,8 @@ static void count_local_variables_in_stmt(statement_t *stmt, void *const env)
 /**
  * Return the number of local (alias free) variables used by a function.
  */
-static int get_function_n_local_vars(entity_t *entity)
+static int get_function_n_local_vars(function_t const *const function)
 {
-	const function_t *function = &entity->function;
 	int count = 0;
 
 	/* count parameters */
@@ -4839,16 +4835,15 @@ static int get_function_n_local_vars(entity_t *entity)
 /**
  * Build Firm code for the parameters of a function.
  */
-static void initialize_function_parameters(entity_t *entity)
+static void initialize_function_parameters(function_t *const function)
 {
-	assert(entity->kind == ENTITY_FUNCTION);
-	assert(!entity->function.need_closure);
+	assert(!function->need_closure);
 	ir_graph *irg             = current_ir_graph;
 	ir_node  *args            = get_irg_args(irg);
 	unsigned  n               = 0;
-	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
+	ir_type  *function_irtype = get_ir_type(function->base.type);
 
-	for (entity_t *parameter = entity->function.parameters.first_entity;
+	for (entity_t *parameter = function->parameters.first_entity;
 	     parameter != NULL; parameter = parameter->base.next, ++n) {
 		if (parameter->kind != ENTITY_PARAMETER)
 			continue;
@@ -4925,27 +4920,24 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 }
 
 /**
- * Create code for a function
- *
- * @param entity  the function entity
+ * Create firm graph for a function.
  */
-static void create_function(entity_t *entity)
+static void create_function(function_t *const function)
 {
-	assert(entity->kind == ENTITY_FUNCTION);
-	if (entity->function.body == NULL)
+	if (function->body == NULL)
 		return;
 
-	ir_entity *const function_entity = get_function_entity(entity);
-	if (entity->declaration.modifiers & DM_CONSTRUCTOR) {
+	ir_entity *const function_entity = get_function_entity(function);
+	if (function->base.modifiers & DM_CONSTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_CONSTRUCTORS);
 		add_function_pointer(segment, function_entity, "constructor_ptr.%u");
 	}
-	if (entity->declaration.modifiers & DM_DESTRUCTOR) {
+	if (function->base.modifiers & DM_DESTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_DESTRUCTORS);
 		add_function_pointer(segment, function_entity, "destructor_ptr.%u");
 	}
 
-	current_function_entity = entity;
+	current_function_entity = function;
 	current_function_name   = NULL;
 	current_funcsig         = NULL;
 
@@ -4955,7 +4947,7 @@ static void create_function(entity_t *entity)
 	ijmp_ops    = NEW_ARR_F(ir_node*, 0);
 	ijmp_blocks = NEW_ARR_F(ir_node*, 0);
 
-	int       n_local_vars = get_function_n_local_vars(entity);
+	unsigned  n_local_vars = get_function_n_local_vars(function);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
 	current_ir_graph = irg;
 
@@ -4966,15 +4958,15 @@ static void create_function(entity_t *entity)
 	                 get_entity_dbg_info(function_entity));
 
 	next_value_number_function = 0;
-	initialize_function_parameters(entity);
+	initialize_function_parameters(function);
 
-	statement_to_firm(entity->function.body);
+	statement_to_firm(function->body);
 
 	ir_node *end_block = get_irg_end_block(irg);
 
 	/* do we have a return statement yet? */
 	if (currently_reachable()) {
-		type_t *type = skip_typeref(entity->declaration.type);
+		type_t *type = skip_typeref(function->base.type);
 		assert(is_type_function(type));
 		type_t *const return_type = skip_typeref(type->function.return_type);
 
@@ -4986,7 +4978,7 @@ static void create_function(entity_t *entity)
 
 			ir_node *in[1];
 			/* §5.1.2.2.3 main implicitly returns 0 */
-			if (is_main(entity)) {
+			if (is_main((entity_t const*)function)) {
 				in[0] = new_Const(get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
@@ -5068,7 +5060,7 @@ static void scope_to_firm(scope_t *scope)
 			 * programs with unused function declarations containing va_list
 			 * for backends without support for variadic functions. */
 			if (is_decl_necessary(entity))
-				(void)get_function_entity(entity);
+				(void)get_function_entity(&entity->function);
 			break;
 		case ENTITY_VARIABLE:
 			create_global_variable(entity);
@@ -5099,7 +5091,7 @@ static void scope_to_firm(scope_t *scope)
 				ir_entity *aliased = get_irentity(alias);
 				set_entity_alias(entity->function.irentity, aliased);
 			} else if (is_decl_necessary(entity)) {
-				create_function(entity);
+				create_function(&entity->function);
 			}
 			break;
 		}
