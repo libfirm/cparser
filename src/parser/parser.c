@@ -514,6 +514,11 @@ static inline const token_t *look_ahead(size_t num)
 	return &lookahead_buffer[pos];
 }
 
+static inline bool peek_ahead(token_kind_t const kind)
+{
+	return look_ahead(1)->kind == kind;
+}
+
 /**
  * Adds a token type to the token type anchor set (a multi-set).
  */
@@ -1119,7 +1124,7 @@ static string_t *concat_string_literals(void)
 	assert(peek(T_STRING_LITERAL));
 
 	string_t *result;
-	if (look_ahead(1)->kind == T_STRING_LITERAL) {
+	if (peek_ahead(T_STRING_LITERAL)) {
 		/* construct new string on ast_obstack, as string_obstack may be used
 		 * simulatneously be the preprocessor */
 		begin_string_construction_on(&ast_obstack);
@@ -1212,8 +1217,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		attribute_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 
 		/* is it an identifier */
-		if (peek(T_IDENTIFIER)
-		 && (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
+		if (peek(T_IDENTIFIER) && (peek_ahead(',') || peek_ahead(')'))) {
 			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
 			argument->v.symbol = token.base.symbol;
 			eat(T_IDENTIFIER);
@@ -1892,7 +1896,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		if (peek('.') || peek('[')) {
 			designator = parse_designation();
 			goto finish_designator;
-		} else if (peek(T_IDENTIFIER) && look_ahead(1)->kind == ':') {
+		} else if (peek(T_IDENTIFIER) && peek_ahead(':')) {
 			/* GNU-style designator ("identifier: value") */
 			if (!GNU_MODE)
 				errorf(HERE, "designator with ':' is a GCC extension");
@@ -3058,7 +3062,7 @@ static void semantic_parameter_complete(const entity_t *entity)
 static bool has_parameters(void)
 {
 	/* func(void) is not a parameter */
-	if (look_ahead(1)->kind != ')')
+	if (!peek_ahead(')'))
 		return true;
 	if (peek(T_IDENTIFIER)) {
 		entity_t const *const entity = get_entity(token.base.symbol, NAMESPACE_NORMAL);
@@ -3095,7 +3099,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 
 	if (peek(T_IDENTIFIER)
 	 && !is_typedef_symbol(token.base.symbol)
-	 && (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
+	 && (peek_ahead(',') || peek_ahead(')'))) {
 		type->kr_style_parameters = true;
 		parse_identifier_list(scope);
 	} else if (peek(')')) {
@@ -3244,7 +3248,7 @@ static construct_type_t *parse_array_declarator(void)
 	array->is_static       = is_static;
 
 	expression_t *size = NULL;
-	if (peek('*') && look_ahead(1)->kind == ']') {
+	if (peek('*') && peek_ahead(']')) {
 		array->is_variable = true;
 		eat('*');
 	} else if (!peek(']')) {
@@ -5526,9 +5530,7 @@ static void parse_compound_declarators(compound_t *compound,
 				       entity, orig_type);
 			} else if (!is_type_complete(type)) {
 				/* §6.7.2.1:16 flexible array member */
-				if (!is_type_array(type)
-				 || !peek(';')
-				 || look_ahead(1)->kind != '}') {
+				if (!is_type_array(type) || !peek(';') || !peek_ahead('}')) {
 					if (is_type_valid(type))
 						errorf(pos, "'%N' has incomplete type '%T'", entity,
 						       orig_type);
@@ -9366,7 +9368,7 @@ static statement_t *parse_ms_asm_statement(void)
 
 static statement_t *parse_asm_statement(void)
 {
-	if (look_ahead(1)->kind == '{') {
+	if (peek_ahead('{')) {
 		return parse_ms_asm_statement();
 	} else {
 		return parse_gcc_asm_statement();
@@ -9872,7 +9874,7 @@ static statement_t *parse_for(void)
 static statement_t *parse_goto(void)
 {
 	statement_t *statement;
-	if (look_ahead(1)->kind == '*') {
+	if (peek_ahead('*')) {
 		if (!GNU_MODE)
 			errorf(HERE, "computed goto is a GCC extension");
 		statement = allocate_statement_zero(STATEMENT_COMPUTED_GOTO);
@@ -10827,7 +10829,7 @@ static void parse_external(void)
 {
 	switch (token.kind) {
 	case T_extern:
-		if (look_ahead(1)->kind == T_STRING_LITERAL) {
+		if (peek_ahead(T_STRING_LITERAL)) {
 			parse_linkage_specification();
 		} else {
 	case DECLARATION_START_NO_EXTERN:
