@@ -151,10 +151,10 @@ static ir_tarval *fold_expression_to_address(expression_t const *const expr)
 	}
 }
 
-typedef ir_tarval* (*fold_binary_func)(ir_tarval *left, ir_tarval *right);
+typedef ir_tarval* (*tarval_binop)(ir_tarval const *op0, ir_tarval const *op1);
 
 static ir_tarval *fold_binary_expression_arithmetic(
-		binary_expression_t const *const binexpr, fold_binary_func fold)
+		binary_expression_t const *const binexpr, tarval_binop fold)
 {
 	ir_tarval *const left   = fold_expression(binexpr->left);
 	ir_tarval *const right  = fold_expression(binexpr->right);
@@ -678,8 +678,8 @@ ir_tarval *fold_expression(expression_t const *const expr)
 	case EXPR_BINARY_SHIFTLEFT:
 		return fold_binary_expression_arithmetic(&expr->binary, tarval_shl);
 	case EXPR_BINARY_SHIFTRIGHT: {
-		fold_binary_func fold = is_type_signed(skip_typeref(expr->base.type))
-		                      ? tarval_shrs : tarval_shr;
+		tarval_binop fold = is_type_signed(skip_typeref(expr->base.type))
+		                  ? tarval_shrs : tarval_shr;
 		return fold_binary_expression_arithmetic(&expr->binary, fold);
 	}
 
