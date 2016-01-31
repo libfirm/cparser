@@ -9946,14 +9946,9 @@ static bool is_local_variable(const entity_t *entity)
 
 	switch (entity->declaration.storage_class) {
 	case STORAGE_CLASS_AUTO:
-	case STORAGE_CLASS_REGISTER: {
-		const type_t *type = skip_typeref(entity->declaration.type);
-		if (is_type_function(type)) {
-			return false;
-		} else {
-			return true;
-		}
-	}
+	case STORAGE_CLASS_REGISTER:
+		return true;
+
 	default:
 		return false;
 	}
