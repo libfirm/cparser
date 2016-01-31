@@ -10008,8 +10008,7 @@ static statement_t *parse_return(void)
 		}
 		return_value = create_implicit_cast(return_value, return_type);
 		/* check for returning address of a local var */
-		if (return_value != NULL
-		 && return_value->kind == EXPR_UNARY_TAKE_ADDRESS) {
+		if (return_value->kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (expression_is_local_variable(expression))
 				warningf(WARN_OTHER, pos,
