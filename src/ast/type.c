@@ -1293,7 +1293,7 @@ type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 
 	while (true) {
-		switch (type->base.kind) {
+		switch (type->kind) {
 		case TYPE_ERROR:
 			return TYPE_QUALIFIER_NONE;
 		case TYPE_TYPEDEF:

@@ -81,7 +81,7 @@ static void walk_expression(expression_t *const expr,
 {
 	env->expression_func(expr, env->env);
 
-	switch (expr->base.kind) {
+	switch (expr->kind) {
 	case EXPR_STATEMENT:
 		walk_statement(expr->statement.statement, env);
 		return;

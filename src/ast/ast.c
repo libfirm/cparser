@@ -640,7 +640,7 @@ static bool needs_parentheses(expression_t const *const expr, unsigned const top
 	if (expr->base.parenthesized)
 		return true;
 
-	if (top_prec > get_expression_precedence(expr->base.kind))
+	if (top_prec > get_expression_precedence(expr->kind))
 		return true;
 
 	if (print_parenthesis && top_prec != PREC_BOTTOM) {

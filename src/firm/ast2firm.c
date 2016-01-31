@@ -387,7 +387,7 @@ static ir_type *create_array_type(type_t const *const type)
  */
 static ir_type *create_compound_type(type_t *const type)
 {
-	bool        const is_union = type->base.kind == TYPE_COMPOUND_UNION;
+	bool        const is_union = type->kind == TYPE_COMPOUND_UNION;
 	compound_t *const compound = type->compound.compound;
 
 	symbol_t *type_symbol = compound->base.symbol;

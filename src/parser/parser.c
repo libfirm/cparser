@@ -7376,7 +7376,7 @@ static void warn_reference_address_as_bool(expression_t const* expr)
 
 static void warn_assignment_in_condition(const expression_t *const expr)
 {
-	if (expr->base.kind != EXPR_BINARY_ASSIGN)
+	if (expr->kind != EXPR_BINARY_ASSIGN)
 		return;
 	if (expr->base.parenthesized)
 		return;
@@ -8282,7 +8282,7 @@ static void warn_comparison(position_t const *const pos,
 	}
 
 	if (!expr->base.parenthesized) {
-		switch (expr->base.kind) {
+		switch (expr->kind) {
 		case EXPR_BINARY_LESS:
 		case EXPR_BINARY_GREATER:
 		case EXPR_BINARY_LESSEQUAL:
@@ -8552,7 +8552,7 @@ static void semantic_shift_assign(binary_expression_t *expression)
 
 static void warn_logical_and_within_or(const expression_t *const expr)
 {
-	if (expr->base.kind != EXPR_BINARY_LOGICAL_AND)
+	if (expr->kind != EXPR_BINARY_LOGICAL_AND)
 		return;
 	if (expr->base.parenthesized)
 		return;
@@ -9964,7 +9964,7 @@ static bool is_local_variable(const entity_t *entity)
  */
 static bool expression_is_local_variable(const expression_t *expression)
 {
-	if (expression->base.kind != EXPR_REFERENCE)
+	if (expression->kind != EXPR_REFERENCE)
 		return false;
 	const entity_t *entity = expression->reference.entity;
 	return is_local_variable(entity);
@@ -10009,7 +10009,7 @@ static statement_t *parse_return(void)
 		return_value = create_implicit_cast(return_value, return_type);
 		/* check for returning address of a local var */
 		if (return_value != NULL
-		 && return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
+		 && return_value->kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (expression_is_local_variable(expression))
 				warningf(WARN_OTHER, pos,
@@ -10488,8 +10488,7 @@ static entity_t *determine_lhs_ent(expression_t *const expr,
 	case EXPR_REFERENCE: {
 		entity_t *const entity = expr->reference.entity;
 		/* we should only find variables as lvalues... */
-		if (entity->base.kind != ENTITY_VARIABLE
-		 && entity->base.kind != ENTITY_PARAMETER)
+		if (entity->kind != ENTITY_VARIABLE && entity->kind != ENTITY_PARAMETER)
 			return NULL;
 
 		return entity;
