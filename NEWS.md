@@ -10,7 +10,7 @@ cparser 1.22.1 (2016-01-23)
 * Rename `-Wsystem` to `-Wsystem-headers` for gcc/clang compatibility
 * Support `-Wcpp`
 * Stub support for `#ident` and `#sccs`
-* Add switch `-Wreturn-local-addr`
+* Add switch `-Wreturn-local-addr` and handle compound literals
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)

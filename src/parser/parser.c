@@ -9957,12 +9957,37 @@ static bool is_local_variable(const entity_t *entity)
 /**
  * Check if a given expression represents a local variable.
  */
-static bool expression_is_local_variable(const expression_t *expression)
+static bool expression_is_local_variable(expression_t const *const expr)
 {
-	if (expression->kind != EXPR_REFERENCE)
+	switch (expr->kind) {
+	case EXPR_COMPOUND_LITERAL:
+		return true;
+
+	case EXPR_REFERENCE:
+		return is_local_variable(expr->reference.entity);
+
+	default:
 		return false;
-	const entity_t *entity = expression->reference.entity;
-	return is_local_variable(entity);
+	}
+}
+
+static bool is_local_address(expression_t const *const expr)
+{
+	switch (expr->kind) {
+	case EXPR_COMPOUND_LITERAL:
+		return is_type_array(skip_typeref(revert_automatic_type_conversion(expr)));
+
+	case EXPR_UNARY_CAST:
+		if (!expr->base.implicit)
+			return false;
+		return is_local_address(expr->unary.value);
+
+	case EXPR_UNARY_TAKE_ADDRESS:
+		return expression_is_local_variable(expr->unary.value);
+
+	default:
+		return false;
+	}
 }
 
 /**
@@ -10003,11 +10028,8 @@ static statement_t *parse_return(void)
 		}
 		return_value = create_implicit_cast(return_value, return_type);
 		/* check for returning address of a local var */
-		if (return_value->kind == EXPR_UNARY_TAKE_ADDRESS) {
-			const expression_t *expression = return_value->unary.value;
-			if (expression_is_local_variable(expression))
-				warningf(WARN_RETURN_LOCAL_ADDR, pos, "function returns address of local variable");
-		}
+		if (is_local_address(return_value))
+			warningf(WARN_RETURN_LOCAL_ADDR, pos, "function returns address of local variable");
 	} else if (!is_type_void(return_type)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
 		warningf(WARN_RETURN_TYPE, pos,
