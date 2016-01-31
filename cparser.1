@@ -215,6 +215,8 @@ Warn if parentheses are omitted in certain contexts.
 .No Warn if So + Sc or So - Sc is used as operand of So << Sc or So >> Sc , Sq e.g. x\ +\ y\ <<\ z .
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
+.It Fl Wreturn-local-addr
+Warn about returning a pointer (or in C++, a reference) to a variable that goes out of scope after the function returns.
 .It Fl Wshadow
 Warn when a new declaration shadows another declaration with the same name in an outer scope.
 .It Fl Wshadow-local

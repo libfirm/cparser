@@ -10006,8 +10006,7 @@ static statement_t *parse_return(void)
 		if (return_value->kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (expression_is_local_variable(expression))
-				warningf(WARN_OTHER, pos,
-				         "function returns address of local variable");
+				warningf(WARN_RETURN_LOCAL_ADDR, pos, "function returns address of local variable");
 		}
 	} else if (!is_type_void(return_type)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */

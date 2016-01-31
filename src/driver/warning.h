@@ -62,6 +62,7 @@ void print_warning_opt_help(void);
 	M(WARN_POINTER_ARITH,                 ON,  "pointer-arith",                 "Warn about anything that depends on the 'size of' a function type or of 'void'") \
 	M(WARN_POINTER_SIGN,                  ON,  "pointer-sign",                  "gcc silently allows casting int* to unsigned* if this is off") \
 	M(WARN_REDUNDANT_DECLS,               ON,  "redundant-decls",               "Warn about redundant declarations") \
+	M(WARN_RETURN_LOCAL_ADDR,             ON,  "return-local-addr",             "Warn about returning a pointer (or in C++, a reference) to a variable that goes out of scope after the function returns.") \
 	M(WARN_RETURN_TYPE,                   ON,  "return-type",                   "Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'.") \
 	M(WARN_SHADOW,                        OFF, "shadow",                        "Warn whenever a local variable shadows another local variable, parameter or global variable or whenever a built-in function is shadowed") \
 	M(WARN_SHADOW_LOCAL,                  OFF, "shadow-local",                  "" /* TODO explanation */) \
