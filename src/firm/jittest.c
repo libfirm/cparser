@@ -91,7 +91,7 @@ void jit_compile_execute_main(void)
 
 	/* Allocate executable memory */
 	char *const memory = mmap(0, code_size, PROT_READ | PROT_WRITE,
-	                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	                          MAP_PRIVATE | MAP_ANON, -1, 0);
 	if (memory == NULL)
 		panic("Could not mmap memory");
 
