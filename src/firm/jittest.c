@@ -6,9 +6,11 @@
 
 #if defined(__APPLE__) || defined(__linux__)
 
+#define _GNU_SOURCE
 #include <libfirm/irprog.h>
 #include <libfirm/jit.h>
 #include <libfirm/typerep.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/mman.h>
 
@@ -28,24 +30,24 @@ void jit_compile_execute_main(void)
 	/* This is somewhat ad-hoc testing code for the jit, it is limited and
 	 * will not handle all firm programs. */
 
-	static const struct {
+	const struct {
 		char const *name;
 		void const *func;
 	} external_functions[] = {
-		{ "atoi",    (void*)atoi    },
-		{ "free",    (void*)free    },
-		{ "getchar", (void*)getchar },
-		{ "malloc",  (void*)malloc  },
-		{ "printf",  (void*)printf  },
-		{ "puts",    (void*)puts    },
-		{ "rand",    (void*)rand    },
-		{ "realloc", (void*)realloc },
+		{ "atoi",    (void const*)(intptr_t)atoi    },
+		{ "free",    (void const*)(intptr_t)free    },
+		{ "getchar", (void const*)(intptr_t)getchar },
+		{ "malloc",  (void const*)(intptr_t)malloc  },
+		{ "printf",  (void const*)(intptr_t)printf  },
+		{ "puts",    (void const*)(intptr_t)puts    },
+		{ "rand",    (void const*)(intptr_t)rand    },
+		{ "realloc", (void const*)(intptr_t)realloc },
 	};
 
 	ir_jit_segment_t   *const segment   = be_new_jit_segment();
 	ir_entity         **      funcents  = NEW_ARR_F(ir_entity*, 0);
 	ir_jit_function_t **      functions = NEW_ARR_F(ir_jit_function_t*, 0);
-	ir_entity          *main            = NULL;
+	ir_entity          *main_entity     = NULL;
 
 	size_t         code_size   = 0;
 	ir_type *const global_type = get_glob_type();
@@ -67,7 +69,7 @@ void jit_compile_execute_main(void)
 				ARR_APP1(ir_entity*, funcents, entity);
 				code_size += be_get_function_size(func);
 				if (streq(ld_name, "main") || streq(ld_name, "_main"))
-					main = entity;
+					main_entity = entity;
 				continue;
 			}
 		}
@@ -84,7 +86,7 @@ void jit_compile_execute_main(void)
 		}
 	}
 
-	if (main == NULL)
+	if (main_entity == NULL)
 		panic("Could not find main() function");
 
 	/* Allocate executable memory */
@@ -119,7 +121,7 @@ void jit_compile_execute_main(void)
 		panic("Couldn't make memory executable");
 
 	typedef int (*mainfunc)(int argc, char **argv);
-	mainfunc main_ptr = (mainfunc) be_jit_get_entity_addr(main);
+	mainfunc main_ptr = (mainfunc)(intptr_t)be_jit_get_entity_addr(main_entity);
 	int res = main_ptr(0, NULL);
 	fprintf(stderr, "Exit code: %d\n", res);
 
