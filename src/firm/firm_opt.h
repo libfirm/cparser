@@ -115,6 +115,8 @@ void generate_code(FILE *out, const char *input_filename);
 /** process optimization commandline option */
 int firm_option(const char *opt);
 
+void optimize_lower_ir_prog(void);
+
 bool firm_is_inlining_enabled(void);
 
 typedef void (*print_option_help_func)(const char *name, const char *description);

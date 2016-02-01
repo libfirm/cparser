@@ -723,14 +723,7 @@ void init_gen_firm(void)
 	timer_register(t_backend, "Firm: backend");
 }
 
-/**
- * Called, after the Firm generation is completed,
- * do all optimizations and backend call here.
- *
- * @param out                a file handle for the output, may be NULL
- * @param input_filename     the name of the (main) source file
- */
-void generate_code(FILE *out, const char *input_filename)
+void optimize_lower_ir_prog(void)
 {
 	/* initialize implicit opts, just to be sure because really the frontend
 	 * should have called it already before starting graph construction */
@@ -765,6 +758,18 @@ void generate_code(FILE *out, const char *input_filename)
 	do_firm_lowering();
 
 	timer_stop(t_all_opt);
+}
+
+/**
+ * Called, after the Firm generation is completed,
+ * do all optimizations and backend call here.
+ *
+ * @param out                a file handle for the output, may be NULL
+ * @param input_filename     the name of the (main) source file
+ */
+void generate_code(FILE *out, const char *input_filename)
+{
+	optimize_lower_ir_prog();
 
 	/* run the code generator */
 	timer_start(t_backend);

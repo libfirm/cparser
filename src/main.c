@@ -22,6 +22,7 @@
 #include "driver/timing.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
+#include "firm/jittest.h"
 #include "parser/parser.h"
 #include "parser/preprocessor.h"
 #include "wrappergen/write_compoundsizes.h"
@@ -44,6 +45,7 @@ typedef enum compile_mode_t {
 	MODE_PRINT_FLUFFY,
 	MODE_PRINT_JNA,
 	MODE_PRINT_COMPOUND_SIZE,
+	MODE_JITTEST,
 } compile_mode_t;
 static compile_mode_t mode = MODE_COMPILE_ASSEMBLE_LINK;
 
@@ -135,6 +137,14 @@ static void set_unused_after(compile_mode_t mode)
 	}
 }
 
+static bool jittest(compilation_env_t *env, compilation_unit_t *unit)
+{
+	(void)env;
+	(void)unit;
+	jit_compile_execute_main();
+	return true;
+}
+
 /** modify compilation sequence based on choosen compilation mode */
 static void set_handlers(compile_mode_t mode)
 {
@@ -190,6 +200,11 @@ static void set_handlers(compile_mode_t mode)
 		                 generate_code_final, true);
 		set_unused_after(MODE_COMPILE);
 		return;
+	case MODE_JITTEST:
+		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+		                 jittest, true);
+		set_unused_after(MODE_COMPILE);
+		return;
 	case MODE_COMPILE_ASSEMBLE:
 		set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
 		                 assemble_final, true);
@@ -242,6 +257,8 @@ static bool parse_compile_mode_options(options_state_t *s)
 		mode         = MODE_COMPILE_DUMP;
 	} else if (simple_arg("-export-ir", s)) {
 		mode = MODE_COMPILE_EXPORTIR;
+	} else if (simple_arg("-jittest", s)) {
+		mode = MODE_JITTEST;
 	} else if (simple_arg("fsyntax-only", s)) {
 		set_mode_gcc_prec(MODE_PARSE_ONLY, full_option);
 	} else if (simple_arg("fno-syntax-only", s)) {

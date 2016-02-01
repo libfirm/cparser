@@ -284,6 +284,7 @@ static void print_help_debug(void)
 	help_equals("--filtev", "FILTER",       "Set statev filter regex");
 	help_spaced("--dump-function", "FUNC",  "Preprocess, parse and output vcg graph of func");
 	help_simple("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
+	help_simple("--jittest",                "Jit compile and exeucte main() function");
 }
 
 static void print_help_language_tools(void)
