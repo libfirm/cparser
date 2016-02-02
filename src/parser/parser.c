@@ -6218,15 +6218,12 @@ static expression_t *parse_complex_extract_expression(
 static expression_t *get_statement_expression_last(
 		const statement_expression_t *const expr)
 {
-	statement_t *statement = expr->statement;
-	assert(statement->kind == STATEMENT_COMPOUND);
-	statement_t *last = NULL;
-	for (statement_t *s = statement->compound.statements; s != NULL;
-	     s = s->base.next) {
-		last = s;
+	statement_t *const stmt = expr->statement;
+	assert(stmt->kind == STATEMENT_COMPOUND);
+	for (statement_t *s = stmt->compound.statements; s; s = s->base.next) {
+		if (!s->base.next)
+			return s->kind == STATEMENT_EXPRESSION ? s->expression.expression : NULL;
 	}
-	if (last->kind == STATEMENT_EXPRESSION)
-		return last->expression.expression;
 	return NULL;
 }
 
