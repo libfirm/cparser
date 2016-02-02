@@ -6252,6 +6252,9 @@ static expression_t *parse_statement_expression(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
+	if (!current_function)
+		errorf(HERE, "statement expression outside of a function");
+
 	eat('(');
 	add_anchor_token(')');
 
