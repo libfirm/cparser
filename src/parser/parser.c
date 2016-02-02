@@ -10009,36 +10009,38 @@ static statement_t *parse_return(void)
 		mark_vars_read(return_value, NULL);
 	}
 
-	const type_t *const func_type = skip_typeref(current_function->base.type);
-	assert(is_type_function(func_type));
-	type_t *const return_type = skip_typeref(func_type->function.return_type);
+	if (current_function) {
+		const type_t *const func_type = skip_typeref(current_function->base.type);
+		assert(is_type_function(func_type));
+		type_t *const return_type = skip_typeref(func_type->function.return_type);
 
-	position_t const *const pos = &statement->base.pos;
-	if (return_value != NULL) {
+		position_t const *const pos = &statement->base.pos;
+		if (return_value != NULL) {
 
-		if (is_type_void(return_type)) {
-			type_t *return_value_type = skip_typeref(return_value->base.type);
-			if (is_type_void(return_value_type)) {
-				warningf(WARN_PEDANTIC, pos,
-				         "void function should not return void expression");
+			if (is_type_void(return_type)) {
+				type_t *return_value_type = skip_typeref(return_value->base.type);
+				if (is_type_void(return_value_type)) {
+					warningf(WARN_PEDANTIC, pos,
+					         "void function should not return void expression");
+				} else {
+					/* ISO/IEC 14882:1998(E) §6.6.3:2 */
+					warningf(WARN_RETURN_TYPE, pos,
+					         "'return' with a value, in function returning 'void'");
+				}
 			} else {
-				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
-				warningf(WARN_RETURN_TYPE, pos,
-				         "'return' with a value, in function returning 'void'");
+				assign_error_t error = semantic_assign(return_type, return_value);
+				report_assign_error(error, return_type, return_value, "'return'",
+				                    pos);
 			}
-		} else {
-			assign_error_t error = semantic_assign(return_type, return_value);
-			report_assign_error(error, return_type, return_value, "'return'",
-			                    pos);
+			return_value = create_implicit_cast(return_value, return_type);
+			/* check for returning address of a local var */
+			if (is_local_address(return_value))
+				warningf(WARN_RETURN_LOCAL_ADDR, pos, "function returns address of local variable");
+		} else if (!is_type_void(return_type)) {
+			/* ISO/IEC 14882:1998(E) §6.6.3:3 */
+			warningf(WARN_RETURN_TYPE, pos,
+			         "'return' without value, in function returning non-void");
 		}
-		return_value = create_implicit_cast(return_value, return_type);
-		/* check for returning address of a local var */
-		if (is_local_address(return_value))
-			warningf(WARN_RETURN_LOCAL_ADDR, pos, "function returns address of local variable");
-	} else if (!is_type_void(return_type)) {
-		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
-		warningf(WARN_RETURN_TYPE, pos,
-		         "'return' without value, in function returning non-void");
 	}
 	statement->returns.value = return_value;
 
