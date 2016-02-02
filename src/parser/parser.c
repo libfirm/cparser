@@ -6604,12 +6604,14 @@ static expression_t *parse_assume(void)
  */
 static label_t *get_label(char const *const context)
 {
-	assert(current_function != NULL);
-
 	position_t      pos;
 	symbol_t *const sym = expect_identifier(context, &pos);
 	if (sym == sym_anonymous)
 		return NULL;
+	if (!current_function) {
+		errorf(&pos, "using label '%Y' outside of function", sym);
+		return NULL;
+	}
 
 	entity_t *label = get_entity(sym, NAMESPACE_LABEL);
 	/* If we find a local label, we already created the declaration. */
