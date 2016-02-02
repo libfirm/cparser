@@ -3977,7 +3977,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		if (previous->base.parent_scope == current_scope) {
 			if (previous->kind != kind) {
-				if (is_entity_valid(previous) && is_entity_valid(entity))
+				if (is_entity_valid(entity) && is_entity_valid(previous))
 					error_redefined_as_different_kind(pos, previous, kind);
 				goto finish;
 			}
