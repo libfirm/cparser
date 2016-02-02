@@ -5671,6 +5671,7 @@ static void determine_literal_type(literal_expression_t *const literal)
 		errorf(&literal->base.pos,
 		     "integer constant '%E' is larger than the largest %s integer type",
 		       literal, signedness);
+		literal->base.type = type_error_type;
 	}
 
 	tarval_set_wrap_on_overflow(old_wrap_on_overflow);
