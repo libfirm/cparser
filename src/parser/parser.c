@@ -6152,8 +6152,10 @@ static expression_t *parse_compound_literal(position_t const *const pos,
                                             type_t *type)
 {
 	type_t *skipped = skip_typeref(type);
-	if (!is_initializable_type(skipped) && is_type_valid(skipped))
+	if (!is_initializable_type(skipped) && is_type_valid(skipped)) {
 		errorf(pos, "type '%T' invalid for compound literals", type);
+		type = type_error_type;
+	}
 
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 	expression->base.pos = *pos;

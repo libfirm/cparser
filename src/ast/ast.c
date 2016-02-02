@@ -1910,11 +1910,13 @@ check_type:
 		type_t *skipped = skip_typeref(expression->compound_literal.type);
 		if (is_type_scalar(skipped)) {
 			return is_constant_initializer(expression->compound_literal.initializer);
-		} else {
+		} else if (is_type_valid(skipped)) {
 			assert(is_type_array(skipped) || is_type_compound(skipped));
 			/* arrays/compounds degrade automatically to pointers to the
 			 * initializer contents (which is only a linktime constant) */
 			return EXPR_CLASS_VARIABLE;
+		} else {
+			return EXPR_CLASS_ERROR;
 		}
 	}
 
