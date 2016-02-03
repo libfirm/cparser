@@ -1909,7 +1909,8 @@ check_type:
 	case EXPR_COMPOUND_LITERAL: {
 		type_t *skipped = skip_typeref(expression->compound_literal.type);
 		if (is_type_scalar(skipped)) {
-			return is_constant_initializer(expression->compound_literal.initializer);
+			expression_classification_t const cls = is_constant_initializer(expression->compound_literal.initializer);
+			return MIN(cls, EXPR_CLASS_CONSTANT);
 		} else if (is_type_valid(skipped)) {
 			assert(is_type_array(skipped) || is_type_compound(skipped));
 			/* arrays/compounds degrade automatically to pointers to the
