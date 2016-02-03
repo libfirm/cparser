@@ -1792,8 +1792,6 @@ check_type:
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 	case EXPR_BINARY_COMMA:
 	case EXPR_ARRAY_ACCESS:
-		return EXPR_CLASS_VARIABLE;
-
 	case EXPR_REFERENCE: {
 		type_t *const type = skip_typeref(expression->base.type);
 		return is_type_valid(type) ? EXPR_CLASS_VARIABLE : EXPR_CLASS_ERROR;
