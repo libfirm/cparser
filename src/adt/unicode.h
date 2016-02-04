@@ -62,6 +62,7 @@ static inline void obstack_grow_utf8(struct obstack *const obst, utf32 const c)
 		obstack_1grow(obst, 0xE0 |  (c >> 12));
 		goto two_more;
 	} else {
+		assert(c < 0x200000);
 		obstack_1grow(obst, 0xF0 |  (c >> 18));
 		obstack_1grow(obst, 0x80 | ((c >> 12) & 0x3F));
 two_more:
