@@ -1089,6 +1089,8 @@ static expression_t *parse_integer_constant_expression(const char *description)
 	switch (is_constant_expression(result)) {
 	case EXPR_CLASS_VARIABLE:
 		errorf(&result->base.pos, "expression '%E' is not constant", result);
+		/* FALLTHROUGH */
+	case EXPR_CLASS_ERROR:
 		result->base.type = type_error_type;
 		break;
 	case EXPR_CLASS_CONSTANT:
@@ -1103,7 +1105,6 @@ static expression_t *parse_integer_constant_expression(const char *description)
 		}
 		break;
 	case EXPR_CLASS_INTEGER_CONSTANT:
-	case EXPR_CLASS_ERROR:
 		break;
 	}
 	return result;
