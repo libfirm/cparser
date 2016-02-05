@@ -1722,6 +1722,8 @@ static void ascend_to(type_path_t *path, size_t top_path_level)
 static bool walk_designator(type_path_t *path, const designator_t *designator,
                             bool used_in_offsetof)
 {
+	if (!designator)
+		return false;
 	for (; designator != NULL; designator = designator->next) {
 		type_path_entry_t *top       = get_type_path_top(path);
 		type_t            *orig_type = top->type;
