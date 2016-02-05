@@ -218,10 +218,8 @@ bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 	for(;;) {
 		compilation_unit_type_t type = unit->type;
 		compilation_unit_handler handler = handlers[type];
-		if (handler == NULL) {
-			errorf(NULL, "Incomplete handler chain on '%s'\n", unit->name);
-			break;
-		}
+		if (!handler)
+			panic("incomplete handler chain on '%s'", unit->name);
 		if (!handler(env, unit))
 			return false;
 		if (stop_after[type])
