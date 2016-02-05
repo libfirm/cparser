@@ -772,8 +772,9 @@ static utf32 parse_escape_sequence(void)
 	default:
 		break;
 	}
+	put_back(ec);
 	/* §6.4.4.4:8 footnote 64 */
-	warningf(WARN_OTHER, &pp_token.base.pos, "unknown escape sequence");
+	warningf(WARN_OTHER, &input.pos, "unknown escape sequence '\\%lc'", ec);
 	return UTF32_EOF;
 }
 
