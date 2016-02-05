@@ -11015,6 +11015,7 @@ static void complete_incomplete_arrays(void)
 	for (size_t i = 0; i != n; ++i) {
 		declaration_t *const decl = incomplete_arrays[i];
 		type_t        *const type = skip_typeref(decl->type);
+		assert(is_type_array(type));
 
 		if (is_type_complete(type))
 			continue;
