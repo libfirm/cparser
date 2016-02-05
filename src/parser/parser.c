@@ -3439,6 +3439,7 @@ ptr_operator_end: ;
 		*p              = type;
 		if (anchor == p)
 			anchor = &type->base.next;
+		env->must_be_abstract = true;
 	}
 
 declarator_finished:
