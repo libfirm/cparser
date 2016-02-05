@@ -1713,6 +1713,9 @@ static expression_classification_t is_object_with_constant_address(const express
 
 expression_classification_t is_constant_expression(const expression_t *expression)
 {
+	if (!is_type_valid(skip_typeref(expression->base.type)))
+		return EXPR_CLASS_ERROR;
+
 	switch (expression->kind) {
 	case EXPR_LITERAL_CHARACTER:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
@@ -1728,10 +1731,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 
 	case EXPR_CLASSIFY_TYPE:
 		type = skip_typeref(expression->classify_type.type_expression->base.type);
-		goto check_type;
-
-	case EXPR_LITERAL_INTEGER:
-		type = skip_typeref(expression->base.type);
 		goto check_type;
 
 	case EXPR_OFFSETOF:
@@ -1752,10 +1751,11 @@ check_type:
 		return expression->reference.entity->enum_value.enume->error
 		       ? EXPR_CLASS_ERROR : EXPR_CLASS_INTEGER_CONSTANT;
 
-	case EXPR_LITERAL_FLOATINGPOINT: {
-		type_t *const type = skip_typeref(expression->base.type);
-		return is_type_valid(type) ? EXPR_CLASS_CONSTANT : EXPR_CLASS_ERROR;
-	}
+	case EXPR_LITERAL_FLOATINGPOINT:
+		return EXPR_CLASS_CONSTANT;
+
+	case EXPR_LITERAL_INTEGER:
+		return EXPR_CLASS_INTEGER_CONSTANT;
 
 	case EXPR_BUILTIN_CONSTANT_P: {
 		expression_classification_t const c = is_constant_expression(expression->builtin_constant.value);
@@ -1792,10 +1792,8 @@ check_type:
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 	case EXPR_BINARY_COMMA:
 	case EXPR_ARRAY_ACCESS:
-	case EXPR_REFERENCE: {
-		type_t *const type = skip_typeref(expression->base.type);
-		return is_type_valid(type) ? EXPR_CLASS_VARIABLE : EXPR_CLASS_ERROR;
-	}
+	case EXPR_REFERENCE:
+		return EXPR_CLASS_VARIABLE;
 
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_constant_address(expression->unary.value);
@@ -1810,12 +1808,8 @@ check_type:
 		return is_constant_expression(expression->unary.value);
 
 	case EXPR_UNARY_IMAG:
-	case EXPR_UNARY_REAL: {
-		type_t *type = skip_typeref(expression->base.type);
-		if (!is_type_valid(type))
-			return EXPR_CLASS_ERROR;
+	case EXPR_UNARY_REAL:
 		return is_constant_expression(expression->unary.value);
-	}
 
 	case EXPR_UNARY_CAST: {
 		type_t *const type = skip_typeref(expression->base.type);
