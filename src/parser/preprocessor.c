@@ -803,14 +803,14 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 		case '\\': {
 			if (resolve_escape_sequences) {
 				utf32 const tc = parse_escape_sequence();
-				if (tc > limit && tc != UTF32_EOF) {
-					warningf(WARN_OTHER, &input.pos,
-					         "escape sequence out of range");
-				}
-				if (enc == STRING_ENCODING_CHAR) {
-					obstack_1grow(&string_obst, tc);
-				} else {
-					obstack_grow_utf8(&string_obst, tc);
+				if (tc != UTF32_EOF) {
+					if (tc > limit)
+						warningf(WARN_OTHER, &input.pos, "escape sequence out of range");
+					if (enc == STRING_ENCODING_CHAR) {
+						obstack_1grow(&string_obst, tc);
+					} else {
+						obstack_grow_utf8(&string_obst, tc);
+					}
 				}
 			} else {
 				obstack_1grow(&string_obst, (char)input.c);
