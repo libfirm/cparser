@@ -408,6 +408,10 @@ static void maybe_concat_lines(void)
 		info.whitespace_at_line_begin = 0;
 		return;
 
+	case UTF32_EOF:
+		warningf(WARN_OTHER, &input.pos, "'\\' at end of file");
+		return;
+
 	default:
 		break;
 	}
