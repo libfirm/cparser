@@ -1892,7 +1892,8 @@ static void parse_symbol(void)
 			next_char();
 			break;
 
-		case '\\':
+		case '\\': {
+			position_t const pos = input.pos;
 			eat('\\');
 			switch (input.c) {
 			{
@@ -1907,15 +1908,10 @@ universal:
 				next_char();
 				utf32 const v = parse_universal_char(n);
 				if (!is_universal_char_valid_identifier(v)) {
-					if (is_universal_char_valid(v)) {
-						errorf(&input.pos,
-							   "universal character \\%c%0*X is not valid in an identifier",
-							   n == 4 ? 'u' : 'U', (int)n, v);
-					}
+					if (is_universal_char_valid(v))
+						errorf(&pos, "universal character '\\%c%0*X' is not valid in an identifier", n == 4 ? 'u' : 'U', (int)n, v);
 				} else if (obstack_object_size(&symbol_obstack) == 0 && is_universal_char_invalid_identifier_start(v)) {
-					errorf(&input.pos,
-						   "universal character \\%c%0*X is not valid as start of an identifier",
-						   n == 4 ? 'u' : 'U', (int)n, v);
+					errorf(&pos, "universal character '\\%c%0*X' is not valid as start of an identifier", n == 4 ? 'u' : 'U', (int)n, v);
 				} else if (resolve_escape_sequences) {
 					obstack_grow_utf8(&symbol_obstack, v);
 				}
@@ -1926,6 +1922,7 @@ universal:
 				put_back('\\');
 				goto end_symbol;
 			}
+		}
 
 		default:
 dollar_sign:
