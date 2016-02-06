@@ -40,11 +40,12 @@ void notef(position_t const *pos, char const *fmt, ...);
 bool warningf(warning_t, position_t const *pos, char const *fmt, ...);
 
 extern unsigned error_count;
-extern unsigned warning_count;
 extern bool     show_column;             /**< Show column in diagnostic messages */
 extern bool     diagnostics_show_option; /**< Show the switch, which controls a warning. */
 
 /** enable color output, allowed values for n_cols are 0, 8 and 256 */
 void diagnostic_enable_color(int n_cols);
+
+void print_diagnostic_summary(void);
 
 #endif

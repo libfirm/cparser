@@ -215,18 +215,24 @@ void set_unit_handler(compilation_unit_type_t type,
 
 bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 {
-	for(;;) {
+	bool res;
+	for (;;) {
 		compilation_unit_type_t type = unit->type;
 		compilation_unit_handler handler = handlers[type];
 		if (!handler)
 			panic("incomplete handler chain on '%s'", unit->name);
-		if (!handler(env, unit))
-			return false;
-		if (stop_after[type])
+		if (!handler(env, unit)) {
+			res = false;
 			break;
+		} else
+		if (stop_after[type]) {
+			res = true;
+			break;
+		}
 		assert(unit->type != type); /* handler should have changed the type */
 	}
-	return true;
+	print_diagnostic_summary();
+	return res;
 }
 
 bool process_all_units(compilation_env_t *env)

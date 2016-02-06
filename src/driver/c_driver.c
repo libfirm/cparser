@@ -636,17 +636,6 @@ static bool finish_preprocessing(compilation_env_t *env,
 	return true;
 }
 
-static void print_error_summary(void)
-{
-	if (error_count > 0) {
-		/* parsing failed because of errors */
-		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
-				warning_count);
-	} else if (warning_count > 0) {
-		fprintf(stderr, "%u warning(s)\n", warning_count);
-	}
-}
-
 static bool do_print_preprocessing_tokens(FILE *out, compilation_env_t *env,
                                           compilation_unit_t *unit)
 {
@@ -662,9 +651,7 @@ static bool do_print_preprocessing_tokens(FILE *out, compilation_env_t *env,
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	bool res = finish_preprocessing(env, unit);
-	print_error_summary();
-	return res;
+	return finish_preprocessing(env, unit);
 }
 
 bool print_preprocessing_tokens(compilation_env_t *env,
@@ -703,7 +690,6 @@ static bool do_print_dependencies(compilation_env_t *env,
 	 * we will do that ourself here */
 	construct_dep_target = false;
 	bool res = finish_preprocessing(env, unit);
-	print_error_summary();
 	if (res) {
 		write_preproc_dependencies(env->out, env, unit);
 	}
@@ -734,7 +720,6 @@ bool do_parsing(compilation_env_t *env, compilation_unit_t *unit)
 	unit->ast = finish_parsing();
 	check_unclosed_conditionals();
 	bool res = finish_preprocessing(env, unit);
-	print_error_summary();
 
 	unit->type = COMPILATION_UNIT_AST;
 	timer_stop(t_parsing);

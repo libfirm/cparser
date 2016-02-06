@@ -48,9 +48,10 @@ static const colorscheme_t colors_256 = {
 static colorscheme_t colors = { "", "", "", "", "", "", "" };
 
 /** Number of occurred errors. */
-unsigned error_count             = 0;
+unsigned        error_count   = 0;
 /** Number of occurred warnings. */
-unsigned warning_count           = 0;
+static unsigned warning_count = 0;
+
 bool     show_column             = true;
 bool     diagnostics_show_option = true;
 
@@ -331,5 +332,14 @@ void diagnostic_enable_color(int n_cols)
 	case 8:   colors = colors_8;   break;
 	case 256: colors = colors_256; break;
 	default:  colors = no_colors;  break;
+	}
+}
+
+void print_diagnostic_summary(void)
+{
+	if (error_count > 0) {
+		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count, warning_count);
+	} else if (warning_count > 0) {
+		fprintf(stderr, "%u warning(s)\n", warning_count);
 	}
 }
