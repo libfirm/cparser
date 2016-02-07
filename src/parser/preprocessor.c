@@ -2891,9 +2891,7 @@ static void parse_define_directive(void)
 				goto create_parameter;
 			default:
 				if (!is_identifierlike_token(&pp_token)) {
-					errorf(&pp_token.base.pos,
-						   "expected identifier, '...' or ')' in #define argument list, got %K",
-						   &pp_token);
+					errorf(&pp_token.base.pos, "expected identifier, '...' or ')' in macro parameter list, got %K", &pp_token);
 					goto error_out;
 				}
 				/* FALLTHROUGH */
