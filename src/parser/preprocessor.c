@@ -1383,8 +1383,7 @@ static bool concat_macro_parameters(const position_t *pos,
 
 	assert(current_call.macro == NULL);
 	assert(obstack_object_size(&pp_obstack) == 0);
-	pp_definition_t *newdef = obstack_alloc(&pp_obstack, sizeof(*newdef));
-	memset(newdef, 0, sizeof(*newdef));
+	pp_definition_t *const newdef = OALLOCZ(&pp_obstack, pp_definition_t);
 	newdef->symbol       = sym_anonymous;
 	newdef->is_parameter = true;
 	if (gcc_ext) {
@@ -2535,8 +2534,7 @@ static pp_definition_t *add_define_(char const *const name,
 	if (sym->string != string)
 		obstack_free(&symbol_obstack, string);
 
-	pp_definition_t *const def = obstack_alloc(&pp_obstack, sizeof(def[0]));
-	memset(def, 0, sizeof(*def));
+	pp_definition_t *const def = OALLOCZ(&pp_obstack, pp_definition_t);
 	def->symbol          = sym;
 	def->pos             = builtin_position;
 	def->standard_define = standard_define;
@@ -2870,9 +2868,7 @@ static void parse_define_directive(void)
 		goto error_out;
 	symbol_t *const macro_symbol = pp_token.base.symbol;
 
-	pp_definition_t *new_definition
-		= obstack_alloc(&pp_obstack, sizeof(new_definition[0]));
-	memset(new_definition, 0, sizeof(new_definition[0]));
+	pp_definition_t *new_definition = OALLOCZ(&pp_obstack, pp_definition_t);
 	new_definition->symbol = macro_symbol;
 	new_definition->pos    = input.pos;
 	next_input_token();
@@ -3279,10 +3275,7 @@ exit_skip:
 
 static pp_conditional_t *push_conditional(void)
 {
-	pp_conditional_t *conditional
-		= obstack_alloc(&pp_obstack, sizeof(*conditional));
-	memset(conditional, 0, sizeof(*conditional));
-
+	pp_conditional_t *const conditional = OALLOCZ(&pp_obstack, pp_conditional_t);
 	conditional->pos    = pp_token.base.pos;
 	conditional->parent = conditional_stack;
 	conditional_stack   = conditional;
