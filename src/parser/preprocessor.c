@@ -2882,9 +2882,8 @@ static void parse_define_directive(void)
 				symbol_t *symbol;
 				bool      is_variadic;
 			case T_DOTDOTDOT:
-				symbol      = symbol___VA_ARGS__;
-				is_variadic = true;
-				goto create_parameter;
+				symbol = symbol___VA_ARGS__;
+				goto variadic;
 			default:
 				if (!is_identifierlike_token(&pp_token)) {
 					errorf(&pp_token.base.pos, "expected identifier, '...' or ')' in macro parameter list, got %K", &pp_token);
@@ -2894,9 +2893,9 @@ static void parse_define_directive(void)
 			case T_IDENTIFIER: {
 				symbol      = pp_token.base.symbol;
 				is_variadic = false;
-create_parameter:
 				next_input_token();
 				if (pp_token.kind == T_DOTDOTDOT) {
+variadic:
 					eat_token(T_DOTDOTDOT);
 					is_variadic = true;
 				}
