@@ -2879,6 +2879,7 @@ static void parse_define_directive(void)
 		eat_token('(');
 
 		while (true) {
+			position_t const pos = pp_token.base.pos;
 			switch (pp_token.kind) {
 				symbol_t *symbol;
 				bool      is_variadic;
@@ -2902,7 +2903,7 @@ variadic:
 				}
 
 				pp_definition_t const parameter = {
-					.pos          = pp_token.base.pos,
+					.pos          = pos,
 					.symbol       = symbol,
 					.is_parameter = true,
 					.is_variadic  = is_variadic,
