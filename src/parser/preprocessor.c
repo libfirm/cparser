@@ -1833,7 +1833,7 @@ static whitespace_info_t skip_whitespace(void)
 		case WHITESPACE:
 			++wsinfo.whitespace_at_line_begin;
 			next_char();
-			continue;
+			break;
 
 		case EAT_NEWLINE:
 			wsinfo.at_line_begin            = true;
@@ -1843,22 +1843,21 @@ static whitespace_info_t skip_whitespace(void)
 				put_back('\n');
 				return wsinfo;
 			}
-			continue;
+			break;
 
 		case '/':
 			eat('/');
 			if (input.c == '/') {
 				eat('/');
 				skip_line_comment();
-				continue;
 			} else if (input.c == '*') {
 				eat('*');
 				wsinfo.whitespace_at_line_begin = skip_multiline_comment();
-				continue;
 			} else {
 				put_back('/');
+				return wsinfo;
 			}
-			return wsinfo;
+			break;
 
 		default:
 			return wsinfo;
