@@ -3269,7 +3269,9 @@ exit_skip:
 	if (res) {
 		next_input_token();
 	} else {
-		errorf(&pp_token.base.pos, "failed including '%s': %s", headername, strerror(errno));
+		char const ldelim = system_include ? '<' : '"';
+		char const rdelim = system_include ? '>' : '"';
+		errorf(&pp_token.base.pos, "failed including %c%s%c: %s", ldelim, headername, rdelim, strerror(errno));
 		pop_restore_input();
 		goto exit_skip;
 	}
