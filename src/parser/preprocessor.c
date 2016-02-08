@@ -2947,6 +2947,7 @@ finish_argument_list:
 			if (previous != NULL
 			    && previous->function_definition == new_definition) {
 				errorf(&param->pos, "duplicate macro parameter '%Y'", param_sym);
+				notef(&previous->pos, "previous parameter with same name is here");
 				param->symbol = sym_anonymous;
 				continue;
 			}
