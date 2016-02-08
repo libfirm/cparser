@@ -223,16 +223,21 @@ static void switch_input(input_t *const decoder, char const *const input_name,
                          searchpath_entry_t *const path,
                          bool const is_system_header)
 {
-	memset(&input, 0, sizeof(input));
-	input.input                = decoder;
-	input.buf                  = XMALLOCN(utf32, BUFSIZE + MAX_PUTBACK);
-	input.bufend               = input.buf + MAX_PUTBACK;
-	input.bufpos               = input.bufend;
-	input.output_line          = 0;
-	input.pos.input_name       = input_name;
-	input.pos.lineno           = 1;
-	input.pos.is_system_header = is_system_header;
-	input.path                 = path;
+	utf32 *const buf = XMALLOCN(utf32, BUFSIZE + MAX_PUTBACK);
+	utf32 *const end = buf + MAX_PUTBACK;
+	input = (pp_input_t){
+		.input              = decoder,
+		.buf                = buf,
+		.bufend             = end,
+		.bufpos             = end,
+		.output_line        = 0,
+		.pos = {
+			.input_name       = input_name,
+			.lineno           = 1,
+			.is_system_header = is_system_header,
+		},
+		.path               = path,
+	};
 
 	/* indicate that we're at a new input */
 	const char *line_flag;
@@ -947,11 +952,12 @@ static pp_expansion_state_t *push_expansion(pp_definition_t *definition)
 	ARR_EXTEND(pp_expansion_state_t, expansion_stack, 1);
 	size_t          const len    = ARR_LEN(expansion_stack);
 	pp_expansion_state_t *result = &expansion_stack[len-1];
-	memset(result, 0, sizeof(*result));
-	result->definition = definition;
-	result->list_len   = definition->list_len;
-	result->token_list = definition->token_list;
-	result->pos        = 0;
+	*result = (pp_expansion_state_t){
+		.definition = definition,
+		.list_len   = definition->list_len,
+		.token_list = definition->token_list,
+		.pos        = 0,
+	};
 	current_expansion  = result;
 	return result;
 }
@@ -2575,10 +2581,10 @@ void add_define_string(char const *const name, char const *const val,
 	grow_escaped(&string_obst, val, val_len+1);
 	string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
 
-	token_t stringtok;
-	memset(&stringtok, 0, sizeof(stringtok));
-	stringtok.kind           = T_STRING_LITERAL;
-	stringtok.literal.string = string;
+	token_t const stringtok = {
+		.literal.base.kind = T_STRING_LITERAL,
+		.literal.string    = string,
+	};
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 	obstack_grow(&pp_obstack, &stringtok, sizeof(stringtok));
@@ -2598,10 +2604,10 @@ static void add_define_one(char const *const name)
 {
 	pp_definition_t *const def = add_define_(name, false);
 
-	token_t onetok;
-	memset(&onetok, 0, sizeof(onetok));
-	onetok.literal.base.kind = T_NUMBER;
-	onetok.literal.string    = make_string("1");
+	token_t const onetok = {
+		.literal.base.kind = T_NUMBER,
+		.literal.string    = make_string("1"),
+	};
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 	obstack_grow(&pp_obstack, &onetok, sizeof(onetok));
@@ -2668,9 +2674,7 @@ static void add_define_dynamic_string(char const *const name, update_func update
 {
 	pp_definition_t *const def = add_define_(name, true);
 
-	token_t stringtok;
-	memset(&stringtok, 0, sizeof(stringtok));
-	stringtok.kind           = T_STRING_LITERAL;
+	token_t const stringtok = { .kind = T_STRING_LITERAL };
 	assert(obstack_object_size(&pp_obstack) == 0);
 	obstack_grow(&pp_obstack, &stringtok, sizeof(stringtok));
 	def->list_len   = 1;
@@ -2682,9 +2686,7 @@ static void add_define_dynamic_number(char const *const name, update_func update
 {
 	pp_definition_t *const def = add_define_(name, true);
 
-	token_t numbertok;
-	memset(&numbertok, 0, sizeof(numbertok));
-	numbertok.kind           = T_NUMBER;
+	token_t const numbertok =  { .kind = T_NUMBER };
 	assert(obstack_object_size(&pp_obstack) == 0);
 	obstack_grow(&pp_obstack, &numbertok, sizeof(numbertok));
 	def->list_len   = 1;
@@ -2899,12 +2901,12 @@ variadic:
 					is_variadic = true;
 				}
 
-				pp_definition_t parameter;
-				memset(&parameter, 0, sizeof(parameter));
-				parameter.pos          = pp_token.base.pos;
-				parameter.symbol       = symbol;
-				parameter.is_parameter = true;
-				parameter.is_variadic  = is_variadic;
+				pp_definition_t const parameter = {
+					.pos          = pp_token.base.pos,
+					.symbol       = symbol,
+					.is_parameter = true,
+					.is_variadic  = is_variadic,
+				};
 				obstack_grow(&pp_obstack, &parameter, sizeof(parameter));
 
 				if (pp_token.kind == ',') {
