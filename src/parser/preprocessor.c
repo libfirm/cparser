@@ -3642,29 +3642,25 @@ static bool parse_pp_condition(void)
 static void parse_elif_directive(void)
 {
 	pp_conditional_t *const cond = conditional_stack;
-	if (cond == NULL) {
+	if (!cond) {
 		errorf(&pp_token.base.pos, "#elif without prior #if");
 		eat_pp_directive();
-		return;
-	}
-
-	if (cond->in_else) {
+	} else if (cond->in_else) {
 		errorf(&pp_token.base.pos, "#elif after #else");
 		notef(&cond->pos, "condition started here");
 		skip_mode = true;
 		eat_pp_directive();
-		return;
-	}
-
-	cond->pos = pp_token.base.pos;
-
-	if (cond->skip || cond->condition) {
-		eat_pp_directive();
-		skip_mode = true;
 	} else {
-		skip_mode       = false;
-		cond->condition = parse_pp_condition();
-		skip_mode       = !cond->condition;
+		cond->pos = pp_token.base.pos;
+
+		if (cond->skip || cond->condition) {
+			eat_pp_directive();
+			skip_mode = true;
+		} else {
+			skip_mode       = false;
+			cond->condition = parse_pp_condition();
+			skip_mode       = !cond->condition;
+		}
 	}
 }
 
