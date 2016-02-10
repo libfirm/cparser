@@ -3964,9 +3964,8 @@ line_directive:
 		parse_line_directive();
 	} else {
 skip:
-		if (!skip_mode) {
-			errorf(&pp_token.base.pos, "invalid preprocessing directive #%K", &pp_token);
-		}
+		if (!skip_mode)
+			errorf(&pp_token.base.pos, "invalid preprocessing directive #%#K", &pp_token);
 		eat_pp_directive();
 	}
 
