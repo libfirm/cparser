@@ -212,7 +212,7 @@ done_flags:;
 
 		case 'K': {
 			const token_t* const token = va_arg(ap, const token_t*);
-			print_token(out, token);
+			print_token(out, token, extended);
 			break;
 		}
 

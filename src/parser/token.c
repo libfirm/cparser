@@ -92,9 +92,9 @@ char const *get_string_encoding_prefix(string_encoding_t const enc)
 	panic("invalid string encoding");
 }
 
-void print_token(FILE *f, const token_t *token)
+void print_token(FILE *const f, token_t const *const token, bool const simple)
 {
-	char        delim = '\'';
+	char const *delim = simple ? "" : "'";
 	char const *enc   = "";
 	char const *val;
 	switch (token->kind) {
@@ -104,10 +104,9 @@ void print_token(FILE *f, const token_t *token)
 		val = token->base.symbol->string;
 		break;
 
-	case T_STRING_LITERAL:
-		delim = '"';
-		/* FALLTHROUGH */
-	case T_CHARACTER_CONSTANT:
+	case T_STRING_LITERAL:     delim = "\""; goto string;
+	case T_CHARACTER_CONSTANT: delim = "'";  goto string;
+string:
 		enc = get_string_encoding_prefix(token->literal.string->encoding);
 		/* FALLTHROUGH */
 	case T_NUMBER:
@@ -115,12 +114,18 @@ void print_token(FILE *f, const token_t *token)
 		break;
 
 	default: {
-		char const *kind  = (token->base.symbol ? token->base.symbol : token_symbols[token->kind])->string;
-		fprintf(f, "'%s'", kind);
-		return;
+		val = (token->base.symbol ? token->base.symbol : token_symbols[token->kind])->string;
+		if (!simple) {
+			fprintf(f, "'%s'", val);
+			return;
+		}
 	}
 	}
-	fprintf(f, "%s %s%c%s%c", token_symbols[token->kind]->string, enc, delim, val, delim);
+	if (simple) {
+		fprintf(f, "%s%s%s%s", enc, delim, val, delim);
+	} else {
+		fprintf(f, "%s %s%s%s%s", token_symbols[token->kind]->string, enc, delim, val, delim);
+	}
 }
 
 bool tokens_would_paste(token_kind_t token1, token_kind_t token2)

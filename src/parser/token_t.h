@@ -69,7 +69,7 @@ char const *get_string_encoding_prefix(string_encoding_t);
 void init_tokens(void);
 void exit_tokens(void);
 void print_token_kind(FILE *out, token_kind_t token_kind);
-void print_token(FILE *out, const token_t *token);
+void print_token(FILE *out, const token_t *token, bool simple);
 
 /**
  * returns true if pasting 2 preprocessing tokens next to each other
