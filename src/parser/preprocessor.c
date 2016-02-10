@@ -3713,44 +3713,35 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 
 static void parse_else_directive(void)
 {
-	eat_pp(TP_else);
-	expect_directive_end(WARN_ENDIF_LABELS, "#else");
-
-	pp_conditional_t *conditional = conditional_stack;
-	if (conditional == NULL) {
+	pp_conditional_t *const conditional = conditional_stack;
+	if (!conditional) {
 		errorf(&pp_token.base.pos, "#else without prior #if");
-		return;
-	}
-
-	if (conditional->in_else) {
+	} else if (conditional->in_else) {
 		errorf(&pp_token.base.pos, "#else after #else");
 		notef(&conditional->pos, "condition started here");
 		skip_mode = true;
-		return;
+	} else  {
+		conditional->in_else = true;
+		if (!conditional->skip)
+			skip_mode = conditional->condition;
+		conditional->pos = pp_token.base.pos;
 	}
-
-	conditional->in_else = true;
-	if (!conditional->skip) {
-		skip_mode = conditional->condition;
-	}
-	conditional->pos = pp_token.base.pos;
+	eat_pp(TP_else);
+	expect_directive_end(WARN_ENDIF_LABELS, "#else");
 }
 
 static void parse_endif_directive(void)
 {
+	pp_conditional_t *const conditional = conditional_stack;
+	if (!conditional) {
+		errorf(&pp_token.base.pos, "#endif without prior #if");
+	} else {
+		if (!conditional->skip)
+			skip_mode = false;
+		pop_conditional();
+	}
 	eat_pp(TP_endif);
 	expect_directive_end(WARN_ENDIF_LABELS, "#endif");
-
-	pp_conditional_t *conditional = conditional_stack;
-	if (conditional == NULL) {
-		errorf(&pp_token.base.pos, "#endif without prior #if");
-		return;
-	}
-
-	if (!conditional->skip) {
-		skip_mode = false;
-	}
-	pop_conditional();
 }
 
 typedef enum stdc_pragma_kind_t {
