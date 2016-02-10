@@ -2582,8 +2582,10 @@ void add_define_string(char const *const name, char const *const val,
 	string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
 
 	token_t const stringtok = {
-		.literal.base.kind = T_STRING_LITERAL,
-		.literal.string    = string,
+		.literal = {
+			.base   = { .kind = T_STRING_LITERAL },
+			.string = string,
+		}
 	};
 
 	assert(obstack_object_size(&pp_obstack) == 0);
@@ -2605,8 +2607,10 @@ static void add_define_one(char const *const name)
 	pp_definition_t *const def = add_define_(name, false);
 
 	token_t const onetok = {
-		.literal.base.kind = T_NUMBER,
-		.literal.string    = make_string("1"),
+		.literal = {
+			.base   = { .kind = T_NUMBER },
+			.string = make_string("1"),
+		}
 	};
 
 	assert(obstack_object_size(&pp_obstack) == 0);
