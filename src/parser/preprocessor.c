@@ -2875,7 +2875,7 @@ static void parse_define_directive(void)
 
 	pp_definition_t *new_definition = OALLOCZ(&pp_obstack, pp_definition_t);
 	new_definition->symbol = macro_symbol;
-	new_definition->pos    = input.pos;
+	new_definition->pos    = pp_token.base.pos;
 	next_input_token();
 
 	/* spaces are significant: #define b(x) is different from #define b (x)*/
@@ -3032,7 +3032,7 @@ finish_argument_list:
 			warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
 					 "redefining builtin macro '%Y'", macro_symbol);
 		} else if (!pp_definitions_equal(old_definition, new_definition)) {
-			if (warningf(WARN_OTHER, &input.pos, "multiple definitions of macro '%Y'", macro_symbol))
+			if (warningf(WARN_OTHER, &new_definition->pos, "multiple definitions of macro '%Y'", macro_symbol))
 				notef(&old_definition->pos, "macro '%Y' first defined here", macro_symbol);
 		} else {
 			/* reuse the old definition */
