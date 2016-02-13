@@ -1053,8 +1053,8 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			                                        points_to_right)) {
 				if (is_type_integer(points_to_left)
 				 && is_type_integer(points_to_right)
-				 && get_type_size(points_to_left)
-				    == get_type_size(points_to_right))
+				 && get_ctype_size(points_to_left)
+				    == get_ctype_size(points_to_right))
 					return ASSIGN_WARNING_POINTER_SIGNEDNESS;
 
 				return ASSIGN_WARNING_POINTER_INCOMPATIBLE;
@@ -5442,14 +5442,14 @@ static void parse_bitfield_member(entity_t *entity)
 		long size_long;
 		if (size->base.type == type_error_type) {
 			/* just a dummy value */
-			size_long = get_type_size(type) * 8;
+			size_long = get_ctype_size(type) * 8;
 		} else {
 			size_long = fold_expression_to_int(size);
 
 			symbol_t   const *const symbol      = entity->base.symbol;
 			symbol_t   const *const user_symbol = symbol ? symbol
 			                                             : sym_anonymous;
-			unsigned          const bit_size    = get_type_size(type) * 8;
+			unsigned          const bit_size    = get_ctype_size(type) * 8;
 			position_t const *const pos         = &size->base.pos;
 			if (size_long < 0) {
 				errorf(pos, "negative width in bit-field '%Y'", user_symbol);
@@ -9017,7 +9017,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 					size  = get_atomic_type_size(akind);
 				} else {
 					flags = ATOMIC_TYPE_FLAG_INTEGER;
-					size  = get_type_size(type_void_ptr);
+					size  = get_ctype_size(type_void_ptr);
 				}
 
 				do {
@@ -9033,7 +9033,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 						value_size  = get_atomic_type_size(value_akind);
 					} else if (value_kind == TYPE_POINTER) {
 						value_flags = ATOMIC_TYPE_FLAG_INTEGER;
-						value_size  = get_type_size(type_void_ptr);
+						value_size  = get_ctype_size(type_void_ptr);
 					} else {
 						break;
 					}

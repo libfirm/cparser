@@ -112,5 +112,5 @@ unsigned get_declaration_alignment(const declaration_t *declaration)
 	const type_t *type = declaration->type;
 	if (declaration->base.kind == ENTITY_COMPOUND_MEMBER)
 		return get_type_alignment_compound(type);
-	return get_type_alignment(type);
+	return get_ctype_alignment(type);
 }

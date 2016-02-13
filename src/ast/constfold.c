@@ -116,7 +116,7 @@ ir_tarval *fold_builtin_nan(call_expression_t const *const call,
 
 static ir_tarval *get_type_size_tarval(type_t *const type, ir_mode *const mode)
 {
-	size_t const size = get_type_size(type);
+	size_t const size = get_ctype_size(type);
 	return new_tarval_from_long(size, mode);
 }
 
@@ -422,7 +422,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 
 			long    index_long   = fold_expression_to_int(array_index);
 			type_t *element_type = type->array.element_type;
-			long    element_size = get_type_size(element_type);
+			long    element_size = get_ctype_size(element_type);
 
 			/* TODO: check for overflow */
 			offset += index_long * element_size;
@@ -450,7 +450,7 @@ static unsigned get_address_alignment(expression_t const *const expr)
 	} else {
 		type_t *const type = skip_typeref(expr->base.type);
 		assert(is_type_pointer(type));
-		return get_type_alignment(type->pointer.points_to);
+		return get_ctype_alignment(type->pointer.points_to);
 	}
 }
 
@@ -462,7 +462,7 @@ static unsigned get_object_alignment(expression_t const *const expr)
 	case EXPR_UNARY_DEREFERENCE: return get_address_alignment(expr->unary.value);
 	case EXPR_REFERENCE:         ent = expr->reference.entity;      break;
 	case EXPR_SELECT:            ent = expr->select.compound_entry; break;
-	default:                     return get_type_alignment(expr->base.type);
+	default:                     return get_ctype_alignment(expr->base.type);
 	}
 	assert(is_declaration(ent));
 	return get_declaration_alignment(&ent->declaration);
@@ -472,7 +472,7 @@ static ir_tarval *alignof_to_tarval(const typeprop_expression_t *expression)
 {
 	unsigned const alignment = expression->tp_expression
 		? get_object_alignment(expression->tp_expression)
-		: get_type_alignment(expression->type);
+		: get_ctype_alignment(expression->type);
 	ir_mode *const mode = get_ir_mode_storage(expression->base.type);
 	return new_tarval_from_long(alignment, mode);
 }

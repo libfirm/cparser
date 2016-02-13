@@ -1164,7 +1164,7 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
-unsigned get_type_size(type_t const *const type)
+unsigned get_ctype_size(type_t const *const type)
 {
 	switch (type->kind) {
 	case TYPE_ERROR:
@@ -1186,20 +1186,20 @@ unsigned get_type_size(type_t const *const type)
 		return pointer_properties.size;
 	case TYPE_ARRAY: {
 		/* TODO: correct if element_type is aligned? */
-		unsigned element_size = get_type_size(type->array.element_type);
+		unsigned element_size = get_ctype_size(type->array.element_type);
 		return type->array.size * element_size;
 	}
 	case TYPE_TYPEDEF:
-		return get_type_size(type->typedeft.typedefe->type);
+		return get_ctype_size(type->typedeft.typedefe->type);
 	case TYPE_TYPEOF:
-		return get_type_size(type->typeoft.typeof_type);
+		return get_ctype_size(type->typeoft.typeof_type);
 	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}
 	panic("invalid type");
 }
 
-unsigned get_type_alignment(type_t const *const type)
+unsigned get_ctype_alignment(type_t const *const type)
 {
 	switch (type->kind) {
 	case TYPE_ERROR:
@@ -1219,13 +1219,13 @@ unsigned get_type_alignment(type_t const *const type)
 	case TYPE_POINTER:
 		return pointer_properties.alignment;
 	case TYPE_ARRAY:
-		return get_type_alignment(type->array.element_type);
+		return get_ctype_alignment(type->array.element_type);
 	case TYPE_TYPEDEF: {
-		unsigned const alignment = get_type_alignment(type->typedeft.typedefe->type);
+		unsigned const alignment = get_ctype_alignment(type->typedeft.typedefe->type);
 		return MAX(alignment, type->typedeft.typedefe->alignment);
 	}
 	case TYPE_TYPEOF:
-		return get_type_alignment(type->typeoft.typeof_type);
+		return get_ctype_alignment(type->typeoft.typeof_type);
 	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}
@@ -1253,7 +1253,7 @@ unsigned get_type_alignment_compound(type_t const *const type)
 		return get_type_alignment_compound(type->array.element_type);
 
 	default:
-		return get_type_alignment(type);
+		return get_ctype_alignment(type);
 	}
 }
 
@@ -1530,7 +1530,7 @@ void layout_compound(compound_t *const compound)
 		unsigned m_alignment = get_declaration_alignment(&member->base);
 		alignment = MAX(alignment, m_alignment);
 
-		unsigned const m_size = get_type_size(m_type);
+		unsigned const m_size = get_ctype_size(m_type);
 		if (is_union) {
 			size = MAX(size, m_size);
 		} else if (member->bitfield) {

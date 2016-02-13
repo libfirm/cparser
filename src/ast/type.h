@@ -227,7 +227,12 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
  */
 unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
 
-unsigned get_type_alignment(type_t const *type);
+/**
+ * Get alignment of type in bytes.
+ * (Cannot be named get_type_alignment() because libfirm has a function with the
+ *  same name)
+ */
+unsigned get_ctype_alignment(type_t const *type);
 
 /**
  * Get alignment of a type when used inside a compound.
@@ -236,7 +241,12 @@ unsigned get_type_alignment(type_t const *type);
  */
 unsigned get_type_alignment_compound(type_t const *type);
 
-unsigned get_type_size(type_t const *type);
+/**
+ * Get size of type in bytes.
+ * (Cannot be named get_type_size() because libfirm has a function with the same
+ *  name)
+ */
+unsigned get_ctype_size(type_t const *type);
 
 decl_modifiers_t get_type_modifiers(const type_t *type);
 

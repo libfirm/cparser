@@ -321,7 +321,7 @@ ident *create_name_win32(entity_t *entity)
 		case CC_FASTCALL: {
 			unsigned size = 0;
 			for (function_parameter_t const* i = type->function.parameters; i; i = i->next) {
-				size += get_type_size(i->type);
+				size += get_ctype_size(i->type);
 			}
 			obstack_printf(o, "@%u", size);
 			break;

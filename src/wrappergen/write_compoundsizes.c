@@ -37,7 +37,7 @@ void write_compoundsizes(FILE *output, const translation_unit_t *unit)
 		}
 
 		if (had_dllexport && string != NULL) {
-			fprintf(output, "%s %u\n", string, get_type_size(type));
+			fprintf(output, "%s %u\n", string, get_ctype_size(type));
 		}
 	}
 }

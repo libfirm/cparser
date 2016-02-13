@@ -1549,7 +1549,7 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 		if (!is_type_pointer(dest) && (
 				dest->kind != TYPE_ATOMIC                                               ||
 				!(get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER) ||
-				get_atomic_type_size(dest->atomic.akind) < get_type_size(type_void_ptr)
+				get_atomic_type_size(dest->atomic.akind) < get_ctype_size(type_void_ptr)
 		    ))
 			return is_constant_expression(expression);
 

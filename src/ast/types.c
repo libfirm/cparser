@@ -210,8 +210,8 @@ void init_predefined_types(void)
 		type_valist_arg = type_void_ptr;
 	} else if (is_Struct_type(be_va_list_type)) {
 		entity_t *ent = allocate_entity_zero(ENTITY_STRUCT, NAMESPACE_NORMAL, sym_anonymous, &builtin_position);
-		ent->compound.alignment = get_type_alignment_bytes(be_va_list_type);
-		ent->compound.size      = get_type_size_bytes(be_va_list_type);
+		ent->compound.alignment = get_type_alignment(be_va_list_type);
+		ent->compound.size      = get_type_size(be_va_list_type);
 		ent->compound.complete  = true;
 		ent->compound.members   = (scope_t){
 			.first_entity = NULL,

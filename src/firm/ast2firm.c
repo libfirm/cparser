@@ -183,11 +183,11 @@ static ir_type *create_primitive_irtype(type_t const *const type, ir_mode *const
 	ir_type       *const irtype = new_type_primitive(mode);
 	set_type_dbg_info(irtype, dbgi);
 
-	unsigned const align = get_type_alignment(type);
-	set_type_alignment_bytes(irtype, align);
+	unsigned const align = get_ctype_alignment(type);
+	set_type_alignment(irtype, align);
 
-	unsigned const size = get_type_size(type);
-	set_type_size_bytes(irtype, size);
+	unsigned const size = get_ctype_size(type);
+	set_type_size(irtype, size);
 
 	return irtype;
 }
@@ -213,11 +213,11 @@ static ir_type *create_complex_type(type_t const *const type)
 	ir_type       *const irtype  = new_type_array(iretype);
 	set_type_dbg_info(irtype, dbgi);
 
-	unsigned const align = get_type_alignment(type);
-	set_type_alignment_bytes(irtype, align);
+	unsigned const align = get_ctype_alignment(type);
+	set_type_alignment(irtype, align);
 
-	unsigned const size = get_type_size(type);
-	set_type_size_bytes(irtype, size);
+	unsigned const size = get_ctype_size(type);
+	set_type_size(irtype, size);
 
 	set_array_size_int(irtype, 2);
 	set_type_state(irtype, layout_fixed);
@@ -368,14 +368,14 @@ static ir_type *create_array_type(type_t const *const type)
 	ir_type       *const irtype  = new_type_array(iretype);
 	set_type_dbg_info(irtype, dbgi);
 
-	unsigned const align = get_type_alignment(type);
-	set_type_alignment_bytes(irtype, align);
+	unsigned const align = get_ctype_alignment(type);
+	set_type_alignment(irtype, align);
 
 	if (type->array.size_constant) {
 		set_array_size_int(irtype, type->array.size);
 
-		unsigned const size = get_type_size(type);
-		set_type_size_bytes(irtype, size);
+		unsigned const size = get_ctype_size(type);
+		set_type_size(irtype, size);
 	}
 	set_type_state(irtype, layout_fixed);
 
@@ -406,8 +406,8 @@ static ir_type *create_compound_type(type_t *const type)
 	ir_type       *const irtype
 		= is_union ? new_type_union(id) : new_type_struct(id);
 	set_type_dbg_info(irtype, tdbgi);
-	set_type_alignment_bytes(irtype, compound->alignment);
-	set_type_size_bytes(irtype, compound->size);
+	set_type_alignment(irtype, compound->alignment);
+	set_type_size(irtype, compound->size);
 
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
@@ -508,7 +508,7 @@ static ir_node *get_type_size_node(type_t *type)
 		return real_size;
 	}
 
-	unsigned const size = get_type_size(type);
+	unsigned const size = get_ctype_size(type);
 	return new_Const_long(mode, size);
 }
 
@@ -853,8 +853,8 @@ init_wide:
 finish:;
 	ir_type *const type = new_type_array(elem_type);
 	set_array_size_int(type, slen);
-	set_type_size_bytes( type, slen * get_type_size_bytes(elem_type));
-	set_type_state(      type, layout_fixed);
+	set_type_size(type, slen * get_type_size(elem_type));
+	set_type_state(type, layout_fixed);
 
 	ir_type   *const global_type = get_glob_type();
 	ident     *const id          = id_unique("str.%u");
@@ -4004,7 +4004,7 @@ static void allocate_variable_length_array(entity_t *entity)
 	/* make sure size_node is calculated */
 	ir_node  *size  = get_type_size_node(type);
 	ir_node  *mem   = get_store();
-	unsigned  align = get_type_alignment(el_type);
+	unsigned  align = get_ctype_alignment(el_type);
 	ir_node  *alloc = new_d_Alloc(dbgi, mem, size, align);
 
 	ir_node  *proj_m = new_d_Proj(dbgi, alloc, mode_M, pn_Alloc_M);

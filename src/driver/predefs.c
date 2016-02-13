@@ -290,7 +290,7 @@ void add_predefined_macros(void)
 	add_define("__FINITE_MATH_ONLY__",    "0",    false);
 
 	if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 8
-	 && get_type_size(type_void_ptr) == 8
+	 && get_ctype_size(type_void_ptr) == 8
 	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
 		add_define("_LP64",    "1", false);
 		add_define("__LP64__", "1", false);
@@ -299,8 +299,8 @@ void add_predefined_macros(void)
 	ir_mode *float_mode = be_get_mode_float_arithmetic();
 	const char *flt_eval_metod
 		= float_mode == NULL ? "0"
-		: get_mode_size_bytes(float_mode) > get_type_size(type_double)  ? "2"
-		: get_mode_size_bytes(float_mode) == get_type_size(type_double) ? "1"
+		: get_mode_size_bytes(float_mode) > get_ctype_size(type_double)  ? "2"
+		: get_mode_size_bytes(float_mode) == get_ctype_size(type_double) ? "1"
 		: "-1";
 	add_define("__FLT_EVAL_METHOD__", flt_eval_metod, false);
 
@@ -335,7 +335,7 @@ void add_predefined_macros(void)
 	define_sizeof("WCHAR_T",     type_wchar_t->atomic.akind);
 	define_sizeof("WINT_T",      type_wint_t->atomic.akind);
 	define_sizeof("PTRDIFF_T",   type_ptrdiff_t->atomic.akind);
-	add_define_int("__SIZEOF_POINTER__", get_type_size(type_void_ptr));
+	add_define_int("__SIZEOF_POINTER__", get_ctype_size(type_void_ptr));
 
 	define_type_max("SCHAR",     ATOMIC_TYPE_SCHAR);
 	define_type_max("SHRT",      ATOMIC_TYPE_SHORT);
@@ -359,15 +359,15 @@ void add_predefined_macros(void)
 	define_int_n_types(32, ATOMIC_TYPE_UINT,   ATOMIC_TYPE_INT);
 	atomic_type_kind_t akind_uintptr;
 	atomic_type_kind_t akind_intptr;
-	if (get_type_size(type_void_ptr) == 4
+	if (get_ctype_size(type_void_ptr) == 4
 	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
 		akind_intptr = ATOMIC_TYPE_INT;
 		akind_uintptr = ATOMIC_TYPE_UINT;
-	} else if (get_type_size(type_void_ptr) == 8
+	} else if (get_ctype_size(type_void_ptr) == 8
 	        && get_atomic_type_size(ATOMIC_TYPE_LONG) == 8) {
 		akind_intptr = ATOMIC_TYPE_LONG;
 		akind_uintptr = ATOMIC_TYPE_ULONG;
-	} else if (get_type_size(type_void_ptr) == 8
+	} else if (get_ctype_size(type_void_ptr) == 8
 	        && get_atomic_type_size(ATOMIC_TYPE_LONGLONG) == 8) {
 		akind_intptr = ATOMIC_TYPE_LONGLONG;
 		akind_uintptr = ATOMIC_TYPE_ULONGLONG;
