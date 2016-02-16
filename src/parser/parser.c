@@ -83,6 +83,7 @@ static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
 static linkage_kind_t       current_linkage;
+static statement_t         *cgoto_first       = NULL;
 static label_t             *label_first       = NULL;
 static label_t            **label_anchor      = NULL;
 /** current translation unit. */
@@ -4513,7 +4514,9 @@ decl_list_end:
  */
 static void check_labels(void)
 {
+	bool address_taken = false;
 	for (label_t const *label = label_first; label; label = label->next) {
+		address_taken |= label->address_taken;
 		if (!label->statement) {
 			position_t const *const pos = &label->base.pos;
 			errorf(pos, "'%N' used but not defined", (entity_t const*)label);
@@ -4523,6 +4526,9 @@ static void check_labels(void)
 			         (entity_t const*)label);
 		}
 	}
+
+	if (!address_taken && cgoto_first)
+		errorf(&cgoto_first->base.pos, "computed goto in function without address-taken label");
 }
 
 static void warn_unused_entity(warning_t const why, entity_t *entity,
@@ -5273,6 +5279,7 @@ static void parse_external_declaration(void)
 	PUSH_CURRENT_ENTITY(entity);
 	PUSH_PARENT(NULL);
 
+	cgoto_first  = NULL;
 	label_first  = NULL;
 	label_anchor = &label_first;
 
@@ -9897,6 +9904,8 @@ static statement_t *parse_goto(void)
 		}
 
 		statement->computed_goto.expression = expression;
+		if (!cgoto_first)
+			cgoto_first = statement;
 	} else {
 		statement = allocate_statement_zero(STATEMENT_GOTO);
 		eat(T_goto);

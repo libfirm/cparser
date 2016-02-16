@@ -11,6 +11,7 @@ cparser 1.22.1 (2016-01-23)
 * Support `-Wcpp`
 * Stub support for `#ident` and `#sccs`
 * Add switch `-Wreturn-local-addr` and handle compound literals
+* Make it an error to have a computed goto in a function without address-taken label
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
