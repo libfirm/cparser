@@ -315,10 +315,11 @@ bool warningf(warning_t const warn, position_t const* pos, char const *const fmt
 			va_start(ap, fmt);
 			diagnosticvf(pos, kind_color, kind, fmt, ap);
 			va_end(ap);
-			if (diagnostics_show_option)
-				fprintf(stderr, " [-W%s]\n", s->name);
-			else
-				fputc('\n', stderr);
+			if (diagnostics_show_option) {
+				char const *const err = s->state & WARN_STATE_ERROR ? "error=" : "";
+				fprintf(stderr, " [-W%s%s]", err, s->name);
+			}
+			fputc('\n', stderr);
 			return true;
 
 		default:
