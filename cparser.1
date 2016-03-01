@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd January 22, 2016
+.Dd March 1, 2016
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -160,6 +160,10 @@ In particular these are
 .It Fl Wcpp
 .No Show warning messages emitted by So #warning Sc directives.
 Default is on.
+.It Fl Wdeclaration-after-label
+Warn when a declaration is found right after a label, which is not allowed in C.
+This option has no effect for C++, which allows this.
+Default is on as error.
 .It Fl Wdeclaration-after-statement
 Warn about mixing declarations and statements, which is not allowed prior to C99.
 .It Fl Wdiv-by-zero

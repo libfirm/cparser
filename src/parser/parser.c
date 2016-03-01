@@ -9403,7 +9403,7 @@ static statement_t *parse_label_inner_statement(statement_t const *const label,
 		/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
 		/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
 		if (inner_stmt->kind == STATEMENT_DECLARATION && !dialect.cpp)
-			errorf(&inner_stmt->base.pos, "declaration after %s", label_kind);
+			warningf(WARN_DECLARATION_AFTER_LABEL, &inner_stmt->base.pos, "declaration after %s", label_kind);
 		break;
 	}
 	return inner_stmt;
