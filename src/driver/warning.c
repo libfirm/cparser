@@ -14,6 +14,7 @@
 #include "help.h"
 
 static warning_switch_t warning[] = {
+#define ERR WARN_STATE_ON | WARN_STATE_ERROR
 #define ON  WARN_STATE_ON
 #define OFF WARN_STATE_NONE
 #define M(warning, state, option, explanation) [warning] = { state, option, explanation },
