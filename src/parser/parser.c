@@ -9383,8 +9383,8 @@ static statement_t *parse_label_inner_statement(statement_t const *const label,
 	statement_t *inner_stmt;
 	switch (token.kind) {
 	case '}':
-		errorf(&label->base.pos, "%s at end of compound statement", label_kind);
-		inner_stmt = create_error_statement();
+		warningf(WARN_LABEL_AT_END_OF_BLOCK, &label->base.pos, "%s at end of compound statement", label_kind);
+		inner_stmt = create_empty_statement();
 		break;
 
 	case ';':

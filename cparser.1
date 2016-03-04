@@ -192,6 +192,9 @@ Warn about calling a function without a prior declaration.
 Warn about declarations whose declaration specifiers do not include a type specifier.
 .It Fl Winit-self
 Warn about uninitialized variables which are initialized with themselves.
+.It Fl Wlabel-at-end-of-block
+Warn when a label is found right before the closing brace of a compound statement, which is not allowed in C.
+Default is on as error.
 .It Fl Wlong-long
 .No Warn if the type So long long Sc is used .
 .It Fl Wmain

@@ -44,6 +44,7 @@ void print_warning_opt_help(void);
 	M(WARN_IMPLICIT_FUNCTION_DECLARATION, ON,  "implicit-function-declaration", "Warn whenever a function is used before being declared") \
 	M(WARN_IMPLICIT_INT,                  ON,  "implicit-int",                  "Warn when a declaration does not specify a type") \
 	M(WARN_INVALID_BYTE_SEQUENCE,         ON,  "invalid-byte-sequence",         "Warn on invalid byte sequences for chosen input charset") \
+	M(WARN_LABEL_AT_END_OF_BLOCK,         ERR, "label-at-end-of-block",         "Warn when a label is found right before the closing brace of a compound statement") \
 	M(WARN_LONG_LONG,                     OFF, "long-long",                     "Warn if 'long long' type is used") \
 	M(WARN_MAIN,                          ON,  "main",                          "Warn if the type of 'main' is suspicious") \
 	M(WARN_MISSING_INCLUDE_DIRS,          OFF, "missing-include-dirs",          "" /* TODO explanation */) \
