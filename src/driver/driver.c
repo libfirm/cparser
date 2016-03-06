@@ -29,7 +29,7 @@ const char         *driver_default_exe_output = "a.out";
 struct obstack      file_obst;
 compilation_unit_t *units;
 
-static compilation_unit_t *last_unit;
+static compilation_unit_t **unit_anchor = &units;
 
 void driver_add_flag(struct obstack *obst, const char *format, ...)
 {
@@ -286,12 +286,8 @@ void driver_add_input(const char *filename, compilation_unit_type_t type)
 	entry->original_name = filename;
 	entry->type          = type;
 
-	if (last_unit != NULL) {
-		last_unit->next = entry;
-	} else {
-		units = entry;
-	}
-	last_unit = entry;
+	*unit_anchor = entry;
+	unit_anchor  = &entry->next;
 }
 
 compilation_unit_type_t autodetect_input(const char *filename)
