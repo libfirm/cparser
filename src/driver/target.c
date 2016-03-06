@@ -96,12 +96,10 @@ void target_adjust_types_and_dialect(void)
 static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
 {
 	(void)mt;
-	if (*target.user_label_prefix == '\0')
-		return id;
-	else {
-		assert (streq(target.user_label_prefix, "_"));
-		return new_id_fmt("_%s", id);
-	}
+	char const *const prefix = target.user_label_prefix;
+	if (*prefix == '\0')
+		return id; /* Shortcut for empty prefix */
+	return new_id_fmt("%s%s", prefix, id);
 }
 
 /** Add a target specific preprocessor define. */
