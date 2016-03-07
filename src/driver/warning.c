@@ -140,7 +140,7 @@ extra:
 		/* GCC legacy: This way it only can be activated. */
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
 	} else {
-		warningf(WARN_UNKNOWN_WARNING_OPTION, NULL, "ignoring unknown option %hs%hs", "-W", opt);
+		warningf(WARN_UNKNOWN_WARNING_OPTION, NULL, "ignoring unknown option '%hs%hs'", "-W", opt);
 	}
 }
 
