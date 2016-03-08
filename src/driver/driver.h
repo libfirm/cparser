@@ -41,7 +41,7 @@ void set_unit_handler(compilation_unit_type_t type,
 bool process_unit(compilation_env_t *env, compilation_unit_t *unit);
 bool process_all_units(compilation_env_t *env);
 
-compilation_unit_type_t autodetect_input(const char *filename);
+compilation_unit_type_t autodetect_input(char const *path);
 
 extern const char         *outname;
 extern bool                produce_statev;

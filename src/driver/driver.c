@@ -262,11 +262,11 @@ void begin_statistics(void)
 		/* attempt to guess a good name for the file */
 		const char *first_cup = units->name;
 		if (first_cup != NULL) {
-			const char *dot = strrchr(first_cup, '.');
-			const char *pos = dot ? dot : first_cup + strlen(first_cup);
-			char        buf[pos-first_cup+1];
-			strncpy(buf, first_cup, pos-first_cup);
-			buf[pos-first_cup] = '\0';
+			char const *const pos = find_extension(first_cup, NULL);
+			size_t      const len = pos - first_cup;
+			char              buf[len + 1];
+			memcpy(buf, first_cup, len);
+			buf[len] = '\0';
 
 			stat_ev_begin(buf, filtev);
 		}
@@ -290,11 +290,12 @@ void driver_add_input(const char *filename, compilation_unit_type_t type)
 	unit_anchor  = &entry->next;
 }
 
-compilation_unit_type_t autodetect_input(const char *filename)
+compilation_unit_type_t autodetect_input(char const *const path)
 {
-	const char *suffix = strrchr(filename, '.');
+	char const *name;
+	char const *suffix = find_extension(path, &name);
 	/* Ensure there is at least one char before the suffix */
-	if (suffix == NULL || suffix == filename)
+	if (suffix == name)
 		return COMPILATION_UNIT_OBJECT;
 	++suffix;
 	return
