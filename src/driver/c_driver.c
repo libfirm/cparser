@@ -887,10 +887,8 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 		driver_add_flag(&file_obst, "%s", unit->name);
 	}
 
-	if (lsysroot) {
-		obstack_grow(&file_obst," --sysroot=",11);
-		obstack_grow(&file_obst,isysroot,strlen(lsysroot));
-	}
+	if (lsysroot)
+		obstack_printf(&file_obst, " --sysroot=%s", lsysroot);
 
 	driver_add_flag(&file_obst, "-o");
 	driver_add_flag(&file_obst, outname);
