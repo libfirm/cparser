@@ -26,7 +26,6 @@ target_t target = {
 };
 const char *multilib_directory_target_triple;
 unsigned target_size_override;
-static const char *experimental_backend;
 
 void target_adjust_types_and_dialect(void)
 {
@@ -377,8 +376,9 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 
 void warn_experimental_target(void)
 {
-	if (experimental_backend != NULL)
-		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental_backend);
+	char const *const experimental = be_get_backend_param()->experimental;
+	if (experimental)
+		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental);
 }
 
 static bool setup_firm_isa(void)
@@ -401,13 +401,6 @@ static bool setup_firm_isa(void)
 		}
 	}
 
-	if (streq(isa, "amd64")) {
-		experimental_backend
-			= "the x86_64 backend is highly experimental and unfinished (consider the -m32 switch)";
-	} else if (streq(isa, "arm")) {
-		experimental_backend
-			= "the arm backend is highly experimental and unfinished";
-	}
 	return true;
 }
 
