@@ -4117,6 +4117,9 @@ error_redeclaration:
 				}
 			}
 
+			if (is_definition)
+				previous->base.pos = entity->base.pos;
+
 			merge_into_decl(previous, entity);
 			return previous;
 		}
