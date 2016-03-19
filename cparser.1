@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd March 1, 2016
+.Dd March 26, 2016
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -63,9 +63,39 @@ Use the integrated preprocessor instead of an external one.
 .No Otherwise the external preprocessor Ar architecture Ns Cm - Ns Ar vendor Ns Cm - Ns Ar system Ns Cm -gcc No is used .
 .It Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
 Set target, for which code is generated.
-.No Supported Ar architecture Ns s are Cm amd64 , arm , i386 , i486 , i586 , i686 , i787 , sparc No and Cm x86_64 .
-.No Supported Ar vendor Ns s are Cm leon Po for Cm sparc Pc and Cm unknown .
-.No Supported Ar system Ns s are Cm *bsd*, darwin*, elf, irtss, *linux*, midipix*, mingw* No and Cm octopos .
+.No Supported Ar architecture Ns s are:
+.Bl -dash -compact
+.It
+.Cm amd64, x86_64
+.It
+.Cm arm
+.It
+.Cm i386 , i486 , i586 , i686 , i787
+.It
+.Cm sparc
+.El
+.No Supported Ar vendor Ns s are:
+.Bl -dash -compact
+.It
+.Cm leon Pq for Cm sparc
+.It
+.Cm unknown
+.El
+.No Supported Ar system Ns s are:
+.Bl -dash -compact
+.It
+.Cm *bsd*
+.It
+.Cm darwin*
+.It
+.Cm elf , irtss , octopos
+.It
+.Cm *linux*
+.It
+.Cm midipix*
+.It
+.Cm mingw*
+.El
 .It Fl ansi
 .No Same as Fl std=c90 Po for C Pc No or Fl std=c++98 Pq for C++ .
 .It Fl std= Ns Ar standard
