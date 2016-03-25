@@ -7706,7 +7706,7 @@ static void semantic_incdec(unary_expression_t *expression)
 		/* TODO: improve error message */
 		position_t const *const pos = &expression->base.pos;
 		if (!is_type_complex(type)) {
-			errorf(pos, "operation needs an arithmetic or pointer type, but got '%T'", type);
+			errorf(pos, "operation needs a real or pointer type, but got '%T'", type);
 			orig_type = type = type_error_type;
 		} else if (!GNU_MODE) {
 			errorf(pos, "operation on '%T' is a GCC extension", type);
