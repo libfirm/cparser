@@ -7696,8 +7696,10 @@ static bool is_lvalue(const expression_t *expression)
 
 static void semantic_incdec(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.type;
-	type_t *type      = skip_typeref(orig_type);
+	expression_t *const value     = expression->value;
+	type_t             *orig_type = revert_automatic_type_conversion(value);
+	value->base.type = orig_type;
+	type_t *type = skip_typeref(orig_type);
 	if (is_type_pointer(type)) {
 		if (!check_pointer_arithmetic(&expression->base.pos, type, orig_type))
 			return;
@@ -7712,7 +7714,7 @@ static void semantic_incdec(unary_expression_t *expression)
 			errorf(pos, "operation on '%T' is a GCC extension", type);
 		}
 	}
-	if (!is_lvalue(expression->value))
+	if (!is_lvalue(value))
 		/* TODO: improve error message */
 		errorf(&expression->base.pos, "lvalue required as operand");
 	expression->base.type = orig_type;
