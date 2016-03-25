@@ -4004,7 +4004,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				} else {
 					/* GCC extension: redef in system headers is allowed */
 					if ((pos->is_system_header || previous->base.pos.is_system_header)
-					 && types_compatible(type, prev_type))
+					 && types_same(type, prev_type))
 						goto finish;
 				}
 				errorf(pos, "redefinition of '%N'", entity);
