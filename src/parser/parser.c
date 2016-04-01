@@ -3517,17 +3517,20 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 				switch (is_constant_expression(size_expression)) {
 				case EXPR_CLASS_INTEGER_CONSTANT: {
-					long const size = fold_expression_to_int(size_expression);
-					array_type->array.size          = size;
-					array_type->array.size_constant = true;
-					/* §6.7.5.2:1  If the expression is a constant expression,
-					 * it shall have a value greater than zero. */
-					if (size < 0) {
-						errorf(&size_expression->base.pos,
-							   "size of array must be greater than zero");
-					} else if (size == 0 && !GNU_MODE) {
-						errorf(&size_expression->base.pos,
-							   "size of array must be greater than zero (zero length arrays are a GCC extension)");
+					ir_tarval *const size_tv = fold_expression(size_expression);
+					if (tarval_is_constant(size_tv) && get_tarval_highest_bit(size_tv) < 31) {
+						long const size = get_tarval_long(size_tv);
+						array_type->array.size          = size;
+						array_type->array.size_constant = true;
+						/* §6.7.5.2:1  If the expression is a constant expression,
+						 * it shall have a value greater than zero. */
+						if (size < 0) {
+							errorf(&size_expression->base.pos, "size of array must be greater than zero");
+						} else if (size == 0 && !GNU_MODE) {
+							errorf(&size_expression->base.pos, "size of array must be greater than zero (zero length arrays are a GCC extension)");
+						}
+					} else {
+						errorf(&size_expression->base.pos, "array is too large");
 					}
 					break;
 				}
