@@ -1586,9 +1586,9 @@ void layout_compound(compound_t *const compound)
 
 	position_t const *const pos = &compound->base.pos;
 	if (need_pad) {
-		warningf(WARN_PADDED, pos, "'%N' needs padding", compound);
+		warningf(WARN_PADDED, pos, "%N needs padding", compound);
 	} else if (compound->packed) {
-		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'",
+		warningf(WARN_PACKED, pos, "superfluous packed attribute on %N",
 		         compound);
 	}
 

@@ -246,9 +246,9 @@ done_flags:;
 				char     const *const ent_kind = get_entity_kind_name(ent->kind);
 				symbol_t const *const sym      = ent->base.symbol;
 				if (sym) {
-					fprintf(out, "%s %s", ent_kind, sym->string);
+					fprintf(out, "%s '%s'", ent_kind, sym->string);
 				} else {
-					fprintf(out, "anonymous %s", ent_kind);
+					fprintf(out, "anonymous '%s'", ent_kind);
 				}
 			}
 			break;

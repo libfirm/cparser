@@ -96,7 +96,7 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 	if (entity)
-		warningf(WARN_UNINITIALIZED, &entity->base.pos, "'%N' might be used uninitialized", entity);
+		warningf(WARN_UNINITIALIZED, &entity->base.pos, "%N might be used uninitialized", entity);
 	return new_r_Unknown(irg, mode);
 }
 
@@ -932,7 +932,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
 			position_t const *const pos = &ref->base.pos;
-			warningf(WARN_OTHER, pos, "taking address of builtin '%N'", ref->entity);
+			warningf(WARN_OTHER, pos, "taking address of builtin %N", ref->entity);
 
 			/* simply create a NULL pointer */
 			ir_mode *const mode = get_ir_mode_storage(type_void_ptr);
@@ -4241,7 +4241,7 @@ static void create_local_declaration(entity_t *entity)
 			if (entity->function.body != NULL) {
 				entity->declaration.kind = DECLARATION_KIND_INNER_FUNCTION;
 				errorf(&entity->base.pos,
-					   "code generation does not support nested functions (at '%N')", entity);
+					   "code generation does not support nested functions (at %N)", entity);
 				return;
 			}
 			(void)get_function_entity(&entity->function);

@@ -751,7 +751,7 @@ static void reset_symbol(symbol_t *symbol, entity_namespace_t namespc)
 
 static void note_prev_decl(entity_t const *const entity)
 {
-	notef(&entity->base.pos, "previous declaration of '%N' was here", entity);
+	notef(&entity->base.pos, "previous declaration of %N was here", entity);
 }
 
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
@@ -762,7 +762,7 @@ static entity_t *get_tag(symbol_t const *const symbol,
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
 	if (entity != NULL && entity->kind != kind) {
 		char const *const tag = get_entity_kind_name(kind);
-		errorf(pos, "'%s %Y' defined as wrong kind of tag, should be '%N'", tag,
+		errorf(pos, "'%s %Y' defined as wrong kind of tag, should be %N", tag,
 		       symbol, entity);
 		note_prev_decl(entity);
 		entity = NULL;
@@ -920,7 +920,7 @@ static void warn_enum_conversion(type_t *dest_type, expression_t *expression)
 	const enum_t *const dest_enum = skipped_dest->enumt.enume;
 	if (expression_enum != dest_enum) {
 		warningf(WARN_ENUM_CONVERSION, &expression->base.pos,
-				 "implicit conversion from '%N' to different enumeration type '%T'",
+				 "implicit conversion from %N to different enumeration type '%T'",
 				 expression_enum, dest_type);
 	}
 }
@@ -1936,7 +1936,7 @@ finish_designator:
 				if (type == NULL) {
 					if (env->entity != NULL) {
 						errorf(HERE,
-						       "extra brace group at end of initializer for '%N'",
+						       "extra brace group at end of initializer for %N",
 						       env->entity);
 					} else {
 						errorf(HERE, "extra brace group at end of initializer");
@@ -1976,7 +1976,7 @@ excess_elements:;
 				position_t const* const pos = &expression->base.pos;
 				if (env->entity != NULL) {
 					warningf(WARN_OTHER, pos,
-					         "excess elements in initializer for '%N'",
+					         "excess elements in initializer for %N",
 					         env->entity);
 				} else {
 					warningf(WARN_OTHER, pos, "excess elements in initializer");
@@ -2188,7 +2188,7 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 				 * existing definition in outer scope */
 				entity = NULL;
 			} else if (entity->compound.complete && peek('{')) {
-				errorf(&pos, "multiple definitions of '%N'", entity);
+				errorf(&pos, "multiple definitions of %N", entity);
 				note_prev_decl(entity);
 				/* clear members in the hope to avoid further errors */
 				entity->compound.members.first_entity = NULL;
@@ -2295,7 +2295,7 @@ static type_t *parse_enum_specifier(void)
 				 * existing definition in outer scope */
 				entity = NULL;
 			} else if (entity->enume.complete && peek('{')) {
-				errorf(&pos, "multiple definitions of '%N'", entity);
+				errorf(&pos, "multiple definitions of %N", entity);
 				note_prev_decl(entity);
 			}
 		}
@@ -2350,7 +2350,7 @@ static type_t *parse_enum_specifier(void)
 			entity->enume.akind = ATOMIC_TYPE_UINT;
 	} else if (!entity->enume.complete && !dialect.gnu) {
 		errorf(&pos,
-			   "'%N' used before definition (incomplete enums are a GNU extension)",
+			   "%N used before definition (incomplete enums are a GNU extension)",
 			   entity);
 	}
 
@@ -2478,7 +2478,7 @@ static type_t *parse_typedef_name(void)
 	/* Error handling: Look in the tag namespace if no typedef name was found. */
 	entity_t *const tagent = get_entity(symbol, NAMESPACE_TAG);
 	if (tagent) {
-		errorf(HERE, "'%Y' does not name a type; assuming '%N'", symbol, tagent);
+		errorf(HERE, "'%Y' does not name a type; assuming %N", symbol, tagent);
 		switch (tagent->kind) {
 		case ENTITY_ENUM: {
 			type_t *const type = allocate_type_zero(TYPE_ENUM);
@@ -3060,7 +3060,7 @@ static void semantic_parameter_complete(const entity_t *entity)
 	 *             incomplete type. */
 	type_t *type = skip_typeref(entity->declaration.type);
 	if (!is_type_complete(type) && is_type_valid(type))
-		errorf(&entity->base.pos, "'%N' has incomplete type", entity);
+		errorf(&entity->base.pos, "%N has incomplete type", entity);
 }
 
 static bool has_parameters(void)
@@ -3582,7 +3582,7 @@ static type_t *semantic_parameter(const position_t *pos, type_t *type,
 	type = automatic_type_conversion(type);
 
 	if (specifiers->is_inline && is_type_valid(type))
-		errorf(pos, "'%N' declared 'inline'", param);
+		errorf(pos, "%N declared 'inline'", param);
 
 	/* §6.9.1:6  The declarations in the declaration list shall contain
 	 *           no storage-class specifier other than register and no
@@ -3590,7 +3590,7 @@ static type_t *semantic_parameter(const position_t *pos, type_t *type,
 	if (specifiers->thread_local
 	 || (specifiers->storage_class != STORAGE_CLASS_NONE
 	  && specifiers->storage_class != STORAGE_CLASS_REGISTER))
-		errorf(pos, "invalid storage class for '%N'", param);
+		errorf(pos, "invalid storage class for %N", param);
 
 	/* delay test for incomplete type, because we might have (void)
 	 * which is legal but incomplete... */
@@ -3647,11 +3647,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 		if (env.symbol != NULL) {
 			if (specifiers->is_inline && is_type_valid(type))
-				errorf(&env.pos, "'%N' declared 'inline'", entity);
+				errorf(&env.pos, "%N declared 'inline'", entity);
 
 			if (specifiers->thread_local
 			 || specifiers->storage_class != STORAGE_CLASS_NONE)
-				errorf(&env.pos, "'%N' must have no storage class", entity);
+				errorf(&env.pos, "%N must have no storage class", entity);
 		}
 	} else {
 		if (flags & DECL_IS_PARAMETER) {
@@ -3673,7 +3673,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				  && specifiers->storage_class != STORAGE_CLASS_NONE
 				  && (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
 					))
-					errorf(&env.pos, "invalid storage class for '%N'", entity);
+					errorf(&env.pos, "invalid storage class for %N", entity);
 			}
 		} else {
 			entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
@@ -3682,7 +3682,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 			if (env.symbol != NULL) {
 				if (specifiers->is_inline && is_type_valid(type))
-					errorf(&env.pos, "'%N' declared 'inline'", entity);
+					errorf(&env.pos, "%N declared 'inline'", entity);
 
 				if (current_scope == file_scope) {
 					if (specifiers->storage_class != STORAGE_CLASS_EXTERN
@@ -3692,7 +3692,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				} else if (specifiers->thread_local
 				        && specifiers->storage_class == STORAGE_CLASS_NONE) {
 invalid_storage_class:
-					errorf(&env.pos, "invalid storage class for '%N'", entity);
+					errorf(&env.pos, "invalid storage class for %N", entity);
 				}
 			}
 		}
@@ -3807,7 +3807,7 @@ static void error_redefined_as_different_kind(const position_t *pos,
 		const entity_t *old, entity_kind_t new_kind)
 {
 	char const *const what = get_entity_kind_name(new_kind);
-	errorf(pos, "redeclaration of '%N' as %s", old, what);
+	errorf(pos, "redeclaration of %N as %s", old, what);
 	note_prev_decl(old);
 }
 
@@ -3862,7 +3862,7 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 static void parse_error_multiple_definition(entity_t *previous,
                                             const position_t *pos)
 {
-	errorf(pos, "redefinition of '%N'", previous);
+	errorf(pos, "redefinition of %N", previous);
 	note_prev_decl(previous);
 }
 
@@ -3978,7 +3978,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 		 && previous->base.parent_scope == &current_function->parameters
 		 && previous->base.parent_scope->depth+1 == current_scope->depth) {
 			assert(previous->kind == ENTITY_PARAMETER);
-			errorf(pos, "declaration of '%N' redeclares '%N'", entity, previous);
+			errorf(pos, "declaration of %N redeclares %N", entity, previous);
 			note_prev_decl(previous);
 			goto finish;
 		}
@@ -4010,7 +4010,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 					 && types_same(type, prev_type))
 						goto finish;
 				}
-				errorf(pos, "redefinition of '%N'", entity);
+				errorf(pos, "redefinition of %N", entity);
 				note_prev_decl(previous);
 				goto finish;
 			}
@@ -4092,13 +4092,13 @@ warn_redundant_declaration: ;
 					if (has_new_attrs) {
 						merge_in_attributes(decl, prev_decl->attributes);
 					} else if (!is_definition && is_type_valid(prev_type)) {
-						if (warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%N'", entity))
+						if (warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for %N", entity))
 							note_prev_decl(previous);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC
 					 && new_storage_class == STORAGE_CLASS_STATIC) {
-						errorf(pos, "static declaration of '%N' follows non-static declaration", entity);
+						errorf(pos, "static declaration of %N follows non-static declaration", entity);
 						note_prev_decl(previous);
 					} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						prev_decl->storage_class          = STORAGE_CLASS_NONE;
@@ -4112,9 +4112,9 @@ warn_redundant_declaration: ;
 				} else if (is_type_valid(prev_type)) {
 					if (old_storage_class == new_storage_class) {
 error_redeclaration:
-						errorf(pos, "redeclaration of '%N'", entity);
+						errorf(pos, "redeclaration of %N", entity);
 					} else {
-						errorf(pos, "redeclaration of '%N' with different linkage", entity);
+						errorf(pos, "redeclaration of %N with different linkage", entity);
 					}
 					note_prev_decl(previous);
 				}
@@ -4131,7 +4131,7 @@ error_redeclaration:
 		if (is_warn_on(why = WARN_SHADOW)
 		 || (is_warn_on(why = WARN_SHADOW_LOCAL)
 		 && previous->base.parent_scope != file_scope)) {
-			if (warningf(why, pos, "'%N' shadows '%N'", entity, previous))
+			if (warningf(why, pos, "%N shadows %N", entity, previous))
 				note_prev_decl(previous);
 		}
 	}
@@ -4151,7 +4151,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 
 	if (entity->kind == ENTITY_TYPEDEF) {
 		errorf(&entity->base.pos,
-		       "'%N' is initialized (use __typeof__ instead)", entity);
+		       "%N is initialized (use __typeof__ instead)", entity);
 	} else {
 		assert(is_declaration(entity));
 		orig_type = entity->declaration.type;
@@ -4160,7 +4160,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	if (entity->kind == ENTITY_VARIABLE
 	 && entity->variable.alias.symbol != NULL)
 		errorf(&entity->base.pos,
-		       "'%N' has an initializer but is declared as an alias for '%Y'",
+		       "%N has an initializer but is declared as an alias for '%Y'",
 		       entity, entity->variable.alias.symbol);
 
 	type_t *type = skip_typeref(orig_type);
@@ -4174,15 +4174,15 @@ static void parse_init_declarator_rest(entity_t *entity)
 
 	if (is_type_function(type)) {
 		errorf(&entity->base.pos,
-		       "'%N' is initialized like a variable", entity);
+		       "%N is initialized like a variable", entity);
 		orig_type = type_error_type;
 	} else if (is_type_array(type)) {
 		if (type->array.is_vla)
 			errorf(&entity->base.pos,
-			       "variable sized '%N' may not be initialized", entity);
+			       "variable sized %N may not be initialized", entity);
 	} else if (!is_type_complete(type) && is_type_valid(type)) {
 		errorf(&entity->base.pos,
-		       "'%N' has incomplete type '%T' but is initialized", entity,
+		       "%N has incomplete type '%T' but is initialized", entity,
 		       orig_type);
 	}
 
@@ -4299,7 +4299,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 			if (entity->variable.alias.symbol != NULL
 			 && is_common_variable(entity))
 				errorf(&entity->base.pos,
-					   "'%N' is a definition but declared as an alias for '%Y'",
+					   "%N is a definition but declared as an alias for '%Y'",
 					   entity, entity->variable.alias.symbol);
 		}
 
@@ -4336,7 +4336,7 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	}
 
 	if (is_definition)
-		errorf(HERE, "'%N' is initialised", entity);
+		errorf(HERE, "%N is initialised", entity);
 
 	return record_entity(entity, false);
 }
@@ -4464,11 +4464,11 @@ decl_list_end:
 		if (parameter_type == NULL) {
 			position_t const* const pos = &parameter->base.pos;
 			if (dialect.strict) {
-				errorf(pos, "no type specified for function '%N'", parameter);
+				errorf(pos, "no type specified for function %N", parameter);
 				parameter_type = type_error_type;
 			} else {
 				warningf(WARN_IMPLICIT_INT, pos,
-				         "no type specified for function parameter '%N', using 'int'",
+				         "no type specified for function parameter %N, using 'int'",
 				         parameter);
 				parameter_type = type_int;
 			}
@@ -4525,10 +4525,10 @@ static void check_labels(void)
 		address_taken |= label->address_taken;
 		if (!label->statement) {
 			position_t const *const pos = &label->base.pos;
-			errorf(pos, "'%N' used but not defined", (entity_t const*)label);
+			errorf(pos, "%N used but not defined", (entity_t const*)label);
 		} else if (!label->used) {
 			position_t const *const pos = &label->base.pos;
-			warningf(WARN_UNUSED_LABEL, pos, "'%N' defined but not used",
+			warningf(WARN_UNUSED_LABEL, pos, "%N defined but not used",
 			         (entity_t const*)label);
 		}
 	}
@@ -4550,11 +4550,11 @@ static void warn_unused_entity(warning_t const why, entity_t *entity,
 			continue;
 
 		if (!declaration->used) {
-			warningf(why, &entity->base.pos, "'%N' is unused", entity);
+			warningf(why, &entity->base.pos, "%N is unused", entity);
 		} else if ((entity->kind == ENTITY_VARIABLE
 		            || entity->kind == ENTITY_PARAMETER)
 		           && !entity->variable.read) {
-			warningf(why, &entity->base.pos, "'%N' is never read", entity);
+			warningf(why, &entity->base.pos, "%N is never read", entity);
 		}
 	}
 }
@@ -5210,10 +5210,10 @@ static void parse_external_declaration(void)
 	if (current_scope != file_scope) {
 		if (GNU_MODE) {
 			warningf(WARN_PEDANTIC, pos,
-			         "nested function '%N' is a GCC extension", ndeclaration);
+			         "nested function %N is a GCC extension", ndeclaration);
 		} else {
 			errorf(pos,
-			       "nested function '%N' is a GCC extension", ndeclaration);
+			       "nested function %N is a GCC extension", ndeclaration);
 		}
 	}
 
@@ -5226,17 +5226,17 @@ static void parse_external_declaration(void)
 	type_t *const return_type      = skip_typeref(orig_return_type);
 	if (!is_type_complete(return_type) && !is_type_void(return_type)
 	 && is_type_valid(return_type))
-		errorf(pos, "incomplete return type '%T' in definition of '%N'",
+		errorf(pos, "incomplete return type '%T' in definition of %N",
 		       orig_return_type, ndeclaration);
 	if (is_type_compound(return_type))
-		warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate",
+		warningf(WARN_AGGREGATE_RETURN, pos, "%N returns an aggregate",
 		         ndeclaration);
 	if (type->function.unspecified_parameters) {
-		warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of '%N'",
+		warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of %N",
 		         ndeclaration);
 	} else {
 		warningf(WARN_TRADITIONAL, pos,
-		         "traditional C rejects ISO C style definition of '%N'",
+		         "traditional C rejects ISO C style definition of %N",
 		         ndeclaration);
 	}
 
@@ -5363,10 +5363,10 @@ static void check_deprecated(const position_t *pos, const entity_t *entity)
 		return;
 
 	string_t const *const msg = get_deprecated_string(decl->attributes);
-	char     const *const fmt = msg ? "'%N' is deprecated: \"%S\""
-	                                : "'%N' is deprecated";
+	char     const *const fmt = msg ? "%N is deprecated: \"%S\""
+	                                : "%N is deprecated";
 	if (warningf(WARN_DEPRECATED_DECLARATIONS, pos, fmt, entity, msg))
-		notef(&entity->base.pos, "declaration of '%N' was here", entity);
+		notef(&entity->base.pos, "declaration of %N was here", entity);
 }
 
 
@@ -5515,7 +5515,7 @@ static void parse_compound_declarators(compound_t *compound,
 		if (symbol != NULL) {
 			entity_t *prev = find_compound_entry(compound, symbol);
 			if (prev != NULL) {
-				errorf(pos, "multiple declarations of '%N'", entity);
+				errorf(pos, "multiple declarations of %N", entity);
 				note_prev_decl(prev);
 			}
 		}
@@ -5529,13 +5529,13 @@ static void parse_compound_declarators(compound_t *compound,
 			type_t *orig_type = entity->declaration.type;
 			type_t *type      = skip_typeref(orig_type);
 			if (is_type_function(type)) {
-				errorf(pos, "'%N' must not have function type '%T'",
+				errorf(pos, "%N must not have function type '%T'",
 				       entity, orig_type);
 			} else if (!is_type_complete(type)) {
 				/* §6.7.2.1:16 flexible array member */
 				if (!is_type_array(type) || !peek(';') || !peek_ahead('}')) {
 					if (is_type_valid(type))
-						errorf(pos, "'%N' has incomplete type '%T'", entity,
+						errorf(pos, "%N has incomplete type '%T'", entity,
 						       orig_type);
 				} else if (compound->members.first_entity == NULL) {
 					errorf(pos,
@@ -6041,7 +6041,7 @@ static entity_t *parse_qualified_identifier(void)
 			/* an implicitly declared function */
 			entity = create_implicit_function(symbol, &pos);
 			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos,
-			         "implicit declaration of '%N'", entity);
+			         "implicit declaration of %N", entity);
 		} else {
 			errorf(&pos, "identifier '%Y' is unknown.", symbol);
 			entity = create_error_entity(symbol, ENTITY_VARIABLE);
@@ -7392,7 +7392,7 @@ static void warn_reference_address_as_bool(expression_t const* expr)
 		position_t const *const pos = &expr->base.pos;
 		entity_t   const *const ent = expr->reference.entity;
 		warningf(WARN_ADDRESS, pos,
-		         "the address of '%N' will always evaluate as 'true'", ent);
+		         "the address of %N will always evaluate as 'true'", ent);
 	}
 }
 
@@ -7828,7 +7828,7 @@ static void set_address_taken(expression_t *expression, bool may_be_register)
 	if (entity->declaration.storage_class == STORAGE_CLASS_REGISTER
 	 && !may_be_register) {
 		position_t const *const pos = &expression->base.pos;
-		errorf(pos, "address of register '%N' requested", entity);
+		errorf(pos, "address of register %N requested", entity);
 	}
 
 	entity->variable.address_taken = true;
@@ -8302,7 +8302,7 @@ static void warn_comparison(position_t const *const pos,
 	if (ref != NULL && is_null_pointer_constant(other)) {
 		entity_t const *const ent = ref->reference.entity;
 		warningf(WARN_ADDRESS, pos,
-		         "the address of '%N' will never be NULL", ent);
+		         "the address of %N will never be NULL", ent);
 	}
 
 	if (!expr->base.parenthesized) {
@@ -9215,7 +9215,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 			need_normalization = true;
 			entity_t *old = set_entity(output);
 			if (old != NULL) {
-				errorf(&output->base.pos, "multiple declarations of '%N'",
+				errorf(&output->base.pos, "multiple declarations of %N",
 				       output);
 				note_prev_decl(old);
 			}
@@ -9229,7 +9229,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 			need_normalization = true;
 			entity_t *old = set_entity(input);
 			if (old != NULL) {
-				errorf(&input->base.pos, "multiple declarations of '%N'",
+				errorf(&input->base.pos, "multiple declarations of %N",
 				       input);
 				note_prev_decl(old);
 			}
@@ -9568,7 +9568,7 @@ static statement_t *parse_label_statement(void)
 	 */
 	position_t const* const pos = &statement->base.pos;
 	if (label->statement != NULL) {
-		errorf(pos, "duplicate '%N'", (entity_t const*)label);
+		errorf(pos, "duplicate %N", (entity_t const*)label);
 		note_prev_decl((entity_t const*)label);
 	} else {
 		label->base.pos  = *pos;
@@ -9702,7 +9702,7 @@ static void check_enum_cases(const switch_statement_t *statement)
 		if (!found) {
 			position_t const *const pos = &statement->base.pos;
 			warningf(WARN_SWITCH_ENUM, pos,
-			         "'%N' not handled in switch", entry);
+			         "%N not handled in switch", entry);
 		}
 	}
 }
@@ -10130,7 +10130,7 @@ static statement_t *parse_local_label_declaration(void)
 		if (symbol != sym_anonymous) {
 			entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 			if (entity != NULL && entity->base.parent_scope == current_scope) {
-				errorf(&pos, "multiple definitions of '%N'", entity);
+				errorf(&pos, "multiple definitions of %N", entity);
 				note_prev_decl(entity);
 			} else {
 				entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, &pos);
@@ -10964,7 +10964,7 @@ static void resolve_aliases(void)
 		/* resolve alias if possible and mark the aliased entity as used */
 		entity_t *def = get_entity(symbol, NAMESPACE_NORMAL);
 		if (def == NULL) {
-			errorf(&entity->base.pos, "'%N' aliased to unknown entity '%Y'",
+			errorf(&entity->base.pos, "%N aliased to unknown entity '%Y'",
 			       entity, symbol);
 		} else {
 			def->declaration.used = true;

@@ -194,7 +194,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 		break;
 
 	default:
-		warningf(WARN_OTHER, &attribute->pos, "alignment attribute specification on '%N' ignored", entity);
+		warningf(WARN_OTHER, &attribute->pos, "alignment attribute specification on %N ignored", entity);
 		break;
 	}
 }
@@ -236,7 +236,7 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 		break;
 
 	default:
-		warningf(WARN_OTHER, &attribute->pos, "visibility attribute specification on '%N' ignored", entity);
+		warningf(WARN_OTHER, &attribute->pos, "visibility attribute specification on %N ignored", entity);
 		break;
 	}
 }
@@ -272,7 +272,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 		entity->declaration.modifiers |= DM_PACKED;
 	} else {
 		position_t const *const pos  = &attribute->pos;
-		warningf(WARN_OTHER, pos, "packed attribute on entity '%N' ignored",
+		warningf(WARN_OTHER, pos, "packed attribute on entity %N ignored",
 		         entity);
 		return;
 	}
@@ -321,7 +321,7 @@ static void handle_attribute_alias(const attribute_t *attribute,
 		entity->function.alias.symbol = symbol;
 		break;
 	default:
-		warningf(WARN_OTHER, &attribute->pos, "alias attribute on '%N' ignored",
+		warningf(WARN_OTHER, &attribute->pos, "alias attribute on %N ignored",
 		         entity);
 		return;
 	}
@@ -329,7 +329,7 @@ static void handle_attribute_alias(const attribute_t *attribute,
 	if (decl->storage_class == STORAGE_CLASS_EXTERN) {
 		/* code generator will ignore the extern declaration */
 		warningf(WARN_OTHER, &entity->base.pos,
-				 "extern storage class ignored for alias '%N'", entity);
+				 "extern storage class ignored for alias %N", entity);
 	}
 
 	ARR_APP1(entity_t*, alias_entities, entity);
