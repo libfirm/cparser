@@ -130,6 +130,8 @@ void jit_compile_execute_main(void)
 
 #else
 
+#include "adt/panic.h"
+
 /* We don't know how to allocate executable ememory on this system */
 void jit_compile_execute_main(void)
 {
