@@ -292,9 +292,14 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		ppdefc("linux",     "1", cond_not_strict);
 		if (strstr(os, "gnu") != NULL)
 			ppdef("__gnu_linux__", "1");
+	} else if (strstart(os, "freebsd")) {
+		ppdef( "__FreeBSD__", "");
+		goto bsd;
 	} else if (strstr(os, "bsd") != NULL) {
+bsd:
 		init_generic_elf();
 		init_unix();
+		set_be_option("ia32-struct_in_reg=yes");
 	} else if (streq(os, "elf") || streq(os, "octopos") || streq(os, "irtss")) {
 		init_generic_elf();
 	} else if (strstart(os, "darwin")) {
@@ -510,6 +515,8 @@ static machine_triple_t *get_host_machine_triple(void)
 	machine->operating_system = xstrdup("win32");
 #elif defined(__APPLE__)
 	machine->operating_system = xstrdup("darwin");
+#elif defined(__FreeBSD__)
+	machine->operating_system = xstrdup("freebsd");
 #elif defined(__gnu_linux__)
 	machine->operating_system = xstrdup("linux-gnu");
 #elif defined(__linux__)
