@@ -490,44 +490,51 @@ static machine_triple_t *get_host_machine_triple(void)
 	 * defines (look into predefs.c for inspiration) */
 	machine_triple_t *machine = XMALLOC(machine_triple_t);
 
+	machine->cpu_type = xstrdup(
 #if defined(__x86_64__)
-	machine->cpu_type = xstrdup("x86_64");
+		"x86_64"
 #elif defined(__i686__)
-	machine->cpu_type = xstrdup("i686");
+		"i686"
 #elif defined(__i386__)
-	machine->cpu_type = xstrdup("i386");
+		"i386"
 #elif defined(__sparc__)
-	machine->cpu_type = xstrdup("sparc");
+		"sparc"
 #elif defined(__arm__)
-	machine->cpu_type = xstrdup("arm");
+		"arm"
 #else
 	/* Choose a widely used cpu_type; "unknown" would not be useful here. */
-	machine->cpu_type = xstrdup("i386");
+		"i386"
 #endif
+	);
 
+	machine->manufacturer = xstrdup(
 #if defined(__leon__)
-	machine->manufacturer = xstrdup("leon");
+		"leon"
 #else
-	machine->manufacturer = xstrdup("unknown");
+		"unknown"
 #endif
+	);
 
+	machine->operating_system = xstrdup(
 #if defined(_WIN32) || defined(__CYGWIN__)
-	machine->operating_system = xstrdup("win32");
+		"win32"
 #elif defined(__APPLE__)
-	machine->operating_system = xstrdup("darwin");
+		"darwin"
 #elif defined(__FreeBSD__)
-	machine->operating_system = xstrdup("freebsd");
+		"freebsd"
 #elif defined(__gnu_linux__)
-	machine->operating_system = xstrdup("linux-gnu");
+		"linux-gnu"
 #elif defined(__linux__)
-	machine->operating_system = xstrdup("linux");
+		"linux"
 #elif defined(__midipix__)
-	machine->operating_system = xstrdup("midipix");
+		"midipix"
 #elif defined(__ELF__)
-	machine->operating_system = xstrdup("elf");
+		"elf"
 #else
-	machine->operating_system = xstrdup("unknown");
+		"unknown"
 #endif
+	);
+
 	return machine;
 #endif
 }
