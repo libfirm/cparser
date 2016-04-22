@@ -40,6 +40,7 @@ void print_warning_opt_help(void);
 	M(WARN_FATAL_ERRORS,                  OFF, "fatal-errors",                  "First error stops the compilation") \
 	M(WARN_FLOAT_EQUAL,                   OFF, "float-equal",                   "Warn if floating point values are used in equality comparisons") \
 	M(WARN_FORMAT,                        ON,  "format",                        "Check printf-style format strings") \
+	M(WARN_GNU_EXTENSION,                 ON,  "disabled-gnu-extension-usage",  "Warn when a gnu extension is used while gnu modes are not used") \
 	M(WARN_IGNORED_QUALIFIERS,            ON,  "ignored-qualifiers",            "Warn when type qualifiers are meaningless") \
 	M(WARN_IMPLICIT_FUNCTION_DECLARATION, ON,  "implicit-function-declaration", "Warn whenever a function is used before being declared") \
 	M(WARN_IMPLICIT_INT,                  ON,  "implicit-int",                  "Warn when a declaration does not specify a type") \
