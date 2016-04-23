@@ -3531,8 +3531,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 							errorf(&size_expression->base.pos, "size of array must be greater than zero");
 						} else if (size == 0 && !GNU_MODE) {
 							warningf(WARN_GNU_EXTENSION, &size_expression->base.pos,
-								"size of array must be greater than zero \
-								(zero length arrays are a GCC extension)");
+								"size of array must be greater than zero (zero length arrays are a GCC extension)");
 						}
 					} else {
 						errorf(&size_expression->base.pos, "array is too large");
@@ -5213,8 +5212,15 @@ static void parse_external_declaration(void)
 
 	position_t const *const pos = &ndeclaration->base.pos;
 	if (current_scope != file_scope) {
-		warningf(GNU_MODE? WARN_PEDANTIC: WARN_GNU_EXTENSION, pos,
-			"nested function %N is a GCC extension", ndeclaration);
+		bool printed_warning = false;
+		if (!GNU_MODE) {
+			printed_warning = warningf(WARN_GNU_EXTENSION, pos,
+				"nested function %N is a GCC extension", ndeclaration);
+		}
+		if (!printed_warning) {
+			warningf(WARN_PEDANTIC, pos,
+				"nested function %N is a GCC extension", ndeclaration);
+		}
 	}
 
 	if (is_typeref(orig_type))
