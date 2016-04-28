@@ -166,9 +166,19 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 	} else if (types_compatible_ignore_qualifiers(arg_skip, spec_skip)) {
 		return;
 	} else switch (arg->kind) {
+		type_t *unprom_type;
+	case EXPR_SELECT:
+		if (arg_skip == type_int) {
+			assert(arg->select.compound_entry->kind == ENTITY_COMPOUND_MEMBER);
+			unprom_type = skip_typeref(arg->select.compound_entry->compound_member.base.type);
+			goto check_type;
+		}
+		break;
+
 	case EXPR_UNARY_CAST:
 		if (arg->base.implicit) {
-			type_t *const unprom_type = skip_typeref(arg->unary.value->base.type);
+			unprom_type = skip_typeref(arg->unary.value->base.type);
+check_type:
 			if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
 				return;
 			if (spec_skip == type_unsigned_int && !is_type_signed(unprom_type))
