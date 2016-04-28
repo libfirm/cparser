@@ -165,19 +165,29 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 		}
 	} else if (types_compatible_ignore_qualifiers(arg_skip, spec_skip)) {
 		return;
-	} else if (arg->kind == EXPR_UNARY_CAST && arg->base.implicit) {
-		expression_t const *const expr        = arg->unary.value;
-		type_t             *const unprom_type = skip_typeref(expr->base.type);
-		if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
-			return;
-		if (spec_skip == type_unsigned_int && !is_type_signed(unprom_type))
-			return;
-	} else if (arg->kind == EXPR_LITERAL_CHARACTER) {
+	} else switch (arg->kind) {
+	case EXPR_UNARY_CAST:
+		if (arg->base.implicit) {
+			type_t *const unprom_type = skip_typeref(arg->unary.value->base.type);
+			if (types_compatible_ignore_qualifiers(unprom_type, spec_skip))
+				return;
+			if (spec_skip == type_unsigned_int && !is_type_signed(unprom_type))
+				return;
+		}
+		break;
+
+	case EXPR_LITERAL_CHARACTER:
 		if (spec_skip == type_char && arg->string_literal.value->size == 1)
 			return;
-	} else if (arg->kind == EXPR_ENUM_CONSTANT) {
+		break;
+
+	case EXPR_ENUM_CONSTANT:
 		if (spec_skip->kind == TYPE_ENUM && spec_skip->enumt.enume == arg->reference.entity->enum_value.enume)
 			return;
+		break;
+
+	default:
+		break;
 	}
 	if (!is_type_valid(arg_skip) || !is_type_valid(spec_skip))
 		return;
