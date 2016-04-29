@@ -3749,8 +3749,12 @@ static void create_dynamic_initializer_sub(dbg_info *dbgi,
 	case IR_INITIALIZER_NULL:
 		if (is_compound_type(type))
 			goto compound_init;
-		if (is_Array_type(type))
+		if (is_Array_type(type)) {
+			/* Ignore flexible array members for initialization. */
+			if (!has_array_size(type))
+				return;
 			goto array_init;
+		}
 		ir_mode *mode = get_type_mode(type);
 		ir_node *node = new_d_Const(dbgi, get_mode_null(mode));
 		goto store;
