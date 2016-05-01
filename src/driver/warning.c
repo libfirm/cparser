@@ -43,6 +43,15 @@ void print_warning_opt_help(void)
 
 #define SET(y) (void)(warning[y].state = (warning[y].state & ~off) | on)
 
+static void warn_parentheses(warn_state_t const on, warn_state_t const off)
+{
+	SET(WARN_PARENTHESES_ASSIGNMENT);
+	SET(WARN_PARENTHESES_COMPARISON);
+	SET(WARN_PARENTHESES_ELSE);
+	SET(WARN_PARENTHESES_LOGICAL);
+	SET(WARN_PARENTHESES_SHIFT);
+}
+
 static void warn_unused(warn_state_t const on, warn_state_t const off)
 {
 	SET(WARN_UNUSED_FUNCTION);
@@ -101,7 +110,6 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_MISSING_VARIABLE_DECLARATIONS);
 		SET(WARN_NONNULL);
 		SET(WARN_OTHER);
-		SET(WARN_PARENTHESES);
 		SET(WARN_POINTER_ARITH);
 		SET(WARN_REDUNDANT_DECLS);
 		SET(WARN_RETURN_TYPE);
@@ -112,6 +120,7 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_UNINITIALIZED);
 		SET(WARN_UNKNOWN_PRAGMAS);
 		SET(WARN_UNREACHABLE_CODE);
+		warn_parentheses(on, off);
 		warn_unused(on, off);
 	}
 	OPTX("comments") {
@@ -132,6 +141,9 @@ extra:
 	OPTX("implicit") {
 		SET(WARN_IMPLICIT_FUNCTION_DECLARATION);
 		SET(WARN_IMPLICIT_INT);
+	}
+	OPTX("parentheses") {
+		warn_parentheses(on, off);
 	}
 	OPTX("unused") {
 		warn_unused(on, off);

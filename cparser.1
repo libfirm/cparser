@@ -170,7 +170,11 @@ In particular these are
 .Fl Winit-self ,
 .Fl Wmain ,
 .Fl Wnonnull ,
-.Fl Wparentheses ,
+.Fl Wparentheses-assignment ,
+.Fl Wparentheses-comparison ,
+.Fl Wparentheses-else ,
+.Fl Wparentheses-logical ,
+.Fl Wparentheses-shift ,
 .Fl Wpointer-arith ,
 .Fl Wredundant-decls ,
 .Fl Wreturn-type ,
@@ -246,12 +250,23 @@ Warn if an
 .Sq extern
 declaration is encountered within a function.
 .It Fl Wparentheses
-Warn if parentheses are omitted in certain contexts.
+Warn if parentheses or braces are omitted in certain contexts.
+.No Activate Fl Wparentheses-assignment , Wparentheses-comparison , Wparentheses-else , Wparentheses-logical , Wparentheses-shift .
+.It Fl Wparentheses-assignment
 .No Warn if an assignment is used as condition, e.g. Sq if\ (x\ =\ 23) .
-.No Warn if So && Sc without parentheses is used within So || Sc , e.g. Sq if\ (x\ ||\ y\ &&\ z) .
-.No Warn if it there may be confusion which So if Sc Ns -statement an So else Sc Ns -branch belongs to, e.g. Sq if\ (x)\ if\ (y)\ {}\ else\ {} .
+Default is off.
+.It Fl Wparentheses-comparison
 .No Warn if cascaded comparisons appear which do not have their mathematical meaning, e.g. Sq if\ (23\ <=\ x\ <\ 42) .
+Default is off.
+.It Fl Wparentheses-else
+.No Warn if it there may be confusion which So if Sc Ns -statement an So else Sc Ns -branch belongs to, e.g. Sq if\ (x)\ if\ (y)\ {}\ else\ {} .
+Default is off.
+.It Fl Wparentheses-logical
+.No Warn if So && Sc without parentheses is used within So || Sc , e.g. Sq if\ (x\ ||\ y\ &&\ z) .
+Default is off.
+.It Fl Wparentheses-shift
 .No Warn if So + Sc or So - Sc is used as operand of So << Sc or So >> Sc , Sq e.g. x\ +\ y\ <<\ z .
+Default is off.
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
 .It Fl Wreturn-local-addr

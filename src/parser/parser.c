@@ -7403,7 +7403,7 @@ static void warn_assignment_in_condition(const expression_t *const expr)
 	if (expr->base.parenthesized)
 		return;
 	position_t const *const pos = &expr->base.pos;
-	warningf(WARN_PARENTHESES, pos,
+	warningf(WARN_PARENTHESES_ASSIGNMENT, pos,
 	         "suggest parentheses around assignment used as truth value");
 }
 
@@ -8080,7 +8080,7 @@ static void warn_addsub_in_shift(const expression_t *const expr)
 	}
 
 	position_t const *const pos = &expr->base.pos;
-	warningf(WARN_PARENTHESES, pos,
+	warningf(WARN_PARENTHESES_SHIFT, pos,
 	         "suggest parentheses around '%c' inside shift", op);
 }
 
@@ -8313,7 +8313,7 @@ static void warn_comparison(position_t const *const pos,
 		case EXPR_BINARY_GREATEREQUAL:
 		case EXPR_BINARY_NOTEQUAL:
 		case EXPR_BINARY_EQUAL:
-			warningf(WARN_PARENTHESES, pos,
+			warningf(WARN_PARENTHESES_COMPARISON, pos,
 			         "comparisons like 'x <= y < z' do not have their mathematical meaning");
 			break;
 		default:
@@ -8581,7 +8581,7 @@ static void warn_logical_and_within_or(const expression_t *const expr)
 	if (expr->base.parenthesized)
 		return;
 	position_t const *const pos = &expr->base.pos;
-	warningf(WARN_PARENTHESES, pos, "suggest parentheses around && within ||");
+	warningf(WARN_PARENTHESES_LOGICAL, pos, "suggest parentheses around && within ||");
 }
 
 /**
@@ -9651,7 +9651,7 @@ static statement_t *parse_if(void)
 	} else if (true_stmt->kind == STATEMENT_IF
 	        && true_stmt->ifs.false_statement != NULL) {
 		position_t const *const pos = &true_stmt->base.pos;
-		warningf(WARN_PARENTHESES, pos,
+		warningf(WARN_PARENTHESES_ELSE, pos,
 		         "suggest explicit braces to avoid ambiguous 'else'");
 	}
 

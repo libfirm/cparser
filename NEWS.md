@@ -14,6 +14,7 @@ cparser 1.22.1 (2016-01-23)
 * Make it an error to have a computed goto in a function without address-taken label
 * Add option `-Wdeclaration-after-label`
 * Add option `-Wlabel-at-end-of-block`
+* Split `-Wparentheses` into `Wparentheses-assignment`, `Wparentheses-comparison`, `Wparentheses-else`, `Wparentheses-logical` and `Wparentheses-shift`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)

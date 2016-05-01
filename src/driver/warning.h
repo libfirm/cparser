@@ -59,7 +59,11 @@ void print_warning_opt_help(void);
 	M(WARN_OTHER,                         ON,  "other",                         "Warnings not covered by any other option") \
 	M(WARN_PACKED,                        OFF, "packed",                        "Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure") \
 	M(WARN_PADDED,                        OFF, "padded",                        "Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure") \
-	M(WARN_PARENTHESES,                   OFF, "parentheses",                   "Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces)") \
+	M(WARN_PARENTHESES_ASSIGNMENT,        OFF, "parentheses-assignment",        "Warn if parentheses are omitted around an assignment where truth value is expected") \
+	M(WARN_PARENTHESES_COMPARISON,        OFF, "parentheses-comparison",        "Warn if parentheses are omitted around a comparison as operand of another comparison") \
+	M(WARN_PARENTHESES_ELSE,              OFF, "parentheses-else",              "Warn if braces are omitted around an 'if-else' as consequence of an 'if'") \
+	M(WARN_PARENTHESES_LOGICAL,           OFF, "parentheses-logical",           "Warn if parentheses are omitted around an && as operand of an ||") \
+	M(WARN_PARENTHESES_SHIFT,             OFF, "parentheses-shift",             "Warn if parentheses are omitted around an additive operation as operand to a shift") \
 	M(WARN_PEDANTIC,                      OFF, "pedantic",                      "Warn for cases where the c standard isn't stricly followed (but where we can easily continue)") \
 	M(WARN_POINTER_ARITH,                 ON,  "pointer-arith",                 "Warn about anything that depends on the 'size of' a function type or of 'void'") \
 	M(WARN_POINTER_SIGN,                  ON,  "pointer-sign",                  "gcc silently allows casting int* to unsigned* if this is off") \
