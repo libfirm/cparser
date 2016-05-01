@@ -861,8 +861,6 @@ finish:;
 	entity = new_global_entity(global_type, id, type,
 	                           ir_visibility_private,
 	                           IR_LINKAGE_CONSTANT | IR_LINKAGE_NO_IDENTITY);
-	set_entity_visibility( entity, ir_visibility_private);
-	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT|IR_LINKAGE_NO_IDENTITY);
 	set_entity_initializer(entity, initializer);
 
 	value->entity = entity;
@@ -4918,8 +4916,6 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ident     *debug_name = id_unique(unique_template);
 	set_entity_ident(ptr, debug_name);
 
-	set_entity_visibility(ptr, ir_visibility_private);
-	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
 	set_atomic_ent_value(ptr, val);
 }
 
