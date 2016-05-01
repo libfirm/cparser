@@ -41,6 +41,17 @@ void print_warning_opt_help(void)
 	}
 }
 
+#define SET(y) (void)(warning[y].state = (warning[y].state & ~off) | on)
+
+static void warn_unused(warn_state_t const on, warn_state_t const off)
+{
+	SET(WARN_UNUSED_FUNCTION);
+	SET(WARN_UNUSED_LABEL);
+	SET(WARN_UNUSED_PARAMETER);
+	SET(WARN_UNUSED_VALUE);
+	SET(WARN_UNUSED_VARIABLE);
+}
+
 void set_warning_opt(const char *const opt)
 {
 	/* Process prefixes: -W[no-][error=] */
@@ -74,7 +85,6 @@ void set_warning_opt(const char *const opt)
 		goto extra;
 	}
 #define OPTX(x)   else if (streq(s, x))
-#define SET(y)    (void)(warning[y].state = (warning[y].state & ~off) | on)
 	OPTX("all") {
 		/* Note: this switched on a lot more warnings than gcc's -Wall */
 		SET(WARN_ADDRESS);
@@ -102,11 +112,7 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_UNINITIALIZED);
 		SET(WARN_UNKNOWN_PRAGMAS);
 		SET(WARN_UNREACHABLE_CODE);
-		SET(WARN_UNUSED_FUNCTION);
-		SET(WARN_UNUSED_LABEL);
-		SET(WARN_UNUSED_PARAMETER);
-		SET(WARN_UNUSED_VALUE);
-		SET(WARN_UNUSED_VARIABLE);
+		warn_unused(on, off);
 	}
 	OPTX("comments") {
 		SET(WARN_COMMENT);
@@ -128,11 +134,7 @@ extra:
 		SET(WARN_IMPLICIT_INT);
 	}
 	OPTX("unused") {
-		SET(WARN_UNUSED_FUNCTION);
-		SET(WARN_UNUSED_LABEL);
-		SET(WARN_UNUSED_PARAMETER);
-		SET(WARN_UNUSED_VALUE);
-		SET(WARN_UNUSED_VARIABLE);
+		warn_unused(on, off);
 	}
 #undef SET
 #undef OPT_X
