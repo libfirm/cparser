@@ -10,8 +10,9 @@ LIBFIRM_FILE  ?= $(FIRM_HOME)/$(LIBFIRM_FILE_BASE)
 LIBFIRM_FILE_DLL_BASE ?= build/$(variant)/libfirm$(DLLEXT)
 LIBFIRM_FILE_DLL ?= $(FIRM_HOME)/$(LIBFIRM_FILE_DLL_BASE)
 else
-FIRM_CPPFLAGS ?= `pkg-config --cflags libfirm`
-FIRM_LIBS     ?= `pkg-config --libs libfirm`
+PKG_CONFIG    ?= pkg-config
+FIRM_CPPFLAGS ?= $(shell $(PKG_CONFIG) --cflags libfirm)
+FIRM_LIBS     ?= $(shell $(PKG_CONFIG) --libs   libfirm)
 LIBFIRM_FILE =
 LIBFIRM_FILE_DLL =
 endif
