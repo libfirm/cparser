@@ -6406,6 +6406,39 @@ static expression_t *parse_offsetof(void)
 	return expression;
 }
 
+static void parse_intrinsic_call(expression_t **const args, unsigned const n)
+{
+	position_t        const pos = *HERE;
+	symbol_t   const *const ctx = token.base.symbol;
+	next_token();
+
+	unsigned i = 0;
+	add_anchor_token(')');
+	add_anchor_token(',');
+	expect('(');
+	if (!peek(')')) {
+		do {
+			expression_t *const expr = parse_assignment_expression();
+			if (i < n)
+				args[i] = expr;
+			++i;
+		} while (accept(','));
+	}
+	rem_anchor_token(',');
+	rem_anchor_token(')');
+	expect(')');
+
+	if (i != n) {
+		errorf(&pos, "wrong number of arguments for '%Y', expected %u, got %u", ctx, n, i);
+		if (i < n) {
+			expression_t *const err = create_error_expression();
+			do {
+				args[i++] = err;
+			} while (i != n);
+		}
+	}
+}
+
 static bool is_last_parameter(expression_t *const param)
 {
 	if (param->kind == EXPR_REFERENCE) {
@@ -6435,26 +6468,18 @@ static expression_t *parse_va_start(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_VA_START);
 
-	eat(T___builtin_va_start);
-
-	add_anchor_token(')');
-	add_anchor_token(',');
-	expect('(');
-	expression->va_starte.ap = parse_assignment_expression();
-	rem_anchor_token(',');
-	expect(',');
-	expression_t *const param = parse_assignment_expression();
-	expression->va_starte.parameter = param;
-	rem_anchor_token(')');
-	expect(')');
+	expression_t *args[2];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
+	expression->va_starte.ap        = args[0];
+	expression->va_starte.parameter = args[1];
 
 	if (!current_function) {
 		errorf(&expression->base.pos, "'va_start' used outside of function");
 	} else if (!current_function->base.type->function.variadic) {
 		errorf(&expression->base.pos,
 		       "'va_start' used in non-variadic function");
-	} else if (!is_last_parameter(param)) {
-		errorf(&param->base.pos,
+	} else if (!is_last_parameter(args[1])) {
+		errorf(&args[1]->base.pos,
 		       "second argument of 'va_start' must be last parameter of the current function");
 	} else {
 		check_vararg_support(expression);
@@ -6497,26 +6522,18 @@ static expression_t *parse_va_copy(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_VA_COPY);
 
-	eat(T___builtin_va_copy);
+	expression_t *args[2];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
 
-	add_anchor_token(')');
-	add_anchor_token(',');
-	expect('(');
-	expression_t *dst = parse_assignment_expression();
+	expression_t *const dst = args[0];
 	assign_error_t error = semantic_assign(type_valist_arg, dst);
 	report_assign_error(error, type_valist, dst, "call argument 1",
 	                    &dst->base.pos);
 	expression->va_copye.dst = dst;
 
-	rem_anchor_token(',');
-	expect(',');
-
-	call_argument_t src;
-	src.expression = parse_assignment_expression();
+	call_argument_t src = { .expression = args[1] };
 	check_call_argument(type_valist_arg, &src, 2);
 	expression->va_copye.src = src.expression;
-	rem_anchor_token(')');
-	expect(')');
 
 	check_vararg_support(expression);
 	return expression;
@@ -6527,17 +6544,11 @@ static expression_t *parse_va_copy(void)
  */
 static expression_t *parse_builtin_constant(void)
 {
-	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
-
-	eat(T___builtin_constant_p);
-
-	add_anchor_token(')');
-	expect('(');
-	expression->builtin_constant.value = parse_expression();
-	rem_anchor_token(')');
-	expect(')');
-	expression->base.type = type_int;
-
+	expression_t *const expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
+	expression_t       *args[1];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
+	expression->builtin_constant.value = args[0];
+	expression->base.type              = type_int;
 	return expression;
 }
 
@@ -6571,23 +6582,15 @@ static expression_t *parse_builtin_types_compatible(void)
 static expression_t *parse_compare_builtin(expression_kind_t const kind)
 {
 	expression_t *const expression = allocate_expression_zero(kind);
-	next_token();
+	expression_t       *args[2];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
+	expression->binary.left  = args[0];
+	expression->binary.right = args[1];
 
-	add_anchor_token(')');
-	add_anchor_token(',');
-	expect('(');
-	expression->binary.left = parse_assignment_expression();
-	rem_anchor_token(',');
-	expect(',');
-	expression->binary.right = parse_assignment_expression();
-	rem_anchor_token(')');
-	expect(')');
-
-	type_t *const orig_type_left  = expression->binary.left->base.type;
-	type_t *const orig_type_right = expression->binary.right->base.type;
-
-	type_t *const type_left  = skip_typeref(orig_type_left);
-	type_t *const type_right = skip_typeref(orig_type_right);
+	type_t *const orig_type_left  = args[0]->base.type;
+	type_t *const orig_type_right = args[1]->base.type;
+	type_t *const type_left       = skip_typeref(orig_type_left);
+	type_t *const type_right      = skip_typeref(orig_type_right);
 	if (!is_type_float(type_left) && !is_type_float(type_right)) {
 		if (is_type_valid(type_left) && is_type_valid(type_right))
 			type_error_incompatible("invalid operands in comparison",
@@ -6605,17 +6608,11 @@ static expression_t *parse_compare_builtin(expression_kind_t const kind)
  */
 static expression_t *parse_assume(void)
 {
-	expression_t *expression = allocate_expression_zero(EXPR_UNARY_ASSUME);
-
-	eat(T__assume);
-
-	add_anchor_token(')');
-	expect('(');
-	expression->unary.value = parse_expression();
-	rem_anchor_token(')');
-	expect(')');
-
-	expression->base.type = type_void;
+	expression_t *const expression = allocate_expression_zero(EXPR_UNARY_ASSUME);
+	expression_t       *args[1];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
+	expression->unary.value = args[0];
+	expression->base.type   = type_void;
 	return expression;
 }
 
@@ -7554,18 +7551,11 @@ static expression_t *parse_extension(void)
  */
 static expression_t *parse_builtin_classify_type(void)
 {
-	expression_t *result = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
-	result->base.type    = type_int;
-
-	eat(T___builtin_classify_type);
-
-	add_anchor_token(')');
-	expect('(');
-	expression_t *expression = parse_expression();
-	rem_anchor_token(')');
-	expect(')');
-	result->classify_type.type_expression = expression;
-
+	expression_t *const result = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
+	expression_t       *args[1];
+	parse_intrinsic_call(args, ARRAY_SIZE(args));
+	result->classify_type.type_expression = args[0];
+	result->base.type                     = type_int;
 	return result;
 }
 
