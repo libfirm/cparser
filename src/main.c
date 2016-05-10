@@ -84,7 +84,7 @@ static bool parse_ignore_errors(compilation_env_t *env,
 static void set_mode_gcc_prec(compile_mode_t new_mode, const char *arg)
 {
 	/* in gcc the compilation modes appear to have a precedence */
-	if (new_mode < mode) {
+	if (mode >= new_mode) {
 		mode = new_mode;
 	} else {
 		warningf(WARN_UNUSED_OPTION, NULL,
