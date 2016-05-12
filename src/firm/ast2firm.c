@@ -375,9 +375,9 @@ static ir_type *create_compound_type(type_t *const type)
 		id = new_id_from_str(type_symbol->string);
 	} else {
 		if (is_union) {
-			id = id_unique("__anonymous_union.%u");
+			id = id_unique("__anonymous_union");
 		} else {
-			id = id_unique("__anonymous_struct.%u");
+			id = id_unique("__anonymous_struct");
 		}
 	}
 
@@ -404,7 +404,7 @@ static ir_type *create_compound_type(type_t *const type)
 			if (entry->compound_member.bitfield)
 				continue;
 			assert(is_type_compound(entry_type));
-			member_id = id_unique("anon.%u");
+			member_id = id_unique("anon");
 		} else {
 			member_id = new_id_from_str(symbol->string);
 		}
@@ -832,7 +832,7 @@ init_wide:
 finish:;
 	ir_type *const type        = new_type_array(elem_type, slen);
 	ir_type *const global_type = get_glob_type();
-	ident   *const id          = id_unique("str.%u");
+	ident   *const id          = id_unique("str");
 	entity = new_global_entity(global_type, id, type,
 	                           ir_visibility_private,
 	                           IR_LINKAGE_CONSTANT | IR_LINKAGE_NO_IDENTITY);
@@ -1958,7 +1958,7 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
 	POP_IRG();
 
-	ident     *const id          = id_unique("initializer.%u");
+	ident     *const id          = id_unique("initializer");
 	type_t    *const skipped     = skip_typeref(type);
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
@@ -1993,7 +1993,7 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 		return new_d_Address(dbgi, entity);
 	} else {
 		/* create an entity on the stack */
-		ident   *const id     = id_unique("CompLit.%u");
+		ident   *const id     = id_unique("CompLit");
 		ir_type *const irtype = get_ir_type(type);
 		ir_type *frame_type   = get_irg_frame_type(current_ir_graph);
 
@@ -2619,7 +2619,7 @@ static ir_node *complex_to_memory(dbg_info *dbgi, type_t *type,
 {
 	ir_graph  *const irg         = current_ir_graph;
 	ir_type   *const frame_type  = get_irg_frame_type(irg);
-	ident     *const id          = id_unique("cmplex_tmp.%u");
+	ident     *const id          = id_unique("cmplex_tmp");
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_entity *const tmp_storage = new_entity(frame_type, id, irtype);
 	ir_node   *const frame       = get_irg_frame(irg);
@@ -4053,10 +4053,7 @@ static void create_local_static_variable(entity_t *entity)
 	dbg_info *const dbgi     = get_dbg_info(&entity->base.pos);
 	ir_type  *const var_type = get_glob_var_type(entity);
 
-	size_t l = strlen(entity->base.symbol->string);
-	char   buf[l + sizeof(".%u")];
-	snprintf(buf, sizeof(buf), "%s.%%u", entity->base.symbol->string);
-	ident     *const id       = id_unique(buf);
+	ident     *const id       = id_unique(entity->base.symbol->string);
 	ir_entity *const irentity = new_global_entity(var_type, id, irtype,
 	                                              ir_visibility_local,
 	                                              IR_LINKAGE_DEFAULT);
@@ -4872,7 +4869,7 @@ static void initialize_function_parameters(function_t *const function)
 }
 
 static void add_function_pointer(ir_type *segment, ir_entity *method,
-                                 const char *unique_template)
+                                 const char *tag)
 {
 	ir_type   *method_type  = get_entity_type(method);
 	ir_type   *ptr_type     = new_type_pointer(method_type);
@@ -4888,7 +4885,7 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ir_graph  *irg = get_const_code_irg();
 	ir_node   *val = new_r_Address(irg, method);
 
-	ident     *debug_name = id_unique(unique_template);
+	ident     *debug_name = id_unique(tag);
 	set_entity_ident(ptr, debug_name);
 
 	set_atomic_ent_value(ptr, val);
@@ -4905,11 +4902,11 @@ static void create_function(function_t *const function)
 	ir_entity *const function_entity = get_function_entity(function);
 	if (function->base.modifiers & DM_CONSTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_CONSTRUCTORS);
-		add_function_pointer(segment, function_entity, "constructor_ptr.%u");
+		add_function_pointer(segment, function_entity, "constructor_ptr");
 	}
 	if (function->base.modifiers & DM_DESTRUCTOR) {
 		ir_type *segment = get_segment_type(IR_SEGMENT_DESTRUCTORS);
-		add_function_pointer(segment, function_entity, "destructor_ptr.%u");
+		add_function_pointer(segment, function_entity, "destructor_ptr");
 	}
 
 	current_function_entity = function;
