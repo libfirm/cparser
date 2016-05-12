@@ -233,7 +233,7 @@ static type_t *get_parameter_type(type_t *orig_type)
 {
 	type_t *type = skip_typeref(orig_type);
 	if (is_type_union(type)
-			&& get_type_modifiers(orig_type) & DM_TRANSPARENT_UNION) {
+	    && get_type_modifiers(orig_type) & DM_TRANSPARENT_UNION) {
 		compound_t *compound = type->compound.compound;
 		type                 = compound->members.first_entity->declaration.type;
 	}
@@ -1459,7 +1459,7 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 
 		entity_t *entity = ref->entity;
 		assert(entity->kind == ENTITY_VARIABLE
-				|| entity->kind == ENTITY_PARAMETER);
+		       || entity->kind == ENTITY_PARAMETER);
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
 		int value_number;
 		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
@@ -1767,7 +1767,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
 			ir_node *const no_mem    = new_NoMem();
 			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size,
-												   mode, op_pin_state_floats);
+			                                       mode, op_pin_state_floats);
 			return new_d_Proj(dbgi, divn, mode, pn_Div_res);
 		}
 		/* fallthrough */
@@ -1962,8 +1962,8 @@ static ir_node *array_access_to_firm(
 {
 	dbg_info *dbgi   = get_dbg_info(&expression->base.pos);
 	ir_node  *addr   = array_access_addr(expression);
-	type_t   *type   = revert_automatic_type_conversion(
-			(const expression_t*) expression);
+	type_t   *type   = revert_automatic_type_conversion((const expression_t*)
+	                                                    expression);
 	type             = skip_typeref(type);
 
 	return deref_address(dbgi, type, addr);
@@ -1987,11 +1987,11 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	type_t    *const skipped     = skip_typeref(type);
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
-	ir_linkage linkage = (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
-		? IR_LINKAGE_CONSTANT : IR_LINKAGE_DEFAULT;
+	ir_linkage       linkage     = (skipped->base.qualifiers & TYPE_QUALIFIER_CONST)
+	                               ? IR_LINKAGE_CONSTANT : IR_LINKAGE_DEFAULT;
 	ir_entity *const entity      = new_global_entity(global_type, id, irtype,
-													 ir_visibility_private,
-													 linkage);
+	                                                 ir_visibility_private,
+	                                                 linkage);
 
 	set_entity_dbg_info(entity, dbgi);
 	set_entity_initializer(entity, irinitializer);
@@ -2072,7 +2072,7 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	type_t *const type = skip_typeref(expression->type);
 	/* §6.5.3.4:2 if the type is a VLA, evaluate the expression. */
 	if (is_type_array(type) && type->array.is_vla
-			&& expression->tp_expression != NULL) {
+	    && expression->tp_expression != NULL) {
 		expression_to_value(expression->tp_expression);
 	}
 
@@ -2156,8 +2156,8 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	ir_node  *addr = select_addr(expression);
-	type_t   *type = revert_automatic_type_conversion(
-			(const expression_t*) expression);
+	type_t   *type = revert_automatic_type_conversion((const expression_t*)
+	                                                  expression);
 	type           = skip_typeref(type);
 
 	entity_t *entry = expression->compound_entry;
@@ -3455,7 +3455,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			if (type->kind == TYPE_COMPOUND_UNION) {
 				ir_initializer_t *initializer = top->initializer;
 				if (initializer != NULL
-					&& get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
+				    && get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
 					/* are we writing to a new element? */
 					ir_initializer_t *oldi
 						= get_initializer_compound_value(initializer, index_int);
@@ -3927,7 +3927,7 @@ static void create_variable_initializer(entity_t *entity)
 				assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 				ir_entity *irentity = entity->variable.v.entity;
 				if (tq & TYPE_QUALIFIER_CONST
-						&& get_entity_owner(irentity) != get_tls_type()) {
+				    && get_entity_owner(irentity) != get_tls_type()) {
 					add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 				}
 				ir_initializer_t *complex_init = create_initializer_compound(2);
@@ -3958,7 +3958,7 @@ static void create_variable_initializer(entity_t *entity)
 			ir_entity *irentity = entity->variable.v.entity;
 
 			if (tq & TYPE_QUALIFIER_CONST
-					&& get_entity_owner(irentity) != get_tls_type()) {
+			    && get_entity_owner(irentity) != get_tls_type()) {
 				add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 			}
 			set_atomic_ent_value(irentity, node);
@@ -4679,7 +4679,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		}
 	}
 	assert(obstack_object_size(&asm_obst)
-			== out_size * sizeof(ir_asm_constraint));
+	       == out_size * sizeof(ir_asm_constraint));
 	ir_asm_constraint *output_constraints = obstack_finish(&asm_obst);
 
 	obstack_grow(&asm_obst, tmp_in_constraints,
@@ -4708,7 +4708,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	ir_node *mem = needs_memory ? get_store() : new_NoMem();
 	assert(obstack_object_size(&asm_obst)
-			== in_size * sizeof(ir_asm_constraint));
+	       == in_size * sizeof(ir_asm_constraint));
 	ir_asm_constraint *input_constraints = obstack_finish(&asm_obst);
 
 	/* create asm node */
@@ -4806,7 +4806,7 @@ static void count_local_variables_in_stmt(statement_t *stmt, void *const env)
 	case STATEMENT_DECLARATION: {
 		const declaration_statement_t *const decl_stmt = &stmt->declaration;
 		*count += count_local_variables(decl_stmt->declarations_begin,
-				decl_stmt->declarations_end);
+		                                decl_stmt->declarations_end);
 		break;
 	}
 
@@ -4874,9 +4874,9 @@ static void initialize_function_parameters(function_t *const function)
 			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
 			parameter->variable.v.value_number = next_value_number_function;
 			set_irg_loc_description(irg, next_value_number_function,
-									parameter);
+			                        parameter);
 			set_irg_loc_description(irg, next_value_number_function+1,
-									parameter);
+			                        parameter);
 			set_value(next_value_number_function, value.real);
 			set_value(next_value_number_function+1, value.imag);
 			next_value_number_function += 2;
@@ -4888,7 +4888,7 @@ static void initialize_function_parameters(function_t *const function)
 			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
 			parameter->variable.v.value_number = next_value_number_function;
 			set_irg_loc_description(irg, next_value_number_function,
-									parameter);
+			                        parameter);
 			++next_value_number_function;
 
 			set_value(parameter->variable.v.value_number, value);
@@ -5097,7 +5097,7 @@ static void scope_to_firm(scope_t *scope)
 		}
 		case ENTITY_VARIABLE: {
 			assert(entity->declaration.kind
-					== DECLARATION_KIND_GLOBAL_VARIABLE);
+			       == DECLARATION_KIND_GLOBAL_VARIABLE);
 			entity_t *alias = entity->variable.alias.entity;
 			if (alias != NULL) {
 				ir_entity *aliased = get_irentity(alias);

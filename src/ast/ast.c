@@ -1178,13 +1178,13 @@ static void print_ms_modifiers(const declaration_t *declaration)
 	if (declaration->base.kind == ENTITY_VARIABLE) {
 		variable_t *variable = (variable_t*)declaration;
 		if (variable->alignment != 0
-				|| variable->get_property_sym != NULL
-				|| variable->put_property_sym != NULL) {
+		    || variable->get_property_sym != NULL
+		    || variable->put_property_sym != NULL) {
 			if (variable->alignment != 0) {
 				print_format("%salign(%u)", sep_next(&sep), variable->alignment);
 			}
 			if (variable->get_property_sym != NULL
-					|| variable->put_property_sym != NULL) {
+			    || variable->put_property_sym != NULL) {
 				char *comma = "";
 				print_format("%sproperty(", sep_next(&sep));
 				if (variable->get_property_sym != NULL) {
@@ -1299,7 +1299,7 @@ static void print_declaration(entity_t const *const entity)
 	switch (entity->kind) {
 		case ENTITY_FUNCTION:
 			print_type_ext(entity->declaration.type, entity->base.symbol,
-					&entity->function.parameters);
+			               &entity->function.parameters);
 
 			if (entity->function.body != NULL) {
 				print_char('\n');
@@ -1411,7 +1411,7 @@ void print_ast(const translation_unit_t *unit)
 		if (entity->kind == ENTITY_ENUM_VALUE)
 			continue;
 		if (entity->base.namespc != NAMESPACE_NORMAL
-				&& entity->base.symbol == NULL)
+		    && entity->base.symbol == NULL)
 			continue;
 		if (is_generated_entity(entity))
 			continue;
@@ -1546,10 +1546,10 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 		/* FALLTHROUGH */
 	case EXPR_UNARY_CAST: {
 		type_t *dest = skip_typeref(expression->base.type);
-		if (!is_type_pointer(dest) && (
-				dest->kind != TYPE_ATOMIC                                               ||
-				!(get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER) ||
-				get_atomic_type_size(dest->atomic.akind) < get_ctype_size(type_void_ptr)
+		if (!is_type_pointer(dest) &&
+		    (dest->kind != TYPE_ATOMIC                                               ||
+		     !(get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER) ||
+		     get_atomic_type_size(dest->atomic.akind) < get_ctype_size(type_void_ptr)
 		    ))
 			return is_constant_expression(expression);
 

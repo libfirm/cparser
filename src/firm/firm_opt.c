@@ -637,9 +637,9 @@ static void do_firm_lowering(void)
 {
 	/* enable architecture dependent optimizations */
 	arch_dep_set_opts((arch_dep_opts_t)
-			((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
-			 (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
-			 (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
+	                  ((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
+	                   (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
+	                   (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
 	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "reassociation");
@@ -733,7 +733,7 @@ void optimize_lower_ir_prog(void)
 	firm_dump.ir_graph = (bool) (firm_dump.ir_graph | firm_dump.all_phases);
 
 	ir_add_dump_flags(ir_dump_flag_keepalive_edges
-			| ir_dump_flag_consts_local | ir_dump_flag_dominance);
+	                  | ir_dump_flag_consts_local | ir_dump_flag_dominance);
 	ir_remove_dump_flags(ir_dump_flag_loops | ir_dump_flag_ld_names);
 
 	/* FIXME: cloning might ADD new graphs. */

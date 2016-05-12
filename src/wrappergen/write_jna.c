@@ -336,7 +336,7 @@ static void write_enum(const symbol_t *symbol, const enum_t *entity)
 		}
 		fprintf(out, ")");
 		if (entry->base.next != NULL
-				&& entry->base.next->kind == ENTITY_ENUM_VALUE) {
+		    && entry->base.next->kind == ENTITY_ENUM_VALUE) {
 			fputs(",\n", out);
 		} else {
 			fputs(";\n", out);

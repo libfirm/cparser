@@ -160,7 +160,7 @@ static void check_argument_type(format_env_t *const env, type_t *const spec_type
 			type_t *const arg_to  = skip_typeref(arg_skip->pointer.points_to);
 			/* Allow any pointer type, if void* is expected. */
 			if ((arg_to->base.qualifiers & ~spec_to->base.qualifiers) == 0 &&
-					(types_compatible_ignore_qualifiers(arg_to, spec_to) || is_type_void(spec_to)))
+			    (types_compatible_ignore_qualifiers(arg_to, spec_to) || is_type_void(spec_to)))
 				return;
 		}
 	} else if (types_compatible_ignore_qualifiers(arg_skip, spec_skip)) {
@@ -562,8 +562,8 @@ check_c_width:
 		if (!suppress_assignment && env->arg) {
 			type_t *const type = skip_typeref(revert_automatic_type_conversion(env->arg->expression));
 			if (is_type_array(type)       &&
-					type->array.size_constant &&
-					width > type->array.size) {
+			    type->array.size_constant &&
+			    width > type->array.size) {
 				warningf(WARN_FORMAT, env->pos, "target buffer '%T' is too small for %u characters at format %u", type, width, env->num_fmt);
 			}
 		}
@@ -588,8 +588,8 @@ check_c_width:
 		if (!suppress_assignment && width != 0 && env->arg) {
 			type_t *const type = skip_typeref(revert_automatic_type_conversion(env->arg->expression));
 			if (is_type_array(type)       &&
-					type->array.size_constant &&
-					width >= type->array.size) {
+			    type->array.size_constant &&
+			    width >= type->array.size) {
 				warningf(WARN_FORMAT, env->pos, "target buffer '%T' is too small for %u characters and \\0 at format %u", type, width, env->num_fmt);
 			}
 		}

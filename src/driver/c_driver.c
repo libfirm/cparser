@@ -174,7 +174,7 @@ static void init_external_preprocessor(void)
 	driver_add_flag(o, "-D__CPARSER_MAJOR__=\"%s\"", CPARSER_MAJOR);
 	driver_add_flag(o, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
 	driver_add_flag(o, "-D__CPARSER_PATCHLEVEL__=\"%s\"",
-					CPARSER_PATCHLEVEL);
+	                CPARSER_PATCHLEVEL);
 
 	driver_add_flag(o, "-U_FORTIFY_SOURCE");
 	driver_add_flag(o, "-D_FORTIFY_SOURCE=0");
@@ -237,7 +237,7 @@ static void init_c_dialect(bool const is_cpp, compilation_unit_t const *const un
 	if (!is_cpp) {
 		switch (standard) {
 		case STANDARD_C89:     features = _C89;                       break;
-							   /* TODO determine difference between these two */
+		/* TODO determine difference between these two */
 		case STANDARD_C89AMD1: features = _C89;                       break;
 		case STANDARD_C99:     features = _C89 | _C99;                break;
 		case STANDARD_C11:     features = _C89 | _C99 | _C11;         break;
@@ -509,7 +509,7 @@ static void append_standard_include_paths(void)
 #ifdef APPEND_MULTILIB_DIRS
 	assert(obstack_object_size(&file_obst) == 0);
 	const char *triple = multilib_directory_target_triple != NULL
-					   ? multilib_directory_target_triple : target.triple;
+	                     ? multilib_directory_target_triple : target.triple;
 	if (triple != NULL) {
 		obstack_printf(&file_obst, "%s/%s", local_include_dir, triple);
 		char *const path = obstack_nul_finish(&file_obst);
@@ -765,7 +765,7 @@ bool build_firm_ir(compilation_env_t *env, compilation_unit_t *unit)
 	timer_stop(t_construct);
 	if (stat_ev_enabled) {
 		stat_ev_dbl("time_graph_construction",
-					ir_timer_elapsed_sec(t_construct));
+		            ir_timer_elapsed_sec(t_construct));
 		stat_ev_int("size_graph_construction", count_firm_nodes());
 	}
 	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;

@@ -169,7 +169,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
                                      entity_t *entity)
 {
 	int alignment = 32; /* TODO: fill in maximum useful alignment for
-						   target machine */
+	                             target machine */
 	if (attribute->a.arguments) {
 		attribute_argument_t *argument = attribute->a.arguments;
 		alignment = fold_expression_to_int(argument->v.expression);
@@ -329,7 +329,7 @@ static void handle_attribute_alias(const attribute_t *attribute,
 	if (decl->storage_class == STORAGE_CLASS_EXTERN) {
 		/* code generator will ignore the extern declaration */
 		warningf(WARN_OTHER, &entity->base.pos,
-				 "extern storage class ignored for alias %N", entity);
+		         "extern storage class ignored for alias %N", entity);
 	}
 
 	ARR_APP1(entity_t*, alias_entities, entity);
@@ -356,8 +356,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_CONSTRUCTOR:   modifiers |= DM_CONSTRUCTOR; break;
 		case ATTRIBUTE_GNU_DESTRUCTOR:    modifiers |= DM_DESTRUCTOR; break;
 		case ATTRIBUTE_GNU_TRANSPARENT_UNION:
-										  modifiers |= DM_TRANSPARENT_UNION;
-										  break;
+		                                  modifiers |= DM_TRANSPARENT_UNION; break;
 		case ATTRIBUTE_GNU_USED:          modifiers |= DM_USED; break;
 		case ATTRIBUTE_GNU_UNUSED:        modifiers |= DM_UNUSED; break;
 		case ATTRIBUTE_GNU_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
@@ -367,14 +366,14 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 		case ATTRIBUTE_GNU_GNU_INLINE:    modifiers |= DM_GNU_INLINE; break;
 
-		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
-		case ATTRIBUTE_MS_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
-		case ATTRIBUTE_MS_NAKED:         modifiers |= DM_NAKED; break;
-		case ATTRIBUTE_MS_NOINLINE:      modifiers |= DM_NOINLINE; break;
-		case ATTRIBUTE_MS_THREAD:        modifiers |= DM_THREAD; break;
-		case ATTRIBUTE_MS_DEPRECATED:    modifiers |= DM_DEPRECATED; break;
-		case ATTRIBUTE_MS_RESTRICT:      modifiers |= DM_RESTRICT; break;
-		case ATTRIBUTE_MS_NOALIAS:       modifiers |= DM_NOALIAS; break;
+		case ATTRIBUTE_MS_DLLIMPORT:      modifiers |= DM_DLLIMPORT; break;
+		case ATTRIBUTE_MS_DLLEXPORT:      modifiers |= DM_DLLEXPORT; break;
+		case ATTRIBUTE_MS_NAKED:          modifiers |= DM_NAKED; break;
+		case ATTRIBUTE_MS_NOINLINE:       modifiers |= DM_NOINLINE; break;
+		case ATTRIBUTE_MS_THREAD:         modifiers |= DM_THREAD; break;
+		case ATTRIBUTE_MS_DEPRECATED:     modifiers |= DM_DEPRECATED; break;
+		case ATTRIBUTE_MS_RESTRICT:       modifiers |= DM_RESTRICT; break;
+		case ATTRIBUTE_MS_NOALIAS:        modifiers |= DM_NOALIAS; break;
 
 		case ATTRIBUTE_GNU_ALIAS:
 			handle_attribute_alias(attribute, entity);

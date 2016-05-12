@@ -191,7 +191,7 @@ static void merge_builtin(entity_t *def, builtin_kind_t kind, type_t *type)
 {
 	if (def->kind != ENTITY_FUNCTION) {
 		warningf(WARN_OTHER, &def->base.pos,
-				 "language standard mandates that %N is a function", def);
+		         "language standard mandates that %N is a function", def);
 		return;
 	} else {
 		/* check if the type is compatible with the libc specified one */
@@ -199,8 +199,8 @@ static void merge_builtin(entity_t *def, builtin_kind_t kind, type_t *type)
 		type_t *def_skipped = skip_typeref(def_type);
 		if (!types_compatible(def_skipped, type)) {
 			warningf(WARN_OTHER, &def->base.pos,
-					 "declaration of %N with type '%T' is incompatible with language standard specified '%T'",
-					 def, def_type, type);
+			         "declaration of %N with type '%T' is incompatible with language standard specified '%T'",
+		                 def, def_type, type);
 			return;
 		}
 	}

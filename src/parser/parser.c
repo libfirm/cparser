@@ -920,8 +920,8 @@ static void warn_enum_conversion(type_t *dest_type, expression_t *expression)
 	const enum_t *const dest_enum = skipped_dest->enumt.enume;
 	if (expression_enum != dest_enum) {
 		warningf(WARN_ENUM_CONVERSION, &expression->base.pos,
-				 "implicit conversion from %N to different enumeration type '%T'",
-				 expression_enum, dest_type);
+		         "implicit conversion from %N to different enumeration type '%T'",
+		         expression_enum, dest_type);
 	}
 }
 
@@ -3045,7 +3045,7 @@ static entity_t *parse_parameter(void)
 	parse_declaration_specifiers(&specifiers);
 
 	entity_t *entity = parse_declarator(&specifiers,
-			DECL_MAY_BE_ABSTRACT | DECL_IS_PARAMETER);
+	                                    DECL_MAY_BE_ABSTRACT | DECL_IS_PARAMETER);
 	anonymous_entity = NULL;
 	return entity;
 }
@@ -3125,7 +3125,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 				entity_t *entity = parse_parameter();
 				if (entity->kind == ENTITY_TYPEDEF) {
 					errorf(&entity->base.pos,
-							"typedef not allowed as function parameter");
+					       "typedef not allowed as function parameter");
 					break;
 				}
 				assert(is_declaration(entity));
@@ -3475,7 +3475,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				errorf(pos, "function returning array is not allowed");
 			} else if (skipped_return_type->base.qualifiers != 0) {
 				warningf(WARN_IGNORED_QUALIFIERS, pos,
-						 "type qualifiers in return type of function type are meaningless");
+				         "type qualifiers in return type of function type are meaningless");
 			}
 
 			/* The function type was constructed earlier.  Freeing it here will
@@ -3625,7 +3625,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	position_t const *const pos = env.symbol ? &env.pos : &specifiers->pos;
 	if (specifiers->storage_class == STORAGE_CLASS_TYPEDEF) {
 		entity = allocate_entity_zero(ENTITY_TYPEDEF, NAMESPACE_NORMAL,
-									  env.symbol, &env.pos);
+		                              env.symbol, &env.pos);
 
 		if (anonymous_entity != NULL) {
 			if (is_type_compound(type)) {
@@ -3643,7 +3643,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		}
 	} else if (flags & DECL_CREATE_COMPOUND_MEMBER) {
 		entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER,
-									  NAMESPACE_NORMAL, env.symbol, pos);
+		                              NAMESPACE_NORMAL, env.symbol, pos);
 
 		if (env.symbol != NULL) {
 			if (specifiers->is_inline && is_type_valid(type))
@@ -5265,7 +5265,7 @@ static void parse_external_declaration(void)
 			parameter->base.parent_scope = current_scope;
 
 		assert(parameter->base.parent_scope == NULL
-				|| parameter->base.parent_scope == current_scope);
+		       || parameter->base.parent_scope == current_scope);
 		parameter->base.parent_scope = current_scope;
 		if (parameter->base.symbol == NULL) {
 			errorf(&parameter->base.pos, "parameter name omitted");
@@ -5304,8 +5304,8 @@ static void parse_external_declaration(void)
 		if (noreturn_candidate
 		 && !(function->base.modifiers & DM_NORETURN))
 			warningf(WARN_MISSING_NORETURN, &body->base.pos,
-					 "function '%#N' is candidate for attribute 'noreturn'",
-					 entity);
+			         "function '%#N' is candidate for attribute 'noreturn'",
+			         entity);
 	}
 
 	if (is_main(entity)) {
@@ -5475,7 +5475,7 @@ static void parse_bitfield_member(entity_t *entity)
 				/* hope that people don't invent crazy types with more bits
 				 * than our struct can hold */
 				assert(size_long <
-						(1 << sizeof(entity->compound_member.bit_size)*8));
+				       (1 << sizeof(entity->compound_member.bit_size) * 8));
 				if (is_type_enum(skipped) && is_warn_on(WARN_BITFIELD_SIZE)) {
 					enum_t *enume = skipped->enumt.enume;
 					if (!enum_bitfield_big_enough(enume, skipped,
@@ -8344,7 +8344,7 @@ static void semantic_comparison(binary_expression_t *expression,
 			 && ((signed_left && maybe_negative(left))
 				 || (signed_right && maybe_negative(right))))
 				warningf(WARN_SIGN_COMPARE, pos,
-						 "comparison between signed and unsigned");
+				         "comparison between signed and unsigned");
 		}
 
 		if (!is_relational && is_type_float(arithmetic_type))
@@ -8375,8 +8375,8 @@ static void semantic_comparison(binary_expression_t *expression,
 		if (is_relational || !is_null_pointer_constant(left)) {
 int_ptr_warning:
 			warningf(WARN_OTHER, pos,
-					 "comparison between pointer and integer: '%T' and '%T'",
-					 orig_type_left, orig_type_right);
+			         "comparison between pointer and integer: '%T' and '%T'",
+			         orig_type_left, orig_type_right);
 		}
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		type_error_incompatible("invalid operands in comparison", pos,
@@ -8638,8 +8638,8 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	 && are_positions_contiguous(&expression->base.pos,
 	                             &expression->right->base.pos))
 		warningf(WARN_NOT_COMPOUND_ASSIGN, &expression->base.pos,
-				 "use of unary operator that may be intended as compound assignment (%hs%E)",
-				 "=", expression->right);
+		         "use of unary operator that may be intended as compound assignment (%hs%E)",
+		         "=", expression->right);
 
 	expression_t *left = expression->left;
 	if (!is_valid_assignment_lhs(left))
@@ -9451,7 +9451,7 @@ static statement_t *parse_case_statement(void)
 			ir_tarval *val = fold_expression(end_range);
 			statement->case_label.last_case = val;
 			if (tarval_cmp(val, statement->case_label.first_case)
-					== ir_relation_less) {
+			                    == ir_relation_less) {
 				statement->case_label.is_empty_range = true;
 				warningf(WARN_OTHER, pos, "empty range specified");
 			}
@@ -10855,7 +10855,7 @@ static void parse_external(void)
 	case T___extension__:
 	/* tokens below are for implicit int */
 	case '&':  /* & x; -> int& x; (and error later, because C++ has no
-				  implicit int) */
+	                               implicit int) */
 	case '*':  /* * x; -> int* x; */
 	case '(':  /* (x); -> int (x); */
 			PUSH_EXTENSION();

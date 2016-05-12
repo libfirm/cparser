@@ -925,7 +925,7 @@ check_promoted_types:
 	function_parameter_t *parameter1 = func1->parameters;
 	function_parameter_t *parameter2 = func2->parameters;
 	for ( ; parameter1 != NULL && parameter2 != NULL;
-			parameter1 = parameter1->next, parameter2 = parameter2->next) {
+	     parameter1 = parameter1->next, parameter2 = parameter2->next) {
 		type_t *parameter1_type = skip_typeref(parameter1->type);
 		type_t *parameter2_type = skip_typeref(parameter2->type);
 
@@ -970,9 +970,9 @@ bool types_compatible_ignore_qualifiers(const type_t *type1,
 	if (type1->kind != type2->kind) {
 		/* enum types are compatible to their base integer type */
 		if ((type1->kind == TYPE_ENUM
-			&& is_type_atomic(type2, type1->enumt.base.akind))
-		 || (type2->kind == TYPE_ENUM
-		    && is_type_atomic(type1, type2->enumt.base.akind)))
+		     && is_type_atomic(type2, type1->enumt.base.akind))
+		    || (type2->kind == TYPE_ENUM
+		     && is_type_atomic(type1, type2->enumt.base.akind)))
 		    return true;
 		/* error types are compatible to everything to avoid follow-up errors */
 		if (!is_type_valid(type1) || !is_type_valid(type2))

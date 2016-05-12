@@ -1396,7 +1396,7 @@ static bool concat_macro_parameters(const position_t *pos,
 		obstack_grow(&pp_obstack, token0, sizeof(*token0));
 		size_t len1 = def1->list_len;
 		obstack_grow(&pp_obstack, def1->token_list,
-					 len1*sizeof(def1->token_list[0]));
+		             len1 * sizeof(def1->token_list[0]));
 		newdef->function_definition = def1->function_definition;
 		goto finish_newdef;
 	}
@@ -2962,7 +2962,7 @@ finish_argument_list:
 	} else {
 		if (!pp_token.base.space_before && pp_token.kind != T_NEWLINE) {
 			warningf(WARN_OTHER, &pp_token.base.pos,
-					 "missing whitespace after macro name");
+			         "missing whitespace after macro name");
 		}
 	}
 
@@ -3030,7 +3030,7 @@ finish_argument_list:
 	if (old_definition != NULL) {
 		if (old_definition->standard_define) {
 			warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
-					 "redefining builtin macro '%Y'", macro_symbol);
+			         "redefining builtin macro '%Y'", macro_symbol);
 		} else if (!pp_definitions_equal(old_definition, new_definition)) {
 			if (warningf(WARN_OTHER, &new_definition->pos, "multiple definitions of macro '%Y'", macro_symbol))
 				notef(&old_definition->pos, "macro '%Y' first defined here", macro_symbol);

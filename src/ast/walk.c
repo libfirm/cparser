@@ -345,7 +345,7 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 
 	case STATEMENT_DECLARATION:
 		walk_declarations(stmt->declaration.declarations_begin,
-				stmt->declaration.declarations_end, env);
+		                  stmt->declaration.declarations_end, env);
 		return;
 
 	case STATEMENT_COMPUTED_GOTO:

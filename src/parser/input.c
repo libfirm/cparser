@@ -183,10 +183,10 @@ one_more:
 					goto invalid_char;
 				}
 				if (decoded < min_code                      ||
-						decoded > 0x10FFFF                      ||
-						(0xD800 <= decoded && decoded < 0xE000) || // high/low surrogates
-						(0xFDD0 <= decoded && decoded < 0xFDF0) || // noncharacters
-						(decoded & 0xFFFE) == 0xFFFE) {            // noncharacters
+				    decoded > 0x10FFFF                      ||
+				    (0xD800 <= decoded && decoded < 0xE000) || // high/low surrogates
+				    (0xFDD0 <= decoded && decoded < 0xFDF0) || // noncharacters
+				    (decoded & 0xFFFE) == 0xFFFE) {            // noncharacters
 					report_invalid_sequence(buffer, dst);
 					decoded = UNICODE_REPLACEMENT_CHARACTER;
 				}

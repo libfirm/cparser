@@ -887,7 +887,7 @@ static complex_constant fold_complex_conditional(
 	if (!is_type_complex(condition_type)) {
 		bool condval = fold_expression_to_bool(cond->condition);
 		expression_t *to_fold = condval ? cond->true_expression
-										: cond->false_expression;
+		                                : cond->false_expression;
 		return fold_complex(to_fold);
 	}
 	complex_constant const val = fold_complex(cond->condition);
