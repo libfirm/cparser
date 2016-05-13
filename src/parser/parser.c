@@ -2930,6 +2930,10 @@ warn_about_long_long:
 		case SPECIFIER_FLOAT:
 			atomic_type = ATOMIC_TYPE_FLOAT;
 			break;
+
+		case SPECIFIER_LONG | SPECIFIER_FLOAT:
+			warningf(WARN_OTHER, pos, "'%hs' is a pre-ANSI spelling for '%hs'", "long float", "double");
+			/* FALLTHROUGH */
 		case SPECIFIER_DOUBLE:
 			atomic_type = ATOMIC_TYPE_DOUBLE;
 			break;
