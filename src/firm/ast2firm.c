@@ -210,18 +210,8 @@ static ir_type *create_complex_type(type_t const *const type)
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	type_t        *const etype   = make_atomic_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
 	ir_type       *const iretype = get_ir_type(etype);
-	ir_type       *const irtype  = new_type_array(iretype);
+	ir_type       *const irtype  = new_type_array(iretype, 2);
 	set_type_dbg_info(irtype, dbgi);
-
-	unsigned const align = get_ctype_alignment(type);
-	set_type_alignment(irtype, align);
-
-	unsigned const size = get_ctype_size(type);
-	set_type_size(irtype, size);
-
-	set_array_size_int(irtype, 2);
-	set_type_state(irtype, layout_fixed);
-
 	return irtype;
 }
 
@@ -365,20 +355,9 @@ static ir_type *create_array_type(type_t const *const type)
 {
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	ir_type       *const iretype = get_ir_type(type->array.element_type);
-	ir_type       *const irtype  = new_type_array(iretype);
+	unsigned       const length  = type->array.size_constant ? type->array.size : 0;
+	ir_type       *const irtype  = new_type_array(iretype, length);
 	set_type_dbg_info(irtype, dbgi);
-
-	unsigned const align = get_ctype_alignment(type);
-	set_type_alignment(irtype, align);
-
-	if (type->array.size_constant) {
-		set_array_size_int(irtype, type->array.size);
-
-		unsigned const size = get_ctype_size(type);
-		set_type_size(irtype, size);
-	}
-	set_type_state(irtype, layout_fixed);
-
 	return irtype;
 }
 
@@ -851,13 +830,9 @@ init_wide:
 	panic("invalid string encoding");
 
 finish:;
-	ir_type *const type = new_type_array(elem_type);
-	set_array_size_int(type, slen);
-	set_type_size(type, slen * get_type_size(elem_type));
-	set_type_state(type, layout_fixed);
-
-	ir_type   *const global_type = get_glob_type();
-	ident     *const id          = id_unique("str.%u");
+	ir_type *const type        = new_type_array(elem_type, slen);
+	ir_type *const global_type = get_glob_type();
+	ident   *const id          = id_unique("str.%u");
 	entity = new_global_entity(global_type, id, type,
 	                           ir_visibility_private,
 	                           IR_LINKAGE_CONSTANT | IR_LINKAGE_NO_IDENTITY);
@@ -3749,7 +3724,7 @@ static void create_dynamic_initializer_sub(dbg_info *dbgi,
 			goto compound_init;
 		if (is_Array_type(type)) {
 			/* Ignore flexible array members for initialization. */
-			if (!has_array_size(type))
+			if (get_array_size(type) == 0)
 				return;
 			goto array_init;
 		}
@@ -3810,7 +3785,7 @@ compound_init:;
 		} else {
 array_init:
 			assert(is_Array_type(type));
-			size_t n = (size_t)get_array_size_int(type);
+			size_t n = (size_t)get_array_size(type);
 			assert(get_initializer_kind(initializer) == IR_INITIALIZER_NULL
 			       || get_initializer_compound_n_entries(initializer) == n);
 
