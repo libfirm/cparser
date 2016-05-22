@@ -264,13 +264,11 @@ static mtp_additional_properties get_additional_entity_properties(
 	return result;
 }
 
-static ir_type *create_method_type(const function_type_t *function_type,
-                                   bool for_closure)
+static ir_type *create_method_type(const function_type_t *function_type)
 {
 	type_t        *return_type  = skip_typeref(function_type->return_type);
 
-	int            n_parameters = count_parameters(function_type)
-	                               + (for_closure ? 1 : 0);
+	int            n_parameters = count_parameters(function_type);
 	int            n_results    = is_type_void(return_type) ? 0 : 1;
 	bool     const is_variadic  = function_type->variadic;
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
@@ -284,11 +282,6 @@ static ir_type *create_method_type(const function_type_t *function_type,
 
 	function_parameter_t *parameter = function_type->parameters;
 	int                   n         = 0;
-	if (for_closure) {
-		ir_type *p_irtype = get_ir_type(type_void_ptr);
-		set_method_param_type(irtype, n, p_irtype);
-		++n;
-	}
 	for ( ; parameter != NULL; parameter = parameter->next) {
 		type_t  *type     = get_parameter_type(parameter->type);
 		ir_type *p_irtype = get_ir_type(type);
@@ -323,9 +316,6 @@ is_cdecl:
 		/* TODO */
 		break;
 	}
-
-	if (for_closure)
-		set_method_calling_convention(irtype, get_method_calling_convention(irtype) | cc_this_call);
 
 	const decl_modifiers_t          modifiers = function_type->modifiers;
 	const mtp_additional_properties props
@@ -440,7 +430,7 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_COMPLEX:         return create_complex_type(type);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:  return create_compound_type(type);
-	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
+	case TYPE_FUNCTION:        return create_method_type(&type->function);
 	case TYPE_POINTER:         return create_pointer_type(type, type->pointer.points_to);
 	case TYPE_REFERENCE:       return create_pointer_type(type, type->reference.refers_to);
 	case TYPE_VOID:            return create_primitive_irtype(type, mode_ANY);
