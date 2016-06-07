@@ -1033,7 +1033,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *shrop = builtin->entity->function.btk == BUILTIN_ROTR ? val : sub;
 		ir_node *shl = new_d_Shl(dbgi, shlop, shf, mode);
 		ir_node *shr = new_d_Shr(dbgi, shrop, shf, mode);
-		return new_d_Or(dbgi, shl, shr, mode);
+		return new_d_Or(dbgi, shl, shr);
 	}
 	case BUILTIN_CIMAG: {
 		complex_value val = expression_to_complex(call->arguments->expression);
@@ -1287,10 +1287,10 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	ir_tarval *shift_mask      = create_bitfield_mask(mode, bitoffset, bitsize);
 	ir_tarval *inv_mask        = tarval_not(shift_mask);
 	ir_node   *inv_mask_node   = new_d_Const(dbgi, inv_mask);
-	ir_node   *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node, mode);
+	ir_node   *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node);
 
 	/* construct new value and store */
-	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, shiftr, mode);
+	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, shiftr);
 	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val, base_type,
 	                                 set_volatile ? cons_volatile : cons_none);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
@@ -1776,13 +1776,13 @@ normal_node:
 		return create_div(dbgi, left, right, mode);
 	case EXPR_BINARY_BITWISE_AND:
 	case EXPR_BINARY_BITWISE_AND_ASSIGN:
-		return new_d_And(dbgi, left, right, mode);
+		return new_d_And(dbgi, left, right);
 	case EXPR_BINARY_BITWISE_OR:
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
-		return new_d_Or(dbgi, left, right, mode);
+		return new_d_Or(dbgi, left, right);
 	case EXPR_BINARY_BITWISE_XOR:
 	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
-		return new_d_Eor(dbgi, left, right, mode);
+		return new_d_Eor(dbgi, left, right);
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 		return new_d_Shl(dbgi, left, right, mode);
