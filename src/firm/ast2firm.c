@@ -1469,7 +1469,7 @@ static ir_node *incdec_to_firm(unary_expression_t const *const expr, bool const 
 	ir_node            *const value       = get_value_from_lvalue(value_expr, addr);
 	ir_node            *const value_arith = create_conv(dbgi, value, mode);
 	ir_node            *const new_value   = inc
-		? new_d_Add(dbgi, value_arith, offset, mode)
+		? new_d_Add(dbgi, value_arith, offset)
 		: new_d_Sub(dbgi, value_arith, offset, mode);
 
 	ir_node *const store_value = set_value_for_expression_addr(value_expr, new_value, addr);
@@ -1764,7 +1764,7 @@ normal_node:
 	switch (kind) {
 	case EXPR_BINARY_ADD_ASSIGN:
 	case EXPR_BINARY_ADD:
-		return new_d_Add(dbgi, left, right, mode);
+		return new_d_Add(dbgi, left, right);
 	case EXPR_BINARY_SUB_ASSIGN:
 	case EXPR_BINARY_SUB:
 		return new_d_Sub(dbgi, left, right, mode);
@@ -1913,7 +1913,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	ir_node  *offset      = expression_to_value(expression->index);
 	type_t   *ref_type    = skip_typeref(expression->array_ref->base.type);
 	ir_node  *real_offset = adjust_for_pointer_arithmetic(dbgi, offset, ref_type);
-	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset, mode_P);
+	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset);
 
 	return result;
 }
@@ -2739,9 +2739,10 @@ typedef complex_value (*new_complex_binop)(dbg_info *dbgi, complex_value left,
 static complex_value new_complex_add(dbg_info *dbgi, complex_value left,
                                      complex_value right, ir_mode *mode)
 {
+	(void)mode;
 	return (complex_value) {
-		new_d_Add(dbgi, left.real, right.real, mode),
-		new_d_Add(dbgi, left.imag, right.imag, mode)
+		new_d_Add(dbgi, left.real, right.real),
+		new_d_Add(dbgi, left.imag, right.imag)
 	};
 }
 
@@ -2763,7 +2764,7 @@ static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
 	ir_node *const op4 = new_d_Mul(dbgi, left.imag, right.real);
 	return (complex_value) {
 		new_d_Sub(dbgi, op1, op2, mode),
-		new_d_Add(dbgi, op3, op4, mode)
+		new_d_Add(dbgi, op3, op4)
 	};
 }
 
@@ -2776,10 +2777,10 @@ static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
 	ir_node *const op4 = new_d_Mul(dbgi, left.real, right.imag);
 	ir_node *const op5 = new_d_Mul(dbgi, right.real, right.real);
 	ir_node *const op6 = new_d_Mul(dbgi, right.imag, right.imag);
-	ir_node *const real_dividend = new_d_Add(dbgi, op1, op2, mode);
-	ir_node *const real_divisor  = new_d_Add(dbgi, op5, op6, mode);
+	ir_node *const real_dividend = new_d_Add(dbgi, op1, op2);
+	ir_node *const real_divisor  = new_d_Add(dbgi, op5, op6);
 	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4, mode);
-	ir_node *const imag_divisor  = new_d_Add(dbgi, op5, op6, mode);
+	ir_node *const imag_divisor  = new_d_Add(dbgi, op5, op6);
 	return (complex_value) {
 		create_div(dbgi, real_dividend, real_divisor, mode),
 		create_div(dbgi, imag_dividend, imag_divisor, mode)
@@ -2794,7 +2795,7 @@ static complex_value new_complex_increment(dbg_info *dbgi, complex_value value,
 {
 	ir_node *one = new_Const(get_mode_one(mode));
 	return (complex_value) {
-		new_d_Add(dbgi, value.real, one, mode),
+		new_d_Add(dbgi, value.real, one),
 		value.imag
 	};
 }
