@@ -1031,8 +1031,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
 		ir_node *shlop = builtin->entity->function.btk == BUILTIN_ROTL ? val : sub;
 		ir_node *shrop = builtin->entity->function.btk == BUILTIN_ROTR ? val : sub;
-		ir_node *shl = new_d_Shl(dbgi, shlop, shf, mode);
-		ir_node *shr = new_d_Shr(dbgi, shrop, shf, mode);
+		ir_node *shl = new_d_Shl(dbgi, shlop, shf);
+		ir_node *shr = new_d_Shr(dbgi, shrop, shf);
 		return new_d_Or(dbgi, shl, shr);
 	}
 	case BUILTIN_CIMAG: {
@@ -1272,11 +1272,11 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	unsigned  shiftwidth = base_bits - bitsize;
 
 	ir_node  *shiftcount = new_Const_long(mode_uint, shiftwidth);
-	ir_node  *shiftl     = new_d_Shl(dbgi, value, shiftcount, mode);
+	ir_node  *shiftl     = new_d_Shl(dbgi, value, shiftcount);
 
 	unsigned  shrwidth   = base_bits - bitsize - bitoffset;
 	ir_node  *shrconst   = new_Const_long(mode_uint, shrwidth);
-	ir_node  *shiftr     = new_d_Shr(dbgi, shiftl, shrconst, mode);
+	ir_node  *shiftr     = new_d_Shr(dbgi, shiftl, shrconst);
 
 	/* load current value */
 	ir_node   *mem             = get_store();
@@ -1302,9 +1302,9 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	ir_node *res_shr;
 	ir_node *count_res_shr = new_Const_long(mode_uint, base_bits - bitsize);
 	if (mode_is_signed(mode)) {
-		res_shr = new_d_Shrs(dbgi, shiftl, count_res_shr, mode);
+		res_shr = new_d_Shrs(dbgi, shiftl, count_res_shr);
 	} else {
-		res_shr = new_d_Shr(dbgi, shiftl, count_res_shr, mode);
+		res_shr = new_d_Shr(dbgi, shiftl, count_res_shr);
 	}
 	return res_shr;
 }
@@ -1341,7 +1341,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	unsigned   shift_bitsl = amode_size - bitoffset - bitsize;
 	ir_tarval *tvl         = new_tarval_from_long((long)shift_bitsl, mode_uint);
 	ir_node   *countl      = new_d_Const(dbgi, tvl);
-	ir_node   *shiftl      = new_d_Shl(dbgi, load_res, countl, amode);
+	ir_node   *shiftl      = new_d_Shl(dbgi, load_res, countl);
 
 	unsigned   shift_bitsr = bitoffset + shift_bitsl;
 	assert(shift_bitsr <= amode_size);
@@ -1349,9 +1349,9 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	ir_node   *countr      = new_d_Const(dbgi, tvr);
 	ir_node   *shiftr;
 	if (mode_is_signed(mode)) {
-		shiftr = new_d_Shrs(dbgi, shiftl, countr, amode);
+		shiftr = new_d_Shrs(dbgi, shiftl, countr);
 	} else {
-		shiftr = new_d_Shr(dbgi, shiftl, countr, amode);
+		shiftr = new_d_Shr(dbgi, shiftl, countr);
 	}
 
 	return conv_to_storage_type(dbgi, shiftr, expression->base.type);
@@ -1785,13 +1785,13 @@ normal_node:
 		return new_d_Eor(dbgi, left, right);
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
-		return new_d_Shl(dbgi, left, right, mode);
+		return new_d_Shl(dbgi, left, right);
 	case EXPR_BINARY_SHIFTRIGHT:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		if (mode_is_signed(mode)) {
-			return new_d_Shrs(dbgi, left, right, mode);
+			return new_d_Shrs(dbgi, left, right);
 		} else {
-			return new_d_Shr(dbgi, left, right, mode);
+			return new_d_Shr(dbgi, left, right);
 		}
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN:
