@@ -1658,7 +1658,7 @@ static ir_node *negate_to_firm(unary_expression_t const *const expr)
 	type_t   *const type  = skip_typeref(expr->base.type);
 	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
 	ir_node  *const value = create_conv(dbgi, expression_to_value(expr->value), mode);
-	return new_d_Minus(dbgi, value, mode);
+	return new_d_Minus(dbgi, value);
 }
 
 static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
@@ -2862,8 +2862,8 @@ static complex_value complex_negate_to_firm(const unary_expression_t *expr)
 	ir_mode      *mode   = get_complex_mode_arithmetic(expr->base.type);
 	cvalue = complex_conv(dbgi, cvalue, mode);
 	return (complex_value) {
-		new_d_Minus(dbgi, cvalue.real, mode),
-		new_d_Minus(dbgi, cvalue.imag, mode)
+		new_d_Minus(dbgi, cvalue.real),
+		new_d_Minus(dbgi, cvalue.imag)
 	};
 }
 
@@ -2875,7 +2875,7 @@ static complex_value complex_complement_to_firm(const unary_expression_t *expr)
 	cvalue = complex_conv(dbgi, cvalue, mode);
 	return (complex_value) {
 		cvalue.real,
-		new_d_Minus(dbgi, cvalue.imag, mode)
+		new_d_Minus(dbgi, cvalue.imag)
 	};
 }
 
