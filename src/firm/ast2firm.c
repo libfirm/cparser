@@ -1638,7 +1638,7 @@ static ir_node *complement_to_firm(unary_expression_t const *const expr)
 	type_t   *const type  = skip_typeref(expr->base.type);
 	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
 	ir_node  *const value = create_conv(dbgi, expression_to_value(expr->value), mode);
-	return new_d_Not(dbgi, value, mode);
+	return new_d_Not(dbgi, value);
 }
 
 static ir_node *dereference_to_firm(unary_expression_t const *const expr)
