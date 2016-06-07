@@ -464,16 +464,16 @@ static ir_type *get_ir_type(type_t *type)
  */
 static ir_node *get_type_size_node(type_t *type)
 {
-	ir_mode *const mode = get_ir_mode_storage(type_size_t);
 	type = skip_typeref(type);
 
 	if (is_type_array(type) && type->array.is_vla) {
 		ir_node *size_node = get_vla_size(&type->array);
 		ir_node *elem_size = get_type_size_node(type->array.element_type);
-		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
+		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size);
 		return real_size;
 	}
 
+	ir_mode *const mode = get_ir_mode_storage(type_size_t);
 	unsigned const size = get_ctype_size(type);
 	return new_Const_long(mode, size);
 }
@@ -1671,7 +1671,7 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
 	ir_node        *      elem_size    = get_type_size_node(points_to);
 	elem_size                          = create_conv(dbgi, elem_size, mode);
 	value                              = create_conv(dbgi, value,     mode);
-	ir_node        *const mul          = new_d_Mul(dbgi, value, elem_size, mode);
+	ir_node        *const mul          = new_d_Mul(dbgi, value, elem_size);
 	return mul;
 }
 
@@ -1770,7 +1770,7 @@ normal_node:
 		return new_d_Sub(dbgi, left, right, mode);
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_MUL:
-		return new_d_Mul(dbgi, left, right, mode);
+		return new_d_Mul(dbgi, left, right);
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_DIV_ASSIGN:
 		return create_div(dbgi, left, right, mode);
@@ -2757,10 +2757,10 @@ static complex_value new_complex_sub(dbg_info *dbgi, complex_value left,
 static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
                                      complex_value right, ir_mode *mode)
 {
-	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real, mode);
-	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag, mode);
-	ir_node *const op3 = new_d_Mul(dbgi, left.real, right.imag, mode);
-	ir_node *const op4 = new_d_Mul(dbgi, left.imag, right.real, mode);
+	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real);
+	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag);
+	ir_node *const op3 = new_d_Mul(dbgi, left.real, right.imag);
+	ir_node *const op4 = new_d_Mul(dbgi, left.imag, right.real);
 	return (complex_value) {
 		new_d_Sub(dbgi, op1, op2, mode),
 		new_d_Add(dbgi, op3, op4, mode)
@@ -2770,12 +2770,12 @@ static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
 static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
                                      complex_value right, ir_mode *mode)
 {
-	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real, mode);
-	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag, mode);
-	ir_node *const op3 = new_d_Mul(dbgi, left.imag, right.real, mode);
-	ir_node *const op4 = new_d_Mul(dbgi, left.real, right.imag, mode);
-	ir_node *const op5 = new_d_Mul(dbgi, right.real, right.real, mode);
-	ir_node *const op6 = new_d_Mul(dbgi, right.imag, right.imag, mode);
+	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real);
+	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag);
+	ir_node *const op3 = new_d_Mul(dbgi, left.imag, right.real);
+	ir_node *const op4 = new_d_Mul(dbgi, left.real, right.imag);
+	ir_node *const op5 = new_d_Mul(dbgi, right.real, right.real);
+	ir_node *const op6 = new_d_Mul(dbgi, right.imag, right.imag);
 	ir_node *const real_dividend = new_d_Add(dbgi, op1, op2, mode);
 	ir_node *const real_divisor  = new_d_Add(dbgi, op5, op6, mode);
 	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4, mode);
