@@ -1676,29 +1676,27 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi, ir_node *value,
 }
 
 typedef ir_node *(*create_div_func)(dbg_info *dbgi, ir_node *memory,
-		ir_node *left, ir_node *right, ir_mode *mode, int pinned);
+		ir_node *left, ir_node *right, int pinned);
 
 static ir_node *create_divmod(create_div_func cons, unsigned pn_res,
-                              dbg_info *dbgi, ir_node *left, ir_node *right,
-                              ir_mode *mode)
+                              dbg_info *dbgi, ir_node *left, ir_node *right)
 {
 	ir_node *memory = get_store();
 	ir_node *pin    = new_Pin(memory);
 	set_store(pin);
-	ir_node *op     = cons(dbgi, pin, left, right, mode, false);
+	ir_node *op     = cons(dbgi, pin, left, right, false);
+	ir_mode *mode   = get_irn_mode(left);
 	return new_d_Proj(dbgi, op, mode, pn_res);
 }
 
-static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right,
-                           ir_mode *mode)
+static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right)
 {
-	return create_divmod(new_d_Div, pn_Div_res, dbgi, left, right, mode);
+	return create_divmod(new_d_Div, pn_Div_res, dbgi, left, right);
 }
 
-static ir_node *create_mod(dbg_info *dbgi, ir_node *left, ir_node *right,
-                           ir_mode *mode)
+static ir_node *create_mod(dbg_info *dbgi, ir_node *left, ir_node *right)
 {
-	return create_divmod(new_d_Mod, pn_Mod_res, dbgi, left, right, mode);
+	return create_divmod(new_d_Mod, pn_Mod_res, dbgi, left, right);
 }
 
 static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, ir_node *right)
@@ -1728,7 +1726,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 			ir_node *const sub       = new_d_Sub(dbgi, left, right);
 			ir_node *const no_mem    = new_NoMem();
 			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size,
-			                                       mode, op_pin_state_floats);
+			                                       op_pin_state_floats);
 			return new_d_Proj(dbgi, divn, mode, pn_Div_res);
 		}
 		/* fallthrough */
@@ -1773,7 +1771,7 @@ normal_node:
 		return new_d_Mul(dbgi, left, right);
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_DIV_ASSIGN:
-		return create_div(dbgi, left, right, mode);
+		return create_div(dbgi, left, right);
 	case EXPR_BINARY_BITWISE_AND:
 	case EXPR_BINARY_BITWISE_AND_ASSIGN:
 		return new_d_And(dbgi, left, right);
@@ -1795,7 +1793,7 @@ normal_node:
 		}
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN:
-		return create_mod(dbgi, left, right, mode);
+		return create_mod(dbgi, left, right);
 	default:
 		panic("unexpected expression kind");
 	}
@@ -2733,33 +2731,26 @@ static complex_value complex_cast_to_firm(const unary_expression_t *expression)
 	}
 }
 
-typedef complex_value (*new_complex_binop)(dbg_info *dbgi, complex_value left,
-                                           complex_value right, ir_mode *mode);
+typedef complex_value (*new_complex_binop)(dbg_info *dbgi, complex_value left, complex_value right);
 
-static complex_value new_complex_add(dbg_info *dbgi, complex_value left,
-                                     complex_value right, ir_mode *mode)
+static complex_value new_complex_add(dbg_info *dbgi, complex_value left, complex_value right)
 {
-	(void)mode;
 	return (complex_value) {
 		new_d_Add(dbgi, left.real, right.real),
 		new_d_Add(dbgi, left.imag, right.imag)
 	};
 }
 
-static complex_value new_complex_sub(dbg_info *dbgi, complex_value left,
-                                     complex_value right, ir_mode *mode)
+static complex_value new_complex_sub(dbg_info *dbgi, complex_value left, complex_value right)
 {
-	(void)mode;
 	return (complex_value) {
 		new_d_Sub(dbgi, left.real, right.real),
 		new_d_Sub(dbgi, left.imag, right.imag)
 	};
 }
 
-static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
-                                     complex_value right, ir_mode *mode)
+static complex_value new_complex_mul(dbg_info *dbgi, complex_value left, complex_value right)
 {
-	(void)mode;
 	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real);
 	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag);
 	ir_node *const op3 = new_d_Mul(dbgi, left.real, right.imag);
@@ -2770,8 +2761,7 @@ static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
 	};
 }
 
-static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
-                                     complex_value right, ir_mode *mode)
+static complex_value new_complex_div(dbg_info *dbgi, complex_value left, complex_value right)
 {
 	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real);
 	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag);
@@ -2784,8 +2774,8 @@ static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
 	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4);
 	ir_node *const imag_divisor  = new_d_Add(dbgi, op5, op6);
 	return (complex_value) {
-		create_div(dbgi, real_dividend, real_divisor, mode),
-		create_div(dbgi, imag_dividend, imag_divisor, mode)
+		create_div(dbgi, real_dividend, real_divisor),
+		create_div(dbgi, imag_dividend, imag_divisor)
 	};
 }
 
@@ -2891,7 +2881,7 @@ static complex_value create_complex_binop(const binary_expression_t *binexpr,
 	complex_value right = expression_to_complex(binexpr->right);
 	left  = complex_conv(dbgi, left, mode);
 	right = complex_conv(dbgi, right, mode);
-	return constructor(dbgi, left, right, mode);
+	return constructor(dbgi, left, right);
 }
 
 static complex_value create_complex_assign_binop(const binary_expression_t *binexpr,
@@ -2906,7 +2896,7 @@ static complex_value create_complex_assign_binop(const binary_expression_t *bine
 	complex_value  right  = expression_to_complex(righte);
 	left  = complex_conv(dbgi, left, mode);
 	right = complex_conv(dbgi, right, mode);
-	complex_value  new_value = constructor(dbgi, left, right, mode);
+	complex_value  new_value = constructor(dbgi, left, right);
 	type_t        *res_type  = skip_typeref(binexpr->base.type);
 	set_complex_value_for_expression(dbgi, lefte, new_value, addr);
 	return complex_conv_to_storage(dbgi, new_value, res_type);
