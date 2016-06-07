@@ -1028,7 +1028,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_mode *mode = get_irn_mode(val);
 		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
-		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
+		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint));
 		ir_node *shlop = builtin->entity->function.btk == BUILTIN_ROTL ? val : sub;
 		ir_node *shrop = builtin->entity->function.btk == BUILTIN_ROTR ? val : sub;
 		ir_node *shl = new_d_Shl(dbgi, shlop, shf);
@@ -1470,7 +1470,7 @@ static ir_node *incdec_to_firm(unary_expression_t const *const expr, bool const 
 	ir_node            *const value_arith = create_conv(dbgi, value, mode);
 	ir_node            *const new_value   = inc
 		? new_d_Add(dbgi, value_arith, offset)
-		: new_d_Sub(dbgi, value_arith, offset, mode);
+		: new_d_Sub(dbgi, value_arith, offset);
 
 	ir_node *const store_value = set_value_for_expression_addr(value_expr, new_value, addr);
 	return pre ? store_value : value;
@@ -1725,7 +1725,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 			mode = get_ir_mode_storage(expr->base.type);
 			ir_node *const elem_size = get_type_size_node(ptr_type->points_to);
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
-			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
+			ir_node *const sub       = new_d_Sub(dbgi, left, right);
 			ir_node *const no_mem    = new_NoMem();
 			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size,
 			                                       mode, op_pin_state_floats);
@@ -1767,7 +1767,7 @@ normal_node:
 		return new_d_Add(dbgi, left, right);
 	case EXPR_BINARY_SUB_ASSIGN:
 	case EXPR_BINARY_SUB:
-		return new_d_Sub(dbgi, left, right, mode);
+		return new_d_Sub(dbgi, left, right);
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_MUL:
 		return new_d_Mul(dbgi, left, right);
@@ -2749,21 +2749,23 @@ static complex_value new_complex_add(dbg_info *dbgi, complex_value left,
 static complex_value new_complex_sub(dbg_info *dbgi, complex_value left,
                                      complex_value right, ir_mode *mode)
 {
+	(void)mode;
 	return (complex_value) {
-		new_d_Sub(dbgi, left.real, right.real, mode),
-		new_d_Sub(dbgi, left.imag, right.imag, mode)
+		new_d_Sub(dbgi, left.real, right.real),
+		new_d_Sub(dbgi, left.imag, right.imag)
 	};
 }
 
 static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
                                      complex_value right, ir_mode *mode)
 {
+	(void)mode;
 	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real);
 	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag);
 	ir_node *const op3 = new_d_Mul(dbgi, left.real, right.imag);
 	ir_node *const op4 = new_d_Mul(dbgi, left.imag, right.real);
 	return (complex_value) {
-		new_d_Sub(dbgi, op1, op2, mode),
+		new_d_Sub(dbgi, op1, op2),
 		new_d_Add(dbgi, op3, op4)
 	};
 }
@@ -2779,7 +2781,7 @@ static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
 	ir_node *const op6 = new_d_Mul(dbgi, right.imag, right.imag);
 	ir_node *const real_dividend = new_d_Add(dbgi, op1, op2);
 	ir_node *const real_divisor  = new_d_Add(dbgi, op5, op6);
-	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4, mode);
+	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4);
 	ir_node *const imag_divisor  = new_d_Add(dbgi, op5, op6);
 	return (complex_value) {
 		create_div(dbgi, real_dividend, real_divisor, mode),
@@ -2805,7 +2807,7 @@ static complex_value new_complex_decrement(dbg_info *dbgi, complex_value value,
 {
 	ir_node *one = new_Const(get_mode_one(mode));
 	return (complex_value) {
-		new_d_Sub(dbgi, value.real, one, mode),
+		new_d_Sub(dbgi, value.real, one),
 		value.imag
 	};
 }
