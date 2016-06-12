@@ -3915,7 +3915,8 @@ static void create_variable_initializer(entity_t *entity)
 			    && get_entity_owner(irentity) != get_tls_type()) {
 				add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 			}
-			set_atomic_ent_value(irentity, node);
+			ir_initializer_t *const init = create_initializer_const(node);
+			set_entity_initializer(irentity, init);
 		}
 	} else {
 have_initializer:
@@ -4867,7 +4868,8 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ident     *debug_name = id_unique(tag);
 	set_entity_ident(ptr, debug_name);
 
-	set_atomic_ent_value(ptr, val);
+	ir_initializer_t *const init = create_initializer_const(val);
+	set_entity_initializer(ptr, init);
 }
 
 /**
