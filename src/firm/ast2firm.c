@@ -3495,6 +3495,15 @@ static void advance_current_object(type_path_t *path)
 	}
 }
 
+static ir_initializer_t *make_complex_init(ir_node *const real, ir_node *const imag)
+{
+	ir_initializer_t *const res       = create_initializer_compound(2);
+	ir_initializer_t *const init_real = create_initializer_const(real);
+	set_initializer_compound_value(res, 0, init_real);
+	ir_initializer_t *const init_imag = create_initializer_const(imag);
+	set_initializer_compound_value(res, 1, init_imag);
+	return res;
+}
 
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
@@ -3513,16 +3522,11 @@ static ir_initializer_t *create_ir_initializer_value(
 			                             type);
 		}
 	} else if (is_type_complex(type)) {
-		complex_value     const value     = expression_to_complex(expr);
-		ir_mode          *const mode      = get_complex_mode_storage(type);
-		ir_node          *const real      = create_conv(NULL, value.real, mode);
-		ir_node          *const imag      = create_conv(NULL, value.imag, mode);
-		ir_initializer_t *const res       = create_initializer_compound(2);
-		ir_initializer_t *const init_real = create_initializer_const(real);
-		ir_initializer_t *const init_imag = create_initializer_const(imag);
-		set_initializer_compound_value(res, 0, init_real);
-		set_initializer_compound_value(res, 1, init_imag);
-		return res;
+		complex_value const value = expression_to_complex(expr);
+		ir_mode      *const mode  = get_complex_mode_storage(type);
+		ir_node      *const real  = create_conv(NULL, value.real, mode);
+		ir_node      *const imag  = create_conv(NULL, value.imag, mode);
+		return make_complex_init(real, imag);
 	}
 
 	if (is_constant_expression(expr) >= EXPR_CLASS_CONSTANT) {
@@ -3884,11 +3888,7 @@ static void create_variable_initializer(entity_t *entity)
 				    && get_entity_owner(irentity) != get_tls_type()) {
 					add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 				}
-				ir_initializer_t *complex_init = create_initializer_compound(2);
-				ir_initializer_t *reali = create_initializer_const(real);
-				set_initializer_compound_value(complex_init, 0, reali);
-				ir_initializer_t *imagi = create_initializer_const(imag);
-				set_initializer_compound_value(complex_init, 1, imagi);
+				ir_initializer_t *const complex_init = make_complex_init(real, imag);
 				set_entity_initializer(irentity, complex_init);
 			}
 			restore_optimization_state(&state);
