@@ -163,62 +163,100 @@ static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
 static void define_float_properties(const char *prefix,
                                     atomic_type_kind_t akind)
 {
-	ir_mode *mode = atomic_modes[akind];
-	unsigned d;
-	if (get_mode_arithmetic(mode) == irma_ieee754
-	 && get_mode_exponent_size(mode) == 8
-	 && get_mode_mantissa_size(mode) == 23) {
-	    d = 0;
-	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	        && get_mode_exponent_size(mode) == 11
-	        && get_mode_mantissa_size(mode) == 52) {
-	    d = 1;
-	} else if (get_mode_arithmetic(mode) == irma_x86_extended_float
-	        && get_mode_exponent_size(mode) == 15
-	        && get_mode_mantissa_size(mode) == 64) {
-		d = 2;
-	} else if (get_mode_arithmetic(mode) == irma_ieee754
-	        && get_mode_exponent_size(mode) == 15
-	        && get_mode_mantissa_size(mode) == 112) {
-	    d = 3;
+	typedef struct float_properties {
+		char const *mant_digs;
+		char const *digs;
+		char const *min_exps;
+		char const *min_10_exps;
+		char const *decimal_digs;
+		char const *max_exps;
+		char const *max_10_exps;
+		char const *maxs;
+		char const *mins;
+		char const *epsilons;
+		char const *denorm_mins;
+	} float_properties;
+
+	float_properties   const *p;
+	ir_mode           *const  mode      = atomic_modes[akind];
+	ir_mode_arithmetic const  arith     = get_mode_arithmetic(mode);
+	unsigned           const  exp_size  = get_mode_exponent_size(mode);
+	unsigned           const  mant_size = get_mode_mantissa_size(mode);
+	if (arith == irma_ieee754 && exp_size == 8 && mant_size == 23) {
+		static float_properties const prop_f32 = {
+			.mant_digs    = "24",
+			.digs         = "6",
+			.min_exps     = "(-125)",
+			.min_10_exps  = "(-37)",
+			.decimal_digs = "9",
+			.max_exps     = "128",
+			.max_10_exps  = "38",
+			.maxs         = "3.40282346638528859812e+38F",
+			.mins         = "1.17549435082228750797e-38F",
+			.epsilons     = "1.19209289550781250000e-7F",
+			.denorm_mins  = "1.40129846432481707092e-45F",
+		};
+		p = &prop_f32;
+	} else if (arith == irma_ieee754 && exp_size == 11 && mant_size == 52) {
+		static float_properties const prop_f64 = {
+			.mant_digs    = "53",
+			.digs         = "15",
+			.min_exps     = "(-1021)",
+			.min_10_exps  = "(-307)",
+			.decimal_digs = "17",
+			.max_exps     = "1024",
+			.max_10_exps  = "308",
+			.maxs         = "((double)1.79769313486231570815e+308L)",
+			.mins         = "((double)2.22507385850720138309e-308L)",
+			.epsilons     = "((double)2.22044604925031308085e-16L)",
+			.denorm_mins  = "((double)4.94065645841246544177e-324L)",
+		};
+		p = &prop_f64;
+	} else if (arith == irma_x86_extended_float && exp_size == 15 && mant_size == 64) {
+		static float_properties const prop_f80 = {
+			.mant_digs    = "64",
+			.digs         = "18",
+			.min_exps     = "(-16381)",
+			.min_10_exps  = "(-4931)",
+			.decimal_digs = "21",
+			.max_exps     = "16384",
+			.max_10_exps  = "4932",
+			.maxs         = "1.18973149535723176502e+4932L",
+			.mins         = "3.36210314311209350626e-4932L",
+			.epsilons     = "1.08420217248550443401e-19L",
+			.denorm_mins  = "3.64519953188247460253e-4951L",
+		};
+		p = &prop_f80;
+	} else if (arith == irma_ieee754 && exp_size == 15 && mant_size == 112) {
+		static float_properties const prop_f128 = {
+			.mant_digs    = "113",
+			.digs         = "33",
+			.min_exps     = "(-16381)",
+			.min_10_exps  = "(-4931)",
+			.decimal_digs = "36",
+			.max_exps     = "16384",
+			.max_10_exps  = "4932",
+			.maxs         = "1.189731495357231765085759326628007016E+4932L",
+			.mins         = "3.36210314311209350626267781732175260e-4932L",
+			.epsilons     = "1.92592994438723585305597794258492732e-34L",
+			.denorm_mins  = "6.47517511943802511092443895822764655e-4966L",
+		};
+		p = &prop_f128;
 	} else {
 		panic("unexpected long double mode");
 	}
 
-	static const char *const mant_digs[]    = { "24", "53", "64", "113" };
-	static const char *const digs[]         = { "6", "15", "18", "33" };
-	static const char *const min_exps[]     = { "(-125)", "(-1021)", "(-16381)", "(-16381)" };
-	static const char *const min_10_exps[]  = { "(-37)", "(-307)", "(-4931)", "(-4931)" };
-	static const char *const decimal_digs[] = { "9", "17", "21", "36" };
-	static const char *const max_exps[]     = { "128", "1024", "16384", "16384" };
-	static const char *const max_10_exps[]  = { "38", "308", "4932", "4932" };
-	static const char *const maxs[]         = {
-		"3.40282346638528859812e+38F", "((double)1.79769313486231570815e+308L)",
-		"1.18973149535723176502e+4932L",
-		"1.189731495357231765085759326628007016E+4932L"};
-	static const char *const mins[]         = {
-		"1.17549435082228750797e-38F", "((double)2.22507385850720138309e-308L)",
-		"3.36210314311209350626e-4932L",
-		"3.36210314311209350626267781732175260e-4932L"};
-	static const char *const epsilons[]     = {
-		"1.19209289550781250000e-7F", "((double)2.22044604925031308085e-16L)",
-		"1.08420217248550443401e-19L",
-		"1.92592994438723585305597794258492732e-34L" };
-	static const char *const denorm_mins[]  = {
-		"1.40129846432481707092e-45F", "((double)4.94065645841246544177e-324L)",
-		"3.64519953188247460253e-4951L",
-		"6.47517511943802511092443895822764655e-4966L" };
-	add_define_prop_fmt("__%s_MANT_DIG__",      prefix, "%s", mant_digs[d]);
-	add_define_prop_fmt("__%s_DIG__",           prefix, "%s", digs[d]);
-	add_define_prop_fmt("__%s_MIN_EXP__",       prefix, "%s", min_exps[d]);
-	add_define_prop_fmt("__%s_MIN_10_EXP__",    prefix, "%s", min_10_exps[d]);
-	add_define_prop_fmt("__%s_MAX_EXP__",       prefix, "%s", max_exps[d]);
-	add_define_prop_fmt("__%s_MAX_10_EXP__",    prefix, "%s", max_10_exps[d]);
-	add_define_prop_fmt("__%s_DECIMAL_DIG__",   prefix, "%s", decimal_digs[d]);
-	add_define_prop_fmt("__%s_MAX__",           prefix, "%s", maxs[d]);
-	add_define_prop_fmt("__%s_MIN__",           prefix, "%s", mins[d]);
-	add_define_prop_fmt("__%s_EPSILON__",       prefix, "%s", epsilons[d]);
-	add_define_prop_fmt("__%s_DENORM_MIN__",    prefix, "%s", denorm_mins[d]);
+	add_define_prop_fmt("__%s_MANT_DIG__",      prefix, "%s", p->mant_digs);
+	add_define_prop_fmt("__%s_DIG__",           prefix, "%s", p->digs);
+	add_define_prop_fmt("__%s_MIN_EXP__",       prefix, "%s", p->min_exps);
+	add_define_prop_fmt("__%s_MIN_10_EXP__",    prefix, "%s", p->min_10_exps);
+	add_define_prop_fmt("__%s_MAX_EXP__",       prefix, "%s", p->max_exps);
+	add_define_prop_fmt("__%s_MAX_10_EXP__",    prefix, "%s", p->max_10_exps);
+	add_define_prop_fmt("__%s_DECIMAL_DIG__",   prefix, "%s", p->decimal_digs);
+	add_define_prop_fmt("__%s_MAX__",           prefix, "%s", p->maxs);
+	add_define_prop_fmt("__%s_MIN__",           prefix, "%s", p->mins);
+	add_define_prop_fmt("__%s_EPSILON__",       prefix, "%s", p->epsilons);
+	add_define_prop_fmt("__%s_DENORM_MIN__",    prefix, "%s", p->denorm_mins);
 	add_define_prop_fmt("__%s_HAS_DENORM__",    prefix, "1");
 	add_define_prop_fmt("__%s_HAS_INFINITY__",  prefix, "1");
 	add_define_prop_fmt("__%s_HAS_QUIET_NAN__", prefix, "1");
