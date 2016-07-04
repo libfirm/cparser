@@ -285,7 +285,7 @@ void add_predefined_macros(void)
 
 	/* let's pretend we are a GCC compiler */
 	add_define("__GNUC__",            "4", false);
-	add_define("__GNUC_MINOR__",      "6", false);
+	add_define("__GNUC_MINOR__",      "2", false);
 	add_define("__GNUC_PATCHLEVEL__", "0", false);
 	if (dialect.cpp)
 		add_define("__GNUG__", "4", false);
