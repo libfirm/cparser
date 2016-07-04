@@ -4,7 +4,7 @@
  */
 #include "jittest.h"
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__unix__)
 
 #define _GNU_SOURCE
 #include <libfirm/irprog.h>
