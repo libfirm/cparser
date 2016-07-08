@@ -266,13 +266,40 @@ static mtp_additional_properties get_additional_entity_properties(
 
 static ir_type *create_method_type(const function_type_t *function_type)
 {
-	type_t        *return_type  = skip_typeref(function_type->return_type);
+	bool const is_variadic = function_type->variadic;
 
+	unsigned cc;
+	switch (function_type->calling_convention) {
+	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
+	case CC_CDECL:
+is_cdecl:
+		cc = cc_cdecl_set;
+		break;
+
+	case CC_STDCALL:
+		if (is_variadic)
+			goto is_cdecl;
+		/* only non-variadic function can use stdcall, else use cdecl */
+		cc = cc_stdcall_set;
+		break;
+
+	case CC_FASTCALL:
+		if (is_variadic)
+			goto is_cdecl;
+		/* only non-variadic function can use fastcall, else use cdecl */
+		cc = cc_fastcall_set;
+		break;
+
+	case CC_THISCALL:
+		cc = cc_cdecl_set; /* TODO */
+		break;
+	}
+
+	type_t        *return_type  = skip_typeref(function_type->return_type);
 	int            n_parameters = count_parameters(function_type);
 	int            n_results    = is_type_void(return_type) ? 0 : 1;
-	bool     const is_variadic  = function_type->variadic;
+	ir_type       *irtype       = new_type_method(n_parameters, n_results, is_variadic, cc);
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
-	ir_type       *irtype       = new_type_method(n_parameters, n_results, is_variadic);
 	set_type_dbg_info(irtype, dbgi);
 
 	if (!is_type_void(return_type)) {
@@ -287,34 +314,6 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		ir_type *p_irtype = get_ir_type(type);
 		set_method_param_type(irtype, n, p_irtype);
 		++n;
-	}
-
-	unsigned cc = get_method_calling_convention(irtype);
-	switch (function_type->calling_convention) {
-	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
-	case CC_CDECL:
-is_cdecl:
-		set_method_calling_convention(irtype, SET_CDECL(cc));
-		break;
-
-	case CC_STDCALL:
-		if (is_variadic)
-			goto is_cdecl;
-
-		/* only non-variadic function can use stdcall, else use cdecl */
-		set_method_calling_convention(irtype, SET_STDCALL(cc));
-		break;
-
-	case CC_FASTCALL:
-		if (is_variadic)
-			goto is_cdecl;
-		/* only non-variadic function can use fastcall, else use cdecl */
-		set_method_calling_convention(irtype, SET_FASTCALL(cc));
-		break;
-
-	case CC_THISCALL:
-		/* TODO */
-		break;
 	}
 
 	const decl_modifiers_t          modifiers = function_type->modifiers;
@@ -1112,11 +1111,10 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		type_dbg_info *tdbgi = get_type_dbg_info_((const type_t*) function_type);
-		int n_res       = get_method_n_ress(ir_method_type);
-		new_method_type = new_type_method(n_parameters, n_res, true);
+		int      const n_res   = get_method_n_ress(ir_method_type);
+		unsigned const cc_mask = get_method_calling_convention(ir_method_type);
+		new_method_type = new_type_method(n_parameters, n_res, true, cc_mask);
 		set_type_dbg_info(new_method_type, tdbgi);
-		set_method_calling_convention(new_method_type,
-		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
 		               get_method_additional_properties(ir_method_type));
 
@@ -2179,7 +2177,7 @@ static ir_node *va_start_expression_to_firm(const va_start_expression_t *const e
 	if (is_Pointer_type(va_list_type)) {
 		/* The backend implements va_list as a single pointer. The initial value of
 		 * a va_list is the result of the va_start call. */
-		ir_type *const funtype = new_type_method(0, 1, false);
+		ir_type *const funtype = new_type_method(0, 1, false, cc_cdecl_set);
 		set_method_res_type(funtype, 0, va_list_type);
 
 		ir_node *const builtin = new_d_Builtin(dbgi, memory, 0, NULL, ir_bk_va_start, funtype);
@@ -2191,7 +2189,7 @@ static ir_node *va_start_expression_to_firm(const va_start_expression_t *const e
 	} else if (is_Struct_type(va_list_type)) {
 		/* The backend implements va_list as a struct. The va_list object is passed
 		 * by reference to va_start, where its fields are initialized. */
-		ir_type *const funtype = new_type_method(1, 0, false);
+		ir_type *const funtype = new_type_method(1, 0, false, cc_cdecl_set);
 		set_method_param_type(funtype, 0, va_list_type);
 
 		ir_node *const ap      = expression_to_value(expr->ap);
@@ -2228,7 +2226,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 
 		ir_node *const memory  = get_store();
 
-		ir_type *const funtype = new_type_method(1, 2, false);
+		ir_type *const funtype = new_type_method(1, 2, false, cc_cdecl_set);
 		set_method_param_type(funtype, 0, aptype);
 		set_method_res_type(funtype, 0, restype);
 		set_method_res_type(funtype, 1, aptype);
@@ -2249,7 +2247,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 		ir_node *const ap      = expression_to_value(expr->ap);
 		ir_node *const memory  = get_store();
 
-		ir_type *const funtype = new_type_method(1, 1, false);
+		ir_type *const funtype = new_type_method(1, 1, false, cc_cdecl_set);
 		set_method_param_type(funtype, 0, aptype);
 		set_method_res_type(funtype, 0, restype);
 
