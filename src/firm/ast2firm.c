@@ -998,6 +998,17 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_tarval *tv = fold_builtin_nan(call, function_type);
 		return new_d_Const(dbgi, tv);
 	}
+	case BUILTIN_ISNAN: {
+		expression_t *arg      = call->arguments->expression;
+		ir_mode      *arg_mode = get_ir_mode_arithmetic(arg->base.type);
+		ir_node      *val      = create_conv(dbgi, expression_to_value(arg), arg_mode);
+		ir_node      *cmp      = new_d_Cmp(dbgi, val, val, ir_relation_unordered);
+		type_t       *res_type = function_type->function.return_type;
+		ir_mode      *res_mode = get_ir_mode_storage(res_type);
+		ir_node      *zero     = new_d_Const(dbgi, get_mode_null(res_mode));
+		ir_node      *one      = new_d_Const(dbgi, get_mode_one(res_mode));
+		return new_d_Mux(dbgi, cmp, zero, one);
+	}
 	case BUILTIN_EXPECT: {
 		expression_t *argument = call->arguments->expression;
 		return expression_to_value(argument);

@@ -97,6 +97,8 @@ static entity_t *create_gnu_builtin_chk(const char *name, unsigned chk_arg_pos,
 
 void create_gnu_builtins(void)
 {
+	type_t *template = type_builtin_template;
+
 	entity_t *(*b)(builtin_kind_t,const char*,type_t*) = create_gnu_builtin;
 	b(BUILTIN_ALLOCA,      "alloca",         make_function_1_type(type_void_ptr, type_size_t, DM_NONE));
 	b(BUILTIN_INF,         "huge_val",       make_function_0_type(type_double, DM_CONST));
@@ -108,6 +110,7 @@ void create_gnu_builtins(void)
 	b(BUILTIN_NAN,         "nan",            make_function_1_type(type_double, type_char_ptr, DM_CONST));
 	b(BUILTIN_NAN,         "nanf",           make_function_1_type(type_float, type_char_ptr, DM_CONST));
 	b(BUILTIN_NAN,         "nanl",           make_function_1_type(type_long_double, type_char_ptr, DM_CONST));
+	b(BUILTIN_ISNAN,       "isnan",          make_function_type(type_int, 1, (type_t *[]) { template }, DM_CONST));
 	b(BUILTIN_VA_END,      "va_end",         make_function_1_type(type_void, type_valist_arg, DM_NONE));
 	b(BUILTIN_EXPECT,      "expect",         make_function_2_type(type_long, type_long, type_long, DM_CONST));
 	b(BUILTIN_OBJECT_SIZE, "object_size",    make_function_2_type(type_size_t, type_void_ptr, type_int, DM_CONST));
@@ -137,7 +140,6 @@ void create_gnu_builtins(void)
 	f(ir_bk_trap,           "trap",           make_function_type(type_void, 0, NULL, DM_NORETURN));
 
 	entity_t *(*s)(ir_builtin_kind,const char*,type_t*) = create_builtin_firm;
-	type_t *template     = type_builtin_template;
 	type_t *template_ptr = type_builtin_template_ptr;
 	s(ir_bk_compare_swap, "__sync_val_compare_and_swap", make_function_type(template, 3, (type_t*[]) { template_ptr, template, template }, DM_NONE));
 	s(ir_bk_may_alias,    "__builtin_may_alias",         make_function_type(type_int, 2, (type_t*[]) { type_const_void_ptr, type_const_void_ptr }, DM_NONE));
