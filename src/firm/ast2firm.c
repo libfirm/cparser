@@ -264,45 +264,48 @@ static mtp_additional_properties get_additional_entity_properties(
 	return result;
 }
 
-static ir_type *create_method_type(const function_type_t *function_type)
+static unsigned determine_calling_convention(function_type_t const *const ft)
 {
-	bool const is_variadic = function_type->variadic;
-
-	unsigned cc;
-	switch (function_type->calling_convention) {
+	switch (ft->calling_convention) {
 	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
 	case CC_CDECL:
 is_cdecl:
-		cc = cc_cdecl_set;
+		return cc_cdecl_set;
 		break;
 
 	case CC_STDCALL:
-		if (is_variadic)
+		if (ft->variadic)
 			goto is_cdecl;
 		/* only non-variadic function can use stdcall, else use cdecl */
-		cc = cc_stdcall_set;
+		return cc_stdcall_set;
 		break;
 
 	case CC_FASTCALL:
-		if (is_variadic)
+		if (ft->variadic)
 			goto is_cdecl;
 		/* only non-variadic function can use fastcall, else use cdecl */
-		cc = cc_fastcall_set;
+		return cc_fastcall_set;
 		break;
 
 	case CC_THISCALL:
-		cc = cc_cdecl_set; /* TODO */
+		return cc_cdecl_set; /* TODO */
 		break;
 	}
+	panic("invalid calling convention");
+}
 
+static ir_type *create_method_type(const function_type_t *function_type)
+{
 	decl_modifiers_t          const modifiers = function_type->modifiers;
 	mtp_additional_properties const props     = get_additional_type_properties(modifiers);
 
-	type_t        *return_type  = skip_typeref(function_type->return_type);
-	int            n_parameters = count_parameters(function_type);
-	int            n_results    = is_type_void(return_type) ? 0 : 1;
-	ir_type       *irtype       = new_type_method(n_parameters, n_results, is_variadic, cc, props);
-	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
+	type_t        *const return_type  = skip_typeref(function_type->return_type);
+	int            const n_parameters = count_parameters(function_type);
+	int            const n_results    = is_type_void(return_type) ? 0 : 1;
+	bool           const is_variadic  = function_type->variadic;
+	unsigned       const cc           = determine_calling_convention(function_type);
+	ir_type       *const irtype       = new_type_method(n_parameters, n_results, is_variadic, cc, props);
+	type_dbg_info *const dbgi         = get_type_dbg_info_((const type_t*) function_type);
 	set_type_dbg_info(irtype, dbgi);
 
 	if (!is_type_void(return_type)) {
