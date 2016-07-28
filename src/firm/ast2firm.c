@@ -2175,7 +2175,14 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	statement_t *statement = expr->statement;
 
 	assert(statement->kind == STATEMENT_COMPOUND);
-	return compound_statement_to_firm(&statement->compound);
+	ir_node *res = compound_statement_to_firm(&statement->compound);
+	if (!currently_reachable()) {
+		set_soft_unreachable();
+		type_t *const type = skip_typeref(expr->base.type);
+		if (!is_type_void(type))
+			res = new_Bad(get_ir_mode_arithmetic(type));
+	}
+	return res;
 }
 
 static ir_node *va_start_expression_to_firm(const va_start_expression_t *const expr)
