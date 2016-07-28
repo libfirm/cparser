@@ -271,25 +271,21 @@ static unsigned determine_calling_convention(function_type_t const *const ft)
 	case CC_CDECL:
 is_cdecl:
 		return cc_cdecl_set;
-		break;
 
 	case CC_STDCALL:
 		if (ft->variadic)
 			goto is_cdecl;
 		/* only non-variadic function can use stdcall, else use cdecl */
 		return cc_stdcall_set;
-		break;
 
 	case CC_FASTCALL:
 		if (ft->variadic)
 			goto is_cdecl;
 		/* only non-variadic function can use fastcall, else use cdecl */
 		return cc_fastcall_set;
-		break;
 
 	case CC_THISCALL:
 		return cc_cdecl_set; /* TODO */
-		break;
 	}
 	panic("invalid calling convention");
 }
