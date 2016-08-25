@@ -27,6 +27,8 @@
 #include "target.h"
 #include "wrappergen/write_jna.h"
 
+#include <libfirm/irio.h>
+
 codegen_option_t  *codegen_options        = NULL;
 codegen_option_t **codegen_options_anchor = &codegen_options;
 bool               profile_generate;
@@ -363,6 +365,11 @@ bool options_parse_linker(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-l%s", arg);
 	} else if ((arg = prefix_arg("L", s)) != NULL) {
 		driver_add_flag(&ldflags_obst, "-L%s", arg);
+	} else if (simple_arg("shared", s)){
+			// in case of lto we can adjust the visibility of entities
+			// we cannot do this if the shared flag is set!
+		    driver_add_flag(&ldflags_obst, full_option);
+			lto_set_shared_flag();
 	} else if (simple_arg("static", s)
 	        || simple_arg("no-pie", s)
 	        || simple_arg("nodefaultlibs", s)
@@ -371,7 +378,6 @@ bool options_parse_linker(options_state_t *s)
 	        || simple_arg("pie", s)
 	        || simple_arg("rdynamic", s)
 	        || simple_arg("s", s)
-	        || simple_arg("shared", s)
 	        || simple_arg("shared-libgcc", s)
 	        || simple_arg("static-libgcc", s)
 	        || simple_arg("symbolic", s)

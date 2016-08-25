@@ -19,6 +19,8 @@
 #include "diagnostic.h"
 #include "timing.h"
 
+#include <libfirm/irio.h>
+
 const char         *outname;
 bool                produce_statev;
 const char         *filtev;
@@ -213,6 +215,8 @@ void set_unit_handler(compilation_unit_type_t type,
 	stop_after[type] = stop_after_val;
 }
 
+static int ir_file_counter = 0;
+
 bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 {
 	bool res;
@@ -230,6 +234,13 @@ bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 			break;
 		}
 		assert(unit->type != type); /* handler should have changed the type */
+
+		// We want to read ALL IR files before we can generate code
+		if (type == COMPILATION_UNIT_IR && ir_file_counter > 1){
+			ir_file_counter--;
+			res = true;
+			break;
+		}
 	}
 	print_diagnostic_summary();
 	return res;
@@ -245,6 +256,18 @@ bool process_all_units(compilation_env_t *env)
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		if (unit->type == COMPILATION_UNIT_AUTODETECT)
 			unit->type = autodetect_input(unit->name);
+
+		// to allow multiple ir files as input we need to be aware
+		// of how many there are and only construct a single IRP
+		if (unit->type == COMPILATION_UNIT_IR){
+			ir_file_counter ++;
+		}
+	}
+
+	// pass to the lto backend before importing the first ir file
+	lto_set_ir_file_count(ir_file_counter);
+
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 
 		stat_ev_ctx_push_str("compilation_unit", unit->name);
 		bool ok = process_unit(env, unit);

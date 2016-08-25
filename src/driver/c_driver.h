@@ -62,6 +62,9 @@ bool do_nothing(compilation_env_t *env, compilation_unit_t *unit);
 bool do_print_ast(compilation_env_t *env, compilation_unit_t *unit);
 bool do_parsing(compilation_env_t *env, compilation_unit_t *unit);
 bool build_firm_ir(compilation_env_t *env, compilation_unit_t *unit);
+
+bool run_optimization(compilation_env_t *env, compilation_unit_t *unit);
+
 bool generate_code_intermediate(compilation_env_t *env,
                                 compilation_unit_t *unit);
 bool generate_code_final(compilation_env_t *env, compilation_unit_t *unit);
