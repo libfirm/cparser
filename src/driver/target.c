@@ -266,6 +266,13 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		long_double_size   = 16;
 		float_int_overflow = ir_overflow_indefinite;
 		dialect.long_double_x87_80bit_float = true;
+	} else if (streq(cpu, "mips")) {
+		ppdef("__mips__", "1");
+		firm_isa           = "mips";
+		pointer_size       =  4;
+		modulo_shift       = 32;
+		long_double_size   =  8;
+		float_int_overflow = ir_overflow_indefinite;
 	} else {
 		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		exit(EXIT_FAILURE);
