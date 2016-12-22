@@ -298,7 +298,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	type_t        *const return_type  = skip_typeref(function_type->return_type);
 	int            const n_parameters = count_parameters(function_type);
 	int            const n_results    = is_type_void(return_type) ? 0 : 1;
-	bool           const is_variadic  = function_type->variadic;
+	bool           const is_variadic  = function_type->variadic || function_type->unspecified_parameters;
 	unsigned       const cc           = determine_calling_convention(function_type);
 	ir_type       *const irtype       = new_type_method(n_parameters, n_results, is_variadic, cc, props);
 	type_dbg_info *const dbgi         = get_type_dbg_info_((const type_t*) function_type);
