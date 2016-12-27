@@ -714,6 +714,12 @@ void init_gen_firm(void)
 	timer_register(t_backend, "Firm: backend");
 }
 
+static void dump_types(char const *const name)
+{
+	if (firm_dump.all_types)
+		dump_ir_prog_ext(dump_typegraph, name);
+}
+
 void optimize_lower_ir_prog(void)
 {
 	/* initialize implicit opts, just to be sure because really the frontend
@@ -734,9 +740,7 @@ void optimize_lower_ir_prog(void)
 	ir_timer_init_parent(t_vcg_dump);
 	timer_start(t_all_opt);
 
-	if (firm_dump.all_types)
-		dump_ir_prog_ext(dump_typegraph, "types.vcg");
-
+	dump_types("types.vcg");
 	dump_all("");
 
 	if (firm_opt.verify) {
@@ -747,6 +751,7 @@ void optimize_lower_ir_prog(void)
 
 	do_firm_optimizations();
 	do_firm_lowering();
+	dump_types("types-low.vcg");
 
 	timer_stop(t_all_opt);
 }
