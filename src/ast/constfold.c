@@ -1068,8 +1068,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 		unsigned        modulo_shift = decide_modulo_shift(bit_size);
 
 		snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U", bit_size);
-		return new_int_mode(name, irma_twos_complement, bit_size, is_signed,
-		                    modulo_shift);
+		return new_int_mode(name, bit_size, is_signed, modulo_shift);
 	}
 
 	return NULL;
