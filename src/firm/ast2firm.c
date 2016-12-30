@@ -1687,11 +1687,17 @@ typedef ir_node *(*create_div_func)(dbg_info *dbgi, ir_node *memory,
 static ir_node *create_divmod(create_div_func cons, unsigned pn_res,
                               dbg_info *dbgi, ir_node *left, ir_node *right)
 {
-	ir_node *memory = get_store();
-	ir_node *pin    = new_Pin(memory);
-	set_store(pin);
-	ir_node *op     = cons(dbgi, pin, left, right, false);
-	ir_mode *mode   = get_irn_mode(left);
+	ir_node *mem;
+	if (current_ir_graph == get_const_code_irg()) {
+		mem = new_NoMem();
+	} else {
+		ir_node *memory = get_store();
+		ir_node *pin    = new_Pin(memory);
+		set_store(pin);
+		mem = pin;
+	}
+	ir_node *op   = cons(dbgi, mem, left, right, false);
+	ir_mode *mode = get_irn_mode(left);
 	return new_d_Proj(dbgi, op, mode, pn_res);
 }
 
