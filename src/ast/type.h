@@ -76,7 +76,11 @@ typedef union  type_t               type_t;
  * to your system as your architecture and operating systems application binary
  * interface (ABI) requires.
  */
-void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size);
+void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size,
+                atomic_type_kind_t wchar_atomic_kind,
+                atomic_type_kind_t pointer_sized_int,
+                atomic_type_kind_t pointer_sized_uint);
+
 void exit_types(void);
 
 /**

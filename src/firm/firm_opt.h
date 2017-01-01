@@ -144,6 +144,4 @@ void set_optimization_level(optimization_level_t opt_level);
  */
 void init_implicit_optimizations(void);
 
-void set_be_option(char const *arg);
-
 #endif

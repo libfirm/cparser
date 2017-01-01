@@ -4,12 +4,12 @@
  */
 #include "actions.h"
 
-#include <libfirm/firm.h>
+#include <libfirm/firm_common.h>
+#include <libfirm/target.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "driver.h"
-#include "machine_triple.h"
 #include "target.h"
 #include "version.h"
 #include <revision.h>
@@ -44,8 +44,9 @@ int action_version_short(const char *argv0)
 int action_dumpmachine(const char *argv0)
 {
 	(void)argv0;
-	machine_triple_t const *const machine = target.machine;
-	printf("%s-%s-%s\n", machine->cpu_type, machine->manufacturer,
-	       machine->operating_system);
+	ir_machine_triple_t const *const machine = target.machine;
+	printf("%s-%s-%s\n", ir_triple_get_cpu_type(machine),
+	       ir_triple_get_manufacturer(machine),
+	       ir_triple_get_operating_system(machine));
 	return EXIT_SUCCESS;
 }

@@ -79,8 +79,8 @@ bool            print_phony_targets;
 const char     *dependency_file;
 const char     *dependency_target;
 bool            dont_escape_target;
-unsigned        features_on;
-unsigned        features_off;
+lang_features_t features_on;
+lang_features_t features_off;
 lang_standard_t standard;
 const char     *dumpfunction;
 const char     *isysroot;
@@ -809,8 +809,6 @@ bool do_nothing(compilation_env_t *env, compilation_unit_t *unit)
 
 static bool do_generate_code(FILE *asm_out, compilation_unit_t *unit)
 {
-	warn_experimental_target();
-
 	ir_timer_t *t_opt_codegen = ir_timer_new();
 	timer_register(t_opt_codegen, "Optimization and Codegeneration");
 	timer_start(t_opt_codegen);

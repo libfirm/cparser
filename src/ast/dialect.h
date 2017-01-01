@@ -7,9 +7,6 @@
 
 #include <stdbool.h>
 
-#include "adt/util.h"
-#include "ast/type.h"
-
 #define BITS_PER_BYTE    8
 
 typedef enum lang_features_t {
@@ -23,31 +20,19 @@ typedef enum lang_features_t {
 } lang_features_t;
 
 typedef struct c_dialect_t {
-	atomic_type_kind_t wchar_atomic_kind;
-	atomic_type_kind_t pointer_sized_int;
-	atomic_type_kind_t pointer_sized_uint;
-	bool               freestanding    : 1;
-	bool               no_builtins     : 1;
-	bool               char_is_signed  : 1;
-	bool               strict          : 1;
-	bool               c89             : 1;
-	bool               c99             : 1;
-	bool               c11             : 1;
-	bool               cpp             : 1;
-	bool               gnu             : 1;
-	bool               ms              : 1;
-	bool               x87_long_double : 1;
+	bool freestanding              : 1;
+	bool no_builtins               : 1;
+	bool strict                    : 1;
+	bool c89                       : 1;
+	bool c99                       : 1;
+	bool c11                       : 1;
+	bool cpp                       : 1;
+	bool gnu                       : 1;
+	bool ms                        : 1;
 	/** enable hack to add call to __main into the main function (mingw) */
-	bool enable_main_collect2_hack    : 1;
-	bool support_fastcall_stdcall     : 1;
-	unsigned char      long_double_size;
-	unsigned char      long_double_align;
-	unsigned char      long_long_and_double_struct_align;
-	unsigned char      long_long_size;
-	unsigned char      int_size;
-	unsigned char      pointer_size;
-	unsigned char      long_size;
-	lang_features_t    features;
+	bool enable_main_collect2_hack : 1;
+	bool support_fastcall_stdcall  : 1;
+	lang_features_t features;
 } c_dialect_t;
 
 extern c_dialect_t dialect;

@@ -993,13 +993,6 @@ bool fold_expression_to_bool(const expression_t *expression)
 	}
 }
 
-static unsigned decide_modulo_shift(unsigned type_size)
-{
-	if (target.modulo_shift == 0)
-		return 0;
-	return MAX(type_size, target.modulo_shift);
-}
-
 bool enum_bitfield_big_enough(enum_t *enume, type_t *base_type,
                               unsigned bitfield_size)
 {
@@ -1038,57 +1031,33 @@ bool enum_bitfield_big_enough(enum_t *enume, type_t *base_type,
 	return true;
 }
 
-static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
-{
-	unsigned flags = get_atomic_type_flags(kind);
-	unsigned size  = get_atomic_type_size(kind);
-	if (flags & ATOMIC_TYPE_FLAG_FLOAT) {
-		if (kind == ATOMIC_TYPE_LONG_DOUBLE && dialect.x87_long_double) {
-			assert(size == 12 || size == 16);
-			return new_float_mode("F80", irma_x86_extended_float, 15, 64,
-			                      target.float_int_overflow);
-		}
-		switch (size) {
-		case 4:
-			return new_float_mode("F32", irma_ieee754, 8, 23,
-			                      target.float_int_overflow);
-		case 8:
-			return new_float_mode("F64", irma_ieee754, 11, 52,
-			                      target.float_int_overflow);
-		case 16:
-			return new_float_mode("F128", irma_ieee754, 15, 112,
-			                      target.float_int_overflow);
-		default: panic("unexpected kind");
-		}
-	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
-		char            name[64];
-		unsigned        bit_size     = size * 8;
-		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
-		unsigned        modulo_shift = decide_modulo_shift(bit_size);
-
-		snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U", bit_size);
-		return new_int_mode(name, bit_size, is_signed, modulo_shift);
-	}
-
-	return NULL;
-}
-
 void init_constfold(void)
 {
 	tarval_set_wrap_on_overflow(true);
 
-	const backend_params *be_params = be_get_backend_param();
-
 	/* initialize modes for arithmetic types */
-	memset(atomic_modes, 0, sizeof(atomic_modes));
-	const ir_type *const type_ld = be_params->type_long_double;
-	if (type_ld != NULL)
-		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_ld);
-	mode_float_arithmetic = be_params->mode_float_arithmetic;
+	mode_float_arithmetic = ir_target_float_arithmetic_mode();
 
-	for (int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
-		if (atomic_modes[i] != NULL)
-			continue;
-		atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
-	}
+	ir_mode **m = atomic_modes;
+	m[ATOMIC_TYPE_BOOL]      = ir_platform_type_mode(IR_TYPE_BOOL, false);
+	m[ATOMIC_TYPE_SCHAR]     = ir_platform_type_mode(IR_TYPE_CHAR, true);
+	m[ATOMIC_TYPE_UCHAR]     = ir_platform_type_mode(IR_TYPE_CHAR, false);
+	m[ATOMIC_TYPE_SHORT]     = ir_platform_type_mode(IR_TYPE_SHORT, true);
+	m[ATOMIC_TYPE_USHORT]    = ir_platform_type_mode(IR_TYPE_SHORT, false);
+	m[ATOMIC_TYPE_INT]       = ir_platform_type_mode(IR_TYPE_INT, true);
+	m[ATOMIC_TYPE_UINT]      = ir_platform_type_mode(IR_TYPE_INT, false);
+	m[ATOMIC_TYPE_LONG]      = ir_platform_type_mode(IR_TYPE_LONG, true);
+	m[ATOMIC_TYPE_ULONG]     = ir_platform_type_mode(IR_TYPE_LONG, false);
+	m[ATOMIC_TYPE_LONGLONG]  = ir_platform_type_mode(IR_TYPE_LONG_LONG, true);
+	m[ATOMIC_TYPE_ULONGLONG] = ir_platform_type_mode(IR_TYPE_LONG_LONG, false);
+	m[ATOMIC_TYPE_FLOAT]     = ir_platform_type_mode(IR_TYPE_FLOAT, true);
+	m[ATOMIC_TYPE_DOUBLE]    = ir_platform_type_mode(IR_TYPE_DOUBLE, true);
+	m[ATOMIC_TYPE_LONG_DOUBLE]
+		= ir_platform_type_mode(IR_TYPE_LONG_DOUBLE, true);
+	m[ATOMIC_TYPE_CHAR]
+		= m[get_atomic_type_flags(ATOMIC_TYPE_CHAR) & ATOMIC_TYPE_FLAG_SIGNED
+		    ? ATOMIC_TYPE_SCHAR : ATOMIC_TYPE_UCHAR];
+	m[ATOMIC_TYPE_WCHAR_T]
+		= ir_platform_type_mode(ir_platform_wchar_type(),
+								ir_platform_wchar_is_signed());
 }

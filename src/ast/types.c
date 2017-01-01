@@ -198,20 +198,19 @@ void init_predefined_types(void)
 
 	type_builtin_template_ptr    = make_pointer_type(type_builtin_template,  TYPE_QUALIFIER_NONE);
 
-	backend_params const *const be_params = be_get_backend_param();
-	ir_type *be_va_list_type = be_params->va_list_type;
-	if (!be_va_list_type) {
+	ir_type *va_list_type = ir_platform_va_list_type();
+	if (!va_list_type) {
 		/* Backend has no vararg support. Just hope the the program will not be
 		 * using any. If it does, the parse_va_* functions will complain. */
 		type_valist     = type_error_type;
 		type_valist_arg = type_error_type;
-	} else if (is_Pointer_type(be_va_list_type)) {
+	} else if (is_Pointer_type(va_list_type)) {
 		type_valist     = type_void_ptr;
 		type_valist_arg = type_void_ptr;
-	} else if (is_Struct_type(be_va_list_type)) {
+	} else if (is_Struct_type(va_list_type)) {
 		entity_t *ent = allocate_entity_zero(ENTITY_STRUCT, NAMESPACE_NORMAL, sym_anonymous, &builtin_position);
-		ent->compound.alignment = get_type_alignment(be_va_list_type);
-		ent->compound.size      = get_type_size(be_va_list_type);
+		ent->compound.alignment = get_type_alignment(va_list_type);
+		ent->compound.size      = get_type_size(va_list_type);
 		ent->compound.complete  = true;
 		ent->compound.members   = (scope_t){
 			.first_entity = NULL,
@@ -220,7 +219,7 @@ void init_predefined_types(void)
 		};
 
 		type_t *type_valist_struct = allocate_type_zero(TYPE_COMPOUND_STRUCT);
-		type_valist_struct->base.firm_type = be_va_list_type;
+		type_valist_struct->base.firm_type = va_list_type;
 		type_valist_struct->compound.compound = &ent->compound;
 
 		type_valist     = make_array_type(type_valist_struct, 1, TYPE_QUALIFIER_NONE);
@@ -232,13 +231,6 @@ void init_predefined_types(void)
 	type_const_char_ptr     = make_pointer_type(type_const_char,        TYPE_QUALIFIER_NONE);
 	type_const_char_ptr_restrict = make_pointer_type(type_const_char,        TYPE_QUALIFIER_RESTRICT);
 
-	atomic_type_kind_t pointer_sized_int  = dialect.pointer_sized_int;
-	atomic_type_kind_t pointer_sized_uint = dialect.pointer_sized_uint;
-	type_size_t     = make_atomic_type(pointer_sized_uint, TYPE_QUALIFIER_NONE);
-	type_ssize_t    = make_atomic_type(pointer_sized_int, TYPE_QUALIFIER_NONE);
-	type_uptrdiff_t = type_size_t;
-	type_ptrdiff_t  = type_ssize_t;
-
 	type_intmax_t  = type_long_long;
 	type_uintmax_t = type_unsigned_long_long;
 	type_wint_t    = type_unsigned_int;
@@ -248,14 +240,6 @@ void init_predefined_types(void)
 	type_uptrdiff_t_ptr = make_pointer_type(type_uptrdiff_t, TYPE_QUALIFIER_NONE);
 	type_ssize_t_ptr    = make_pointer_type(type_ssize_t,    TYPE_QUALIFIER_NONE);
 	type_size_t_ptr     = make_pointer_type(type_size_t,     TYPE_QUALIFIER_NONE);
-
-	atomic_type_kind_t akind
-		= dialect.cpp ? ATOMIC_TYPE_WCHAR_T : dialect.wchar_atomic_kind;
-	type_wchar_t       = make_atomic_type(akind, TYPE_QUALIFIER_NONE);
-	type_const_wchar_t = make_atomic_type(akind, TYPE_QUALIFIER_CONST);
-	type_wchar_t_ptr   = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
-	type_const_wchar_t_ptr
-		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
 
 	atomic_type_kind_t const u2 = find_unsigned_int_atomic_type_kind_for_size(2);
 	type_char16_t           = make_atomic_type(u2, TYPE_QUALIFIER_NONE);

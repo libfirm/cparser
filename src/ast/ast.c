@@ -37,12 +37,8 @@
 #include "type_t.h"
 #include "types.h"
 
-c_dialect_t dialect = {
-	.char_is_signed = true,
-	.long_long_size = 8,
-};
-
 struct obstack ast_obstack;
+c_dialect_t    dialect;
 
 static int indent;
 static int case_indent;

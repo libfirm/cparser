@@ -310,7 +310,6 @@ int main(int argc, char **argv)
 	init_driver();
 	init_default_driver();
 	init_preprocessor();
-	init_firm_opt(); /* initialize early because we need to parse options */
 	init_ast();
 	init_parser();
 
@@ -331,8 +330,9 @@ int main(int argc, char **argv)
 	if (!isysroot)
 		isysroot = lsysroot;
 
-	/* Setup target so later options can override the target defaults */
-	target_set_defaults();
+	/* Initialize firm now that we know the target machine */
+	init_firm_target();
+	init_firm_opt();
 	set_optimization_level(opt_level);
 
 	/* parse rest of options */

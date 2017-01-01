@@ -155,12 +155,7 @@ atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 0,
 	},
-	[ATOMIC_TYPE_WCHAR_T] = {
-		.size      = (unsigned)-1,
-		.alignment = (unsigned)-1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER,
-		.rank      = (unsigned)-1,
-	},
+	/* ATOMIC_TYPE_LONG_DOUBLE and ATOMIC_TYPE_WCHAR_T initialized later */
 };
 atomic_type_properties_t pointer_properties = {
 	.size      = 4,
@@ -168,7 +163,10 @@ atomic_type_properties_t pointer_properties = {
 	.flags     = ATOMIC_TYPE_FLAG_NONE,
 };
 
-void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size)
+void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size,
+                atomic_type_kind_t wchar_atomic_kind,
+                atomic_type_kind_t pointer_sized_int,
+                atomic_type_kind_t pointer_sized_uint)
 {
 	obstack_init(&type_obst);
 
@@ -186,13 +184,26 @@ void init_types(unsigned int_size, unsigned long_size, unsigned pointer_size)
 	pointer_properties.alignment       = pointer_size;
 
 	props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
 
 	/* set struct alignments to the same value as alignment */
 	for (size_t i = 0; i != ARRAY_SIZE(atomic_type_properties); ++i) {
 		props[i].struct_alignment = props[i].alignment;
 	}
 	pointer_properties.struct_alignment = pointer_size;
+
+	type_size_t     = make_atomic_type(pointer_sized_uint, TYPE_QUALIFIER_NONE);
+	type_ssize_t    = make_atomic_type(pointer_sized_int, TYPE_QUALIFIER_NONE);
+	type_uptrdiff_t = type_size_t;
+	type_ptrdiff_t  = type_ssize_t;
+
+	atomic_type_kind_t akind
+		= dialect.cpp ? ATOMIC_TYPE_WCHAR_T : wchar_atomic_kind;
+	type_wchar_t       = make_atomic_type(akind, TYPE_QUALIFIER_NONE);
+	type_const_wchar_t = make_atomic_type(akind, TYPE_QUALIFIER_CONST);
+	type_wchar_t_ptr   = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
+	type_const_wchar_t_ptr
+		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
+	props[ATOMIC_TYPE_WCHAR_T]     = props[wchar_atomic_kind];
 }
 
 void exit_types(void)

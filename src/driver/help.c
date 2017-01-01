@@ -5,7 +5,7 @@
 #include "help.h"
 
 #include <assert.h>
-#include <libfirm/be.h>
+#include <libfirm/target.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -211,7 +211,6 @@ static void print_help_codegeneration(void)
 {
 	help_spaced("-target", "TARGET",              "Specify target architecture as CPU-manufacturer-OS triple");
 	help_equals("--target", "TARGET",             "Same as -target TARGET");
-	help_aprefix("-m", "OPTION",                  "Pass target specific option");
 	help_simple("-m16",                           "Select 16 bit variant of target architecture");
 	help_simple("-m32",                           "Select 32 bit variant of target architecture");
 	help_simple("-m64",                           "Select 64 bit variant of target architecture");
@@ -245,6 +244,7 @@ static void print_help_codegeneration(void)
 	help_equals("-falign-loops", "ALIGNMENT",     "Ignored (gcc compatibility)");
 	help_equals("-falign-jumps", "ALIGNEMNT",     "Ignored (gcc compatibility)");
 	help_equals("-falign-functions", "ALIGNMENT", "Ignored (gcc compatibility)");
+	help_aprefix("-m", "OPTION",                  "Directly pass option to libFirm backend");
 	puts("");
 	puts("\tMost of these options can be used with a no- prefix to disable them");
 	puts("\te.g. -fno-omit-frame-pointer");
@@ -298,10 +298,9 @@ static void print_help_language_tools(void)
 
 static void print_help_firm(void)
 {
-	help_simple("-bhelp",                   "Display firm codegeneration options");
-	help_equals("-bisa", "ARCH",            "Select architecture for firm backend");
-	help_aprefix("-b", "OPTION",            "Directly pass option to libFirm backend");
-	int res = be_parse_arg("help");
+	puts("libFirm backend options:");
+	puts("");
+	int res = ir_target_option("help");
 	(void) res;
 	assert(res);
 }

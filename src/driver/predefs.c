@@ -15,7 +15,6 @@
 #include "ast/types.h"
 #include "firm/ast2firm.h"
 #include "firm/firm_opt.h"
-#include "machine_triple.h"
 #include "parser/preprocessor.h"
 #include "target.h"
 #include "version.h"
@@ -308,12 +307,6 @@ void add_predefined_macros(void)
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
 
-	switch (target.object_format) {
-	case OBJECT_FORMAT_ELF:     add_define("__ELF__", "1", false); break;
-	case OBJECT_FORMAT_PE_COFF: add_define("__PE__", "1", false); break;
-	case OBJECT_FORMAT_MACH_O:  break;
-	}
-
 	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
 	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
 	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
@@ -336,18 +329,13 @@ void add_predefined_macros(void)
 		add_define("__ILP32__", "1", false);
 	}
 
-	ir_mode *float_mode = be_get_mode_float_arithmetic();
+	ir_mode *float_mode = ir_target_float_arithmetic_mode();
 	const char *flt_eval_metod
 		= float_mode == NULL ? "0"
 		: get_mode_size_bytes(float_mode) > get_ctype_size(type_double)  ? "2"
 		: get_mode_size_bytes(float_mode) == get_ctype_size(type_double) ? "1"
 		: "-1";
 	add_define("__FLT_EVAL_METHOD__", flt_eval_metod, false);
-
-	if (target.pic_mode != 0) {
-		add_define_int("__PIC__", target.pic_mode);
-		add_define_int("__pic__", target.pic_mode);
-	}
 
 	char user_label_prefix_str[] = { target.user_label_prefix, '\0' };
 	add_define("__USER_LABEL_PREFIX__", user_label_prefix_str, false);
@@ -462,10 +450,12 @@ void add_predefined_macros(void)
 	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
 
 	/* Add target specific defines */
-	for (const target_define_t *define = target.defines; define != NULL;
-	     define = define->next) {
-		if (define->condition != NULL && !define->condition())
+	for (ir_platform_define_t const *define = ir_platform_define_first();
+		 define != NULL; define = ir_platform_define_next(define)) {
+		char const *const name = ir_platform_define_name(define);
+		if (name[0] != '_' && !dialect.gnu)
 			continue;
-		add_define(define->name, define->value, false);
+		char const *const value = ir_platform_define_value(define);
+		add_define(name, value, false);
 	}
 }

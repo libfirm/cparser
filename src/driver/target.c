@@ -19,48 +19,82 @@
 #include "target.h"
 #include "warning.h"
 
-target_t target = {
-	.biggest_alignment = 16,
-	.pic_mode          = -1,
-};
+target_t target;
+
 const char *multilib_directory_target_triple;
 unsigned target_size_override;
+bool set_wchar;
+bool short_wchar;
+bool unsigned_char;
+
+static atomic_type_kind_t ir_platform_to_ast(ir_platform_type_t type,
+                                             bool get_signed)
+{
+	switch (type) {
+	case IR_TYPE_BOOL:
+		return ATOMIC_TYPE_BOOL;
+	case IR_TYPE_CHAR:
+		return get_signed ? ATOMIC_TYPE_SCHAR : ATOMIC_TYPE_UCHAR;
+	case IR_TYPE_SHORT:
+		return get_signed ? ATOMIC_TYPE_SHORT : ATOMIC_TYPE_USHORT;
+	case IR_TYPE_INT:
+		return get_signed ? ATOMIC_TYPE_INT : ATOMIC_TYPE_UINT;
+	case IR_TYPE_LONG:
+		return get_signed ? ATOMIC_TYPE_LONG : ATOMIC_TYPE_ULONG;
+	case IR_TYPE_LONG_LONG:
+		return get_signed ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
+	case IR_TYPE_FLOAT:
+		assert(get_signed);
+		return ATOMIC_TYPE_FLOAT;
+	case IR_TYPE_DOUBLE:
+		assert(get_signed);
+		return ATOMIC_TYPE_DOUBLE;
+	case IR_TYPE_LONG_DOUBLE:
+		assert(get_signed);
+		return ATOMIC_TYPE_LONG_DOUBLE;
+	}
+	panic("Invalid basic type");
+}
 
 void target_adjust_types_and_dialect(void)
 {
-	init_types(dialect.int_size, dialect.long_size, dialect.pointer_size);
+	unsigned int_size     = ir_platform_type_size(IR_TYPE_INT);
+	unsigned long_size    = ir_platform_type_size(IR_TYPE_LONG);
+	unsigned pointer_size = ir_target_pointer_size();
+	atomic_type_kind_t pointer_sized_int
+		= ir_platform_to_ast(ir_platform_intptr_type(), true);
+	atomic_type_kind_t pointer_sized_uint
+		= ir_platform_to_ast(ir_platform_intptr_type(), false);
+	atomic_type_kind_t wchar_atomic_kind
+		= set_wchar ? (short_wchar ? ATOMIC_TYPE_USHORT : ATOMIC_TYPE_INT)
+		            : ir_platform_to_ast(ir_platform_wchar_type(),
+		                                 ir_platform_wchar_is_signed());
+	init_types(int_size, long_size, pointer_size, wchar_atomic_kind,
+			   pointer_sized_int, pointer_sized_uint);
 
-	atomic_type_properties_t *props = atomic_type_properties;
-
-	/* Adjustments for some systems */
-	props[ATOMIC_TYPE_LONGLONG].size             = dialect.long_long_size;
-	props[ATOMIC_TYPE_LONGLONG].alignment        = dialect.long_long_size;
-	props[ATOMIC_TYPE_LONGLONG].struct_alignment = dialect.long_long_size;
-	props[ATOMIC_TYPE_ULONGLONG].size             = dialect.long_long_size;
-	props[ATOMIC_TYPE_ULONGLONG].alignment        = dialect.long_long_size;
-	props[ATOMIC_TYPE_ULONGLONG].struct_alignment = dialect.long_long_size;
+	atomic_type_properties_t *const props = atomic_type_properties;
 
 	unsigned const ll_d_struct_align
-		= dialect.long_long_and_double_struct_align;
+		= ir_platform_long_long_and_double_struct_align_override();
 	if (ll_d_struct_align > 0) {
 		props[ATOMIC_TYPE_LONGLONG].struct_alignment  = ll_d_struct_align;
 		props[ATOMIC_TYPE_ULONGLONG].struct_alignment = ll_d_struct_align;
 		props[ATOMIC_TYPE_DOUBLE].struct_alignment    = ll_d_struct_align;
 	}
 
-	props[ATOMIC_TYPE_LONG_DOUBLE].size             = dialect.long_double_size;
-	props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = dialect.long_double_align;
-	props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = dialect.long_double_align;
+	props[ATOMIC_TYPE_LONG_DOUBLE].size
+		= ir_platform_type_size(IR_TYPE_LONG_DOUBLE);
+	unsigned align = ir_platform_type_align(IR_TYPE_LONG_DOUBLE);
+	props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = align;
+	props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = align;
 
 	/* stuff decided after processing operating system specifics and
 	 * commandline flags */
-	if (dialect.char_is_signed) {
-		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
-	} else {
+	if (unsigned_char) {
 		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
+	} else {
+		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
 	}
-	/* copy over wchar_t properties (including rank) */
-	props[ATOMIC_TYPE_WCHAR_T] = props[dialect.wchar_atomic_kind];
 
 	static bool had_cpp_warning;
 	if (dialect.cpp && !had_cpp_warning) {
@@ -69,77 +103,21 @@ void target_adjust_types_and_dialect(void)
 		had_cpp_warning = true;
 	}
 
-	if (target.firm_isa_specified) {
-		backend_params const *const p = be_get_backend_param();
-		target.float_int_overflow    = p->float_int_overflow;
-		target.byte_order_big_endian = p->byte_order_big_endian;
-		dialect.pointer_size         = p->machine_size / BITS_PER_BYTE;
-	} else {
-		/* The frontend should do all decisions and should not be influenced by
-		 * outside influences like the firm backend. So we just check here that
-		 * our decisions match the firm backend. */
-		assert(be_get_backend_param()->machine_size % BITS_PER_BYTE == 0);
-		assert(dialect.pointer_size
-		       == be_get_backend_param()->machine_size / BITS_PER_BYTE);
-		assert(target.byte_order_big_endian
-		       == be_get_backend_param()->byte_order_big_endian);
-		assert(target.float_int_overflow
-		       == be_get_backend_param()->float_int_overflow);
-	}
-}
-
-static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
-{
-	(void)mt;
-	char const prefix = target.user_label_prefix;
-	if (prefix == '\0')
-		return id; /* Shortcut for empty prefix */
-	return new_id_fmt("%c%s", prefix, id);
-}
-
-/** Add a target specific preprocessor define. */
-static target_define_t *ppdef(const char *name, const char *value)
-{
-	target_define_t *define = XMALLOCZ(target_define_t);
-	define->name = name;
-	define->value = value;
-	define->next = target.defines;
-	target.defines = define;
-	return define;
-}
-
-/** Add a target specific preprocessor define. This calls \p condition_func
- * to check whether the define should really be added. */
-static target_define_t *ppdefc(const char *name, const char *value,
-                               bool (*condition_func)(void))
-{
-	target_define_t *define = ppdef(name, value);
-	define->condition = condition_func;
-	return define;
-}
-
-static bool cond_not_strict(void)
-{
-	return dialect.gnu;
-}
-
-static bool cond_is_little_endian(void)
-{
-	return !target.byte_order_big_endian;
-}
-
-static void init_generic_elf(void)
-{
-	driver_default_exe_output = "a.out";
-	target.object_format = OBJECT_FORMAT_ELF;
-	set_be_option("ia32-struct_in_reg=no");
-}
-
-static void init_unix(void)
-{
-	ppdef( "__unix",    "1");
-	ppdef( "__unix__",  "1");
-	ppdefc("unix",      "1", cond_not_strict);
+	/* Check that we match libfirms view of the world */
+	assert(ir_platform_type_size(IR_TYPE_BOOL) == props[ATOMIC_TYPE_BOOL].size);
+	assert(ir_platform_type_size(IR_TYPE_CHAR) == props[ATOMIC_TYPE_CHAR].size);
+	assert(ir_platform_type_size(IR_TYPE_SHORT)
+	       == props[ATOMIC_TYPE_SHORT].size);
+	assert(ir_platform_type_size(IR_TYPE_INT) == props[ATOMIC_TYPE_INT].size);
+	assert(ir_platform_type_size(IR_TYPE_LONG) == props[ATOMIC_TYPE_LONG].size);
+	assert(ir_platform_type_size(IR_TYPE_LONG_LONG)
+	       == props[ATOMIC_TYPE_LONGLONG].size);
+	assert(ir_platform_type_size(IR_TYPE_FLOAT)
+	       == props[ATOMIC_TYPE_FLOAT].size);
+	assert(ir_platform_type_size(IR_TYPE_DOUBLE)
+	       == props[ATOMIC_TYPE_DOUBLE].size);
+	assert(ir_platform_type_size(IR_TYPE_LONG_DOUBLE)
+	       == props[ATOMIC_TYPE_LONG_DOUBLE].size);
 }
 
 static bool is_ia32_cpu(const char *cpu)
@@ -154,313 +132,51 @@ static bool is_amd64_cpu(char const *const cpu)
 	return streq(cpu, "x86_64") || streq(cpu, "amd64");
 }
 
-static void set_options_for_machine(machine_triple_t const *const machine)
+void set_target_option(char const *const arg)
 {
-	/* Note: Code here should only check the target triple! Querying other
-	 * target features is not allowed as subsequent commandline options may
-	 * change those. Example:
-	 * ppdefc("X", "Y", cond_not_strict); // Correct: cond_not_strict is
-	 *                                    // evaluated later
-	 * if (dialect.gnu)
-	 *    ppdef("X", "Y"); // Wrong: language dialect/target is not final yet
-	 */
-	const char *const cpu          = machine->cpu_type;
-	const char *const manufacturer = machine->manufacturer;
-	const char *const os           = machine->operating_system;
-	unsigned                              pointer_size;
-	unsigned                              long_double_size;
-	unsigned                              long_double_align;
-	unsigned                              modulo_shift;
-	float_int_conversion_overflow_style_t float_int_overflow;
-	const char                           *firm_isa;
-	if (target.firm_isa_specified) {
-		/* Firm ISA was specified on the commandline, this may be used to
-		 * experiment with new firm backends. */
-		firm_isa = target.firm_isa;
-		unsigned size = target_size_override != 0
-		              ? target_size_override/BITS_PER_BYTE : 4;
-		pointer_size       = size;
-		long_double_size   = 8;
-		long_double_align  = 8;
-		modulo_shift       = size * BITS_PER_BYTE;
-		float_int_overflow = ir_overflow_indefinite;
-
-	/* i386, i486, i586, i686, i786 */
-	} else if (is_ia32_cpu(cpu)) {
-		ppdefc("i386",     "1", cond_not_strict);
-		ppdef( "__i386",   "1");
-		ppdef( "__i386__", "1");
-		switch (cpu[1]) {
-		case '4':
-			ppdef("__i486",   "1");
-			ppdef("__i486__", "1");
-			break;
-		case '5':
-			ppdef("__i586",      "1");
-			ppdef("__i586__",    "1");
-			ppdef("__pentium",   "1");
-			ppdef("__pentium__", "1");
-			//ppdef("__pentium_mmx__", "1");
-			break;
-		case '6':
-			ppdef("__pentiumpro",   "1");
-			ppdef("__pentiumpro__", "1");
-			ppdef("__i686",         "1");
-			ppdef("__i686__",       "1");
-			break;
-		case '7':
-			ppdef("__pentium4",     "1");
-			ppdef("__pentium4__",   "1");
-			break;
-		}
-		firm_isa           = "ia32";
-		pointer_size       = 4;
-		modulo_shift       = 32;
-		long_double_size   = 12;
-		long_double_align  = 4;
-		float_int_overflow = ir_overflow_indefinite;
-		target.firm_arch   = cpu;
-		/* long long and double has a 4 byte alignment inside structs, this odd
-		 * mode is everywhere except for windows OSes (they will revert it
-		 * below) */
-		dialect.long_long_and_double_struct_align = 4;
-		dialect.x87_long_double                   = true;
-	} else if (streq(cpu, "sparc")) {
-		ppdefc("sparc",     "1", cond_not_strict);
-		ppdef( "__sparc",   "1");
-		ppdef( "__sparc__", "1");
-		/* we always produce sparc V8 code at the moment */
-		ppdef( "__sparc_v8__", "1");
-		if (strstr(manufacturer, "leon") != NULL
-		 || streq(manufacturer, "invasic")) {
-			ppdef("__leon__", "1");
-			set_be_option("sparc-cpu=leon");
-		}
-		firm_isa           = "sparc";
-		pointer_size       = 4;
-		modulo_shift       = 32;
-		long_double_size   = 16;
-		long_double_align  = 8;
-		float_int_overflow = ir_overflow_min_max;
-		target.byte_order_big_endian = true;
-		target.biggest_alignment = 8;
-	} else if (streq(cpu, "arm")) {
-		/* TODO: test, what about
-		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
-		ppdef("__arm__",   "1");
-		if (strstr(os, "eabi") != NULL)
-			ppdef("__ARM_EABI__", "1");
-		firm_isa           = "arm";
-		pointer_size       = 4;
-		modulo_shift       = 256;
-		long_double_size   = 8;
-		long_double_align  = 8;
-		float_int_overflow = ir_overflow_min_max;
-		target.biggest_alignment = 8;
-	} else if (is_amd64_cpu(cpu)) {
-		ppdef("__x86_64",   "1");
-		ppdef("__x86_64__", "1");
-		ppdef("__amd64",    "1");
-		ppdef("__amd64__",  "1");
-		firm_isa           = "amd64";
-		pointer_size       = 8;
-		modulo_shift       = 32;
-		long_double_size   = 16;
-		long_double_align  = 16;
-		float_int_overflow = ir_overflow_indefinite;
-		dialect.x87_long_double = true;
-	} else if (streq(cpu, "mips")) {
-		ppdef("__mips__", "1");
-		firm_isa           = "mips";
-		pointer_size       =  4;
-		modulo_shift       = 32;
-		long_double_size   =  8;
-		long_double_align  =  8;
-		float_int_overflow = ir_overflow_indefinite;
-		target.byte_order_big_endian = true;
-		target.biggest_alignment = 8;
-	} else {
-		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
-		exit(EXIT_FAILURE);
-	}
-
-	target.firm_isa            = firm_isa;
-	target.modulo_shift        = modulo_shift;
-	target.float_int_overflow  = float_int_overflow;
-	dialect.pointer_size       = pointer_size;
-	dialect.int_size           = MIN(pointer_size, 4);
-	dialect.long_size          = MIN(pointer_size, 8);
-	dialect.long_double_size   = long_double_size;
-	dialect.long_double_align  = long_double_align;
-	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
-	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
-	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
-
-	set_compilerlib_name_mangle(compilerlib_name_mangle);
-
-	if (strstr(os, "linux") != NULL) {
-		init_generic_elf();
-		init_unix();
-		ppdef( "__linux",   "1");
-		ppdef( "__linux__", "1");
-		ppdefc("linux",     "1", cond_not_strict);
-		if (strstr(os, "gnu") != NULL)
-			ppdef("__gnu_linux__", "1");
-	} else if (strstart(os, "freebsd")) {
-		ppdef( "__FreeBSD__", "");
-		goto bsd;
-	} else if (strstr(os, "bsd") != NULL) {
-bsd:
-		init_generic_elf();
-		init_unix();
-		set_be_option("ia32-struct_in_reg=yes");
-	} else if (streq(os, "elf") || streq(os, "octopos") || streq(os, "irtss")) {
-		init_generic_elf();
-	} else if (strstart(os, "darwin")) {
-		driver_default_exe_output = "a.out";
-		target.user_label_prefix = '_';
-		target.object_format = OBJECT_FORMAT_MACH_O;
-		target.pic_mode = 2;
-		set_be_option("ia32-stackalign=4");
-		set_be_option("ia32-struct_in_reg=yes");
-		dialect.long_double_size = 16;
-		dialect.long_double_align = 16;
-		ppdef( "__MACH__",               "1");
-		ppdef( "__APPLE__",              "1");
-		ppdef( "__APPLE_CC__",           "1");
-		ppdef( "__weak",                 "");
-		ppdef( "__strong",               "");
-		ppdef( "__CONSTANT_CFSTRINGS__", "1");
-		ppdef( "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050");
-		ppdef( "__DYNAMIC__",            "1");
-		ppdefc("__LITTLE_ENDIAN__",      "1", cond_is_little_endian);
-	} else if (strstart(os, "mingw")) {
-		dialect.wchar_atomic_kind = ATOMIC_TYPE_USHORT;
-		driver_default_exe_output = "a.exe";
-		target.object_format = OBJECT_FORMAT_PE_COFF;
-		set_be_option("ia32-struct_in_reg=no");
-		dialect.enable_main_collect2_hack = true;
-		ppdef("__MINGW32__", "1");
-		dialect.long_long_and_double_struct_align = 0;
-		ppdef( "__MSVCRT__", "1");
-		ppdef( "_WINNT",     "1");
-		ppdef( "__WINNT",    "1");
-		ppdef( "__WINNT__",  "1");
-		ppdefc("WINNT",      "1", cond_not_strict);
-		ppdef( "_WIN32",     "1");
-		ppdef( "__WIN32",    "1");
-		ppdef( "__WIN32__",  "1");
-		ppdefc("WIN32",      "1", cond_not_strict);
-		if (pointer_size == 8) {
-			set_be_option("amd64-x64abi=yes");
-			ppdef( "_WIN64",    "1");
-			ppdef( "__WIN64",   "1");
-			ppdef( "__WIN64__", "1");
-			ppdefc("WIN64",     "1", cond_not_strict);
-			ppdef( "__MINGW64__", "1");
-			/* to ease porting of old c-code microsoft decided to use 32bits
-			 * even for long */
-			dialect.long_size = 4;
-			dialect.pointer_sized_int  = ATOMIC_TYPE_LONGLONG;
-			dialect.pointer_sized_uint = ATOMIC_TYPE_ULONGLONG;
-		} else {
-			assert(pointer_size == 4);
-			target.user_label_prefix = '_';
-			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
-			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
-			dialect.support_fastcall_stdcall = true;
-		}
-	} else if (strstart(os, "midipix")) {
-		driver_default_exe_output = "a.out";
-		target.object_format = OBJECT_FORMAT_PE_COFF;
-		set_be_option("ia32-struct_in_reg=no");
-		dialect.long_long_and_double_struct_align = 0;
-		ppdef("__midipix__", "1");
-		if (pointer_size == 8) {
-			set_be_option("amd64-x64abi=yes");
-			ppdef("__NT64", "1");
-		} else {
-			assert(pointer_size == 4);
-			target.user_label_prefix = '_';
-			ppdef("__NT32", "1");
-		}
-	} else {
-		errorf(NULL, "unknown operating system '%s' in target-triple", os);
-		exit(EXIT_FAILURE);
-	}
-}
-
-void warn_experimental_target(void)
-{
-	char const *const experimental = be_get_backend_param()->experimental;
-	if (experimental)
-		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental);
-}
-
-static bool setup_firm_isa(void)
-{
-	const char *isa = target.firm_isa;
-	char buf[64];
-	snprintf(buf, sizeof(buf), "isa=%s", isa);
-	if (!be_parse_arg(buf)) {
-		errorf(NULL, "Couldn't select firm isa '%s'", isa);
-		return false;
-	}
-
-	const char *arch = target.firm_arch;
-	/* only pass down for ia32 for now */
-	if (arch != NULL && streq(isa, "ia32")) {
-		snprintf(buf, sizeof(buf), "%s-arch=%s", isa, arch);
-		if (!be_parse_arg(buf)) {
-			errorf(NULL, "Couldn't select firm arch '%s-arch=%s'", isa, arch);
-			return false;
-		}
-	}
-
-	return true;
+	int res = ir_target_option(arg);
+	if (!res)
+		panic("setting firm backend option '%s' failed (maybe an outdated version of firm is used)", arg);
 }
 
 static bool pass_options_to_firm_be(void)
 {
-	switch (target.object_format) {
-	case OBJECT_FORMAT_ELF:     set_be_option("objectformat=elf");    break;
-	case OBJECT_FORMAT_MACH_O:  set_be_option("objectformat=mach-o"); break;
-	case OBJECT_FORMAT_PE_COFF: set_be_option("objectformat=coff");   break;
-	}
+#ifdef NO_DEFAULT_VERIFY
+    set_target_option("verify=off");
+#endif
 
 	if (profile_generate) {
 		driver_add_flag(&ldflags_obst, "-lfirmprof");
-		set_be_option("profilegenerate");
+		set_target_option("profilegenerate");
 	}
 	if (profile_use) {
-		set_be_option("profileuse");
+		set_target_option("profileuse");
 	}
-	bool res = true;
-	const char *pic_option;
-	if (target.pic_mode > 0) {
-		/* Select correct PIC mode */
-		if (target.object_format == OBJECT_FORMAT_MACH_O) {
-			pic_option = "pic=mach-o";
-		} else {
-			pic_option = target.pic_no_plt ? "pic=elf-noplt"
-			                               : "pic=elf";
+	if (target.set_use_frame_pointer) {
+		set_target_option(target.use_frame_pointer ? "omitfp" : "omitfp=no");
+	}
+
+	if (target.set_pic) {
+		if (target.pic && !ir_target_supports_pic()) {
+			errorf(NULL,
+			       "Position independent code (PIC) not supported by target");
+			exit(EXIT_FAILURE);
 		}
-	} else {
-		pic_option = "pic=none";
-		target.pic_mode = 0;
+
+		set_target_option(target.pic ? "pic=1" : "pic=0");
 	}
-	set_be_option(pic_option);
+	if (target.set_noplt)
+		set_target_option(target.pic_noplt ? "noplt=1" : "noplt=0");
 
 	/* pass options to firm backend (this happens delayed because we first
 	 * had to decide which backend is actually used) */
+	bool res = true;
 	for (codegen_option_t *option = codegen_options; option != NULL;
 	     option = option->next) {
-		char        buf[256];
-		const char *opt = option->option;
-		/* pass option along to firm backend (except the -m32, -m64 stuff) */
-		snprintf(buf, sizeof(buf), "%s-%s", target.firm_isa, opt);
-		if (be_parse_arg(buf) == 0) {
-			errorf(NULL, "Unknown codegen option '-m%s'", opt);
+		/* pass option along to firm backend (except the ones already filtered
+		 * out like -m32, -m64) */
+		if (!ir_target_option(option->option)) {
+			errorf(NULL, "Unknown codegen option '-m%s'", option->option);
 			res = false;
 			continue;
 		}
@@ -472,6 +188,7 @@ static bool pass_options_to_firm_be(void)
 		};
 		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
 			if (streq(pass_to_cpp_and_ld[i], option->option)) {
+				char buf[64];
 				snprintf(buf, sizeof(buf), "-m%s", option->option);
 				driver_add_flag(&cppflags_obst, buf);
 				driver_add_flag(&asflags_obst, buf);
@@ -481,113 +198,76 @@ static bool pass_options_to_firm_be(void)
 		}
 	}
 
-	/* We can initialize the backend at this point and call be_get_backend_param() */
-	if (target.pic_mode > 0 && !be_get_backend_param()->pic_supported) {
-		errorf(NULL, "Selected backend '%s' does not support position independent code (PIC)",
-			   target.firm_isa);
-		res = false;
-	}
-
 	return res;
-}
-
-static machine_triple_t *get_host_machine_triple(void)
-{
-#ifdef HOST_TRIPLE
-	/* a triple for the host machine was defined in the Makefile
-	 * or config.mak */
-	return parse_machine_triple(HOST_TRIPLE);
-#else
-	/* no host triple specified, we do some guessing based on preprocessor
-	 * defines (look into predefs.c for inspiration) */
-	machine_triple_t *machine = XMALLOC(machine_triple_t);
-
-	machine->cpu_type = xstrdup(
-#if defined(__x86_64__)
-		"x86_64"
-#elif defined(__i686__)
-		"i686"
-#elif defined(__i386__)
-		"i386"
-#elif defined(__sparc__)
-		"sparc"
-#elif defined(__arm__)
-		"arm"
-#else
-	/* Choose a widely used cpu_type; "unknown" would not be useful here. */
-		"i386"
-#endif
-	);
-
-	machine->manufacturer = xstrdup(
-#if defined(__leon__)
-		"leon"
-#else
-		"unknown"
-#endif
-	);
-
-	machine->operating_system = xstrdup(
-#if defined(_WIN32) || defined(__CYGWIN__)
-		"win32"
-#elif defined(__APPLE__)
-		"darwin"
-#elif defined(__FreeBSD__)
-		"freebsd"
-#elif defined(__gnu_linux__)
-		"linux-gnu"
-#elif defined(__linux__)
-		"linux"
-#elif defined(__midipix__)
-		"midipix"
-#elif defined(__ELF__)
-		"elf"
-#else
-		"unknown"
-#endif
-	);
-
-	return machine;
-#endif
 }
 
 static void determine_target_machine(void)
 {
 	if (target.machine == NULL)
-		target.machine = get_host_machine_triple();
+		target.machine = ir_get_host_machine_triple();
 	/* adjust for -m32/-m64 flag */
-	const char *cpu = target.machine->cpu_type;
+	const char *cpu = ir_triple_get_cpu_type(target.machine);
 	if (is_ia32_cpu(cpu) && target_size_override == 64) {
-		free(target.machine->cpu_type);
-		target.machine->cpu_type = xstrdup("x86_64");
+		ir_triple_set_cpu_type(target.machine, "x86_64");
 	} else if (is_amd64_cpu(cpu) && target_size_override == 32) {
-		free(target.machine->cpu_type);
-		target.machine->cpu_type = xstrdup("i686");
+		ir_triple_set_cpu_type(target.machine, "i686");
 	}
 }
 
-void target_set_defaults(void)
+static void set_options_from_be(void)
 {
+	if (target.pic && !ir_target_supports_pic()) {
+		errorf(NULL, "Position independent code (PIC) not supported by target");
+		exit(EXIT_FAILURE);
+	}
+
+	target.biggest_alignment     = ir_target_biggest_alignment();
+	target.user_label_prefix     = ir_platform_user_label_prefix();
+	target.byte_order_big_endian = ir_target_big_endian();
+	driver_default_exe_output    = ir_platform_default_exe_name();
+
+	if (strstart(ir_triple_get_operating_system(target.machine), "mingw")) {
+		/* TODO: This should be done by libfirm instead of modifying the AST */
+		dialect.enable_main_collect2_hack = true;
+
+		if (ir_target_pointer_size() == 4)
+			dialect.support_fastcall_stdcall = true;
+	}
+}
+
+void init_firm_target(void)
+{
+	ir_init_library();
 	determine_target_machine();
-	set_options_for_machine(target.machine);
+
+	bool initialized = ir_target_set_triple(target.machine);
+	if (!initialized) {
+		errorf(NULL, "Failed to initialize libfirm code generation\n");
+		exit(EXIT_FAILURE);
+	}
 }
 
 bool target_setup(void)
 {
-	bool res = setup_firm_isa();
-	res &= pass_options_to_firm_be();
+	bool res = pass_options_to_firm_be();
+	if (!res)
+		return false;
 
 	multilib_directory_target_triple = NULL;
 	if (target.triple == NULL) {
 #ifdef MULTILIB_M32_TRIPLE
-		if (dialect.pointer_size == 4)
+		if (ir_target_pointer_size() == 4)
 			multilib_directory_target_triple = MULTILIB_M32_TRIPLE;
 #endif
 #ifdef MULTILIB_M64_TRIPLE
-		if (dialect.pointer_size == 8)
+		if (ir_target_pointer_size() == 8)
 			multilib_directory_target_triple = MULTILIB_M64_TRIPLE;
 #endif
 	}
+
+	ir_target_init();
+
+	set_options_from_be();
 
 	return res;
 }

@@ -6,6 +6,7 @@
 #define C_DRIVER_H
 
 #include "driver.h"
+#include "ast/dialect.h"
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -27,8 +28,8 @@ extern struct obstack  asflags_obst;
 extern struct obstack  codegenflags_obst;
 extern struct obstack  c_cpp_cppflags_obst;
 extern lang_standard_t standard;
-extern unsigned        features_on;
-extern unsigned        features_off;
+extern lang_features_t features_on;
+extern lang_features_t features_off;
 extern bool            construct_dep_target;
 extern bool            dump_defines;
 extern bool            print_dependencies_instead_of_preprocessing;

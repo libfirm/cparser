@@ -382,7 +382,7 @@ bool options_parse_linker(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-Xlinker");
 		driver_add_flag(&ldflags_obst, arg);
 	} else if (simple_arg("pg", s)) {
-		set_be_option("gprof");
+		set_target_option("gprof");
 		driver_add_flag(&ldflags_obst, "-pg");
 	} else if ((arg = equals_arg("print-file-name", s)) != NULL) {
 		print_file_name_file = arg;
@@ -432,18 +432,6 @@ bool options_parse_codegen(options_state_t *s)
 		} else {
 			set_default_visibility(visibility);
 		}
-	} else if (accept_prefix(s, "-b", true, &arg)) {
-		if (!be_parse_arg(arg)) {
-			errorf(NULL, "invalid backend option '%s' (unknown option or invalid argument)",
-			       full_option);
-			s->argument_errors = true;
-		} else if ((arg = equals_arg("bisa", s)) != NULL) {
-			/* This is a quick and dirty option to try out new firm targets.
-			 * Sooner rather than later the new target should be added properly
-			 * to target.c! */
-			target.firm_isa_specified = true;
-			target.firm_isa = arg;
-		}
 	} else if (simple_arg("-unroll-loops", s)) {
 		/* ignore (gcc compatibility) */
 	} else if (simple_arg("fexcess-precision=standard", s)) {
@@ -451,11 +439,11 @@ bool options_parse_codegen(options_state_t *s)
 		 * anyway in this respect */
 	} else if (accept_prefix(s, "-g", false, &arg)) {
 		if (streq(arg, "0")) {
-			set_be_option("debug=none");
-			set_be_option("ia32-optcc=true");
+			set_target_option("debug=none");
+			set_target_option("ia32-optcc=true");
 		} else {
-			set_be_option("debug=frameinfo");
-			set_be_option("ia32-optcc=false");
+			set_target_option("debug=frameinfo");
+			set_target_option("ia32-optcc=false");
 		}
 	} else if (accept_prefix(s, "-m", false, &arg)) {
 		arg = &option[1];
@@ -476,7 +464,8 @@ bool options_parse_codegen(options_state_t *s)
 			if (f_yesno_arg("-ffast-math", s)) {
 				ir_allow_imprecise_float_transforms(truth_value);
 			} else if (f_yesno_arg("-fomit-frame-pointer", s)) {
-				set_be_option(truth_value ? "omitfp" : "omitfp=no");
+				target.set_use_frame_pointer = true;
+				target.use_frame_pointer = truth_value;
 			} else if (f_yesno_arg("-fstrength-reduce", s)) {
 				/* does nothing, for gcc compatibility (even gcc does
 				 * nothing for this switch anymore) */
@@ -489,13 +478,20 @@ bool options_parse_codegen(options_state_t *s)
 				/* ignore for gcc compatibility: we don't have any unsafe
 				 * optimizations in that area */
 			} else if (f_yesno_arg("-fverbose-asm", s)) {
-				set_be_option(truth_value ? "verboseasm" : "verboseasm=no");
+				set_target_option(truth_value ? "verboseasm" : "verboseasm=no");
 			} else if (f_yesno_arg("-fPIC", s)) {
-				target.pic_mode = truth_value ? 2 : 0;
+				target.pic = truth_value;
+				target.set_pic = true;
 			} else if (f_yesno_arg("-fpic", s)) {
-				target.pic_mode = truth_value ? 1 : 0;
+				target.pic = truth_value;
+				target.set_pic = true;
+				/* cparser has no concept of -fPIC vs. -fpic yet */
+				if (truth_value)
+					warningf(WARN_COMPAT_OPTION, NULL,
+							 "-fpic unsupported, using -fPIC instead");
 			} else if (f_yesno_arg("-fplt", s)) {
-				target.pic_no_plt = !truth_value;
+				target.pic_noplt = !truth_value;
+				target.set_noplt = true;
 			} else if (f_yesno_arg("-fjump-tables", s)             ||
 			           f_yesno_arg("-fexpensive-optimizations", s) ||
 			           f_yesno_arg("-fcommon", s)                  ||
@@ -595,12 +591,12 @@ bool options_parse_c_dialect(options_state_t *s)
 	const char *fopt;
 	if ((fopt = f_no_arg(&truth_value, s)) != NULL) {
 		if (f_yesno_arg("-fshort-wchar", s)) {
-			dialect.wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
-			                                        : ATOMIC_TYPE_INT;
+			set_wchar = true;
+			short_wchar = truth_value;
 		} else if (f_yesno_arg("-fsigned-char", s)) {
-			dialect.char_is_signed = truth_value;
+			unsigned_char = !truth_value;
 		} else if (f_yesno_arg("-funsigned-char", s)) {
-			dialect.char_is_signed = !truth_value;
+			unsigned_char = truth_value;
 		} else if (f_yesno_arg("-ffreestanding", s)) {
 			dialect.freestanding = truth_value;
 			dialect.no_builtins = truth_value;
@@ -628,9 +624,6 @@ bool options_parse_help(options_state_t *s)
 		fprintf(stderr,
 		        "warning: -fhelp is deprecated (use --help-optimization)\n");
 		help |= HELP_OPTIMIZATION;
-	} else if (simple_arg("bhelp", s)) {
-		fprintf(stderr, "warning: -bhelp is deprecated (use --help-firm)\n");
-		help |= HELP_FIRM;
 	} else if (simple_arg("-help", s)) {
 		help |= HELP_BASIC;
 	} else if (simple_arg("-help-preprocessor", s)) {
@@ -662,7 +655,7 @@ bool options_parse_help(options_state_t *s)
 
 static bool parse_target_triple(const char *arg)
 {
-	machine_triple_t *triple = parse_machine_triple(arg);
+	ir_machine_triple_t *triple = ir_parse_machine_triple(arg);
 	if (triple == NULL) {
 		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
 		return false;
