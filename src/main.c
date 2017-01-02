@@ -189,12 +189,12 @@ static void set_handlers(compile_mode_t mode)
 	case MODE_COMPILE_DUMP:
 		set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, true);
 		set_unused_after(MODE_COMPILE);
-	    return;
+		return;
 	case MODE_COMPILE_EXPORTIR:
 		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
 		                 write_ir_file, true);
 		set_unused_after(MODE_COMPILE);
-	    return;
+		return;
 	case MODE_COMPILE:
 		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
 		                 generate_code_final, true);
