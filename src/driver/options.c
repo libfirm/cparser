@@ -492,6 +492,8 @@ bool options_parse_codegen(options_state_t *s)
 			} else if (f_yesno_arg("-fplt", s)) {
 				target.pic_noplt = !truth_value;
 				target.set_noplt = true;
+			} else if (f_yesno_arg("-fwhole-program", s)) {
+				set_opt_closed_world(truth_value);
 			} else if (f_yesno_arg("-fjump-tables", s)             ||
 			           f_yesno_arg("-fexpensive-optimizations", s) ||
 			           f_yesno_arg("-fcommon", s)                  ||
