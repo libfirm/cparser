@@ -25,7 +25,7 @@ void jit_compile_execute_main(void)
 	unsigned const alignment  = 16;
 	unsigned const align_mask = ~(alignment-1);
 
-	optimize_lower_ir_prog();
+	optimize_lower_ir_prog(true);
 
 	/* This is somewhat ad-hoc testing code for the jit, it is limited and
 	 * will not handle all firm programs. */

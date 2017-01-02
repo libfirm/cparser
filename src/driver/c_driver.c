@@ -807,10 +807,33 @@ bool do_nothing(compilation_env_t *env, compilation_unit_t *unit)
 	return true;
 }
 
+ir_timer_t *t_opt_codegen;
+
+bool run_optimization(compilation_env_t *env, compilation_unit_t *unit)
+{
+	(void)env;
+
+	t_opt_codegen = ir_timer_new();
+	timer_register(t_opt_codegen, "Optimizations and code generation");
+
+	timer_start(t_opt_codegen);
+	optimize_lower_ir_prog(false);
+	timer_stop(t_opt_codegen);
+
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_opt", ir_timer_elapsed_sec(t_opt_codegen));
+	}
+	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION_OPTIMIZED;
+	return true;
+}
+
 static bool do_generate_code(FILE *asm_out, compilation_unit_t *unit)
 {
-	ir_timer_t *t_opt_codegen = ir_timer_new();
-	timer_register(t_opt_codegen, "Optimization and Codegeneration");
+	if (!t_opt_codegen) {
+		t_opt_codegen = ir_timer_new();
+		timer_register(t_opt_codegen, "Code generation");
+	}
+
 	timer_start(t_opt_codegen);
 	generate_code(asm_out, unit->original_name);
 	timer_stop(t_opt_codegen);
@@ -1000,6 +1023,8 @@ void set_default_handlers(void)
 	                 start_preprocessing, false);
 	set_unit_handler(COMPILATION_UNIT_AST, build_firm_ir, false);
 	set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+	                 run_optimization, false);
+	set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION_OPTIMIZED,
 	                 generate_code_intermediate, false);
 	set_unit_handler(COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
 	                 assemble_intermediate, false);

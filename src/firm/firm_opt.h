@@ -107,6 +107,12 @@ typedef enum optimization_level_t {
 	OPT_g,
 } optimization_level_t;
 
+/**
+ * Store the optimization level. This is required to determine
+ * whether an optimized ir-file should be created or not.
+ */
+extern int optimization_level;
+
 extern ir_entity *rts_entities[rts_max];
 
 /** Initializes the firm optimization manager. */
@@ -126,7 +132,7 @@ void generate_code(FILE *out, const char *input_filename);
 /** process optimization commandline option */
 int firm_option(const char *opt);
 
-void optimize_lower_ir_prog(void);
+void optimize_lower_ir_prog(bool lower);
 
 bool firm_is_inlining_enabled(void);
 

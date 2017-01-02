@@ -128,6 +128,8 @@ static const struct params {
 
 #undef X
 
+int optimization_level = -1;
+
 static ir_timer_t *t_vcg_dump;
 static ir_timer_t *t_verify;
 static ir_timer_t *t_all_opt;
@@ -699,7 +701,7 @@ void init_firm_opt(void)
 	t_vcg_dump = ir_timer_new();
 	timer_register(t_vcg_dump, "Firm: vcg dumping");
 	t_all_opt = ir_timer_new();
-	timer_register(t_all_opt, "Firm: all optimizations");
+	timer_register(t_all_opt, "Firm: optimizations and lowering");
 	t_backend = ir_timer_new();
 	timer_register(t_backend, "Firm: backend");
 }
@@ -710,7 +712,7 @@ static void dump_types(char const *const name)
 		dump_ir_prog_ext(dump_typegraph, name);
 }
 
-void optimize_lower_ir_prog(void)
+void optimize_lower_ir_prog(bool lower)
 {
 	/* initialize implicit opts, just to be sure because really the frontend
 	 * should have called it already before starting graph construction */
@@ -740,15 +742,17 @@ void optimize_lower_ir_prog(void)
 	}
 
 	do_firm_optimizations();
-	do_firm_lowering();
-	dump_types("types-low.vcg");
+	if (lower) {
+		do_firm_lowering();
+		dump_types("types-low.vcg");
+	}
 
 	timer_stop(t_all_opt);
 }
 
 /**
- * Called, after the Firm generation is completed,
- * do all optimizations and backend call here.
+ * Called, after the Firm generation is completed.
+ * Firm lowering is done in this step.
  *
  * @param out                a file handle for the output, may be NULL
  * @param input_filename     the name of the (main) source file
@@ -759,7 +763,10 @@ void generate_code(FILE *out, const char *input_filename)
 	if (experimental)
 		warningf(WARN_EXPERIMENTAL, NULL, "%s", experimental);
 
-	optimize_lower_ir_prog();
+	/* Optimization step is run without lowering. Lower now */
+	timer_start(t_all_opt);
+	do_firm_lowering();
+	timer_stop(t_all_opt);
 
 	/* run the code generator */
 	timer_start(t_backend);
@@ -888,6 +895,9 @@ bool firm_is_inlining_enabled(void)
 
 void set_optimization_level(optimization_level_t level)
 {
+	optimization_level = level;
+
+	/* apply optimization level */
 	switch (level) {
 	case OPT_fast:
 	case OPT_3:

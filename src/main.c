@@ -191,13 +191,21 @@ static void set_handlers(compile_mode_t mode)
 		set_unused_after(MODE_COMPILE);
 		return;
 	case MODE_COMPILE_EXPORTIR:
-		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
-		                 write_ir_file, true);
+		// The actual export (write_ir_file) has been moved to the final step to avoid the unused warning.
+		// If there are no -OX Flags specified, skip the optimization step
+		if (optimization_level == -1) {
+			set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+			                 do_nothing, true);
+		} else {
+			set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+			                 run_optimization, true);
+		}
+
 		set_unused_after(MODE_COMPILE);
 		return;
 	case MODE_COMPILE:
-		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
-		                 generate_code_final, true);
+		set_unit_handler(COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION_OPTIMIZED,
+						 generate_code_final, true);
 		set_unused_after(MODE_COMPILE);
 		return;
 	case MODE_JITTEST:
@@ -291,6 +299,7 @@ int action_compile(const char *argv0)
 		bool (*final_step)(compilation_env_t *env, compilation_unit_t *units)
 			= mode == MODE_COMPILE_ASSEMBLE_LINK ? link_program
 			: mode == MODE_COMPILE_DUMP          ? dump_irg
+			: mode == MODE_COMPILE_EXPORTIR      ? write_ir_file
 			: warn_no_linking;
 		bool res = final_step(&env, units);
 		if (!res) {
