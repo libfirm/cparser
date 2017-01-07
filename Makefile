@@ -118,11 +118,11 @@ $(LIBFIRM_FILE): libfirm_subdir
 Makefile: libfirm_subdir
 # Build libfirm in subdirectory
 libfirm_subdir:
-	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE_BASE)
+	$(Q)$(MAKE) -w -C $(FIRM_HOME) $(LIBFIRM_FILE_BASE)
 
 $(LIBFIRM_FILE_DLL): libfirm_subdir_dll
 libfirm_subdir_dll:
-	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE_DLL_BASE)
+	$(Q)$(MAKE) -w -C $(FIRM_HOME) $(LIBFIRM_FILE_DLL_BASE)
 endif
 endif
 
