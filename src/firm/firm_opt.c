@@ -619,6 +619,8 @@ static void do_firm_optimizations(void)
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "vrp");
 		}
+
+		do_irg_opt(irg, "reassociation");
 	}
 
 	if (firm_dump.ir_graph) {
@@ -635,17 +637,6 @@ static void do_firm_optimizations(void)
  */
 static void do_firm_lowering(void)
 {
-	/* enable architecture dependent optimizations */
-	arch_dep_set_opts((arch_dep_opts_t)
-	                  ((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
-	                   (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
-	                   (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
-	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
-		ir_graph *irg = get_irp_irg(i);
-		do_irg_opt(irg, "reassociation");
-		do_irg_opt(irg, "local");
-	}
-
 	do_irp_opt("target-lowering");
 
 	for (size_t i = get_irp_n_irgs(); i-- > 0; ) {
