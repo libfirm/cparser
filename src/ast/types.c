@@ -199,7 +199,7 @@ void init_predefined_types(void)
 	type_builtin_template_ptr    = make_pointer_type(type_builtin_template,  TYPE_QUALIFIER_NONE);
 
 	backend_params const *const be_params = be_get_backend_param();
-	ir_type *be_va_list_type = be_params->vararg.va_list_type;
+	ir_type *be_va_list_type = be_params->va_list_type;
 	if (!be_va_list_type) {
 		/* Backend has no vararg support. Just hope the the program will not be
 		 * using any. If it does, the parse_va_* functions will complain. */

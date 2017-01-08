@@ -2193,7 +2193,7 @@ static ir_node *va_start_expression_to_firm(const va_start_expression_t *const e
 	ir_node  *const memory  = get_store();
 
 	backend_params const *const be_params = be_get_backend_param();
-	ir_type *va_list_type = be_params->vararg.va_list_type;
+	ir_type *va_list_type = be_params->va_list_type;
 
 	if (is_Pointer_type(va_list_type)) {
 		/* The backend implements va_list as a single pointer. The initial value of
@@ -2237,7 +2237,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 		resmode = mode_P;
 
 	backend_params const *const be_params = be_get_backend_param();
-	ir_type *va_list_type = be_params->vararg.va_list_type;
+	ir_type *va_list_type = be_params->va_list_type;
 
 	if (is_Pointer_type(va_list_type)) {
 		/* va_arg takes the old pointer as argument and returns the current argument
@@ -2292,7 +2292,7 @@ static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const exp
 {
 	ir_node              *const src          = expression_to_value(expr->src);
 	backend_params const *const be_params    = be_get_backend_param();
-	ir_type              *const va_list_type = be_params->vararg.va_list_type;
+	ir_type              *const va_list_type = be_params->va_list_type;
 	dbg_info             *const dbgi         = get_dbg_info(&expr->base.pos);
 
 	if (is_Pointer_type(va_list_type)) {
