@@ -273,6 +273,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		modulo_shift       = 32;
 		long_double_size   =  8;
 		float_int_overflow = ir_overflow_indefinite;
+		target.byte_order_big_endian = true;
 	} else {
 		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		exit(EXIT_FAILURE);
