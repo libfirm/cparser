@@ -6245,8 +6245,12 @@ static expression_t *get_statement_expression_last(
 	statement_t *const stmt = expr->statement;
 	assert(stmt->kind == STATEMENT_COMPOUND);
 	for (statement_t *s = stmt->compound.statements; s; s = s->base.next) {
-		if (!s->base.next)
+		if (!s->base.next) {
+			while (s->kind == STATEMENT_LABEL) {
+				s = s->label.statement;
+			}
 			return s->kind == STATEMENT_EXPRESSION ? s->expression.expression : NULL;
+		}
 	}
 	return NULL;
 }
