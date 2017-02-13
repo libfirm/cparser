@@ -364,6 +364,7 @@ bsd:
 			target.user_label_prefix = "_";
 			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
 			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
+			dialect.support_fastcall_stdcall = true;
 		}
 	} else if (strstart(os, "midipix")) {
 		driver_default_exe_output = "a.out";

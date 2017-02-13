@@ -38,7 +38,8 @@ typedef struct c_dialect_t {
 	bool               ms             : 1;
 	bool               long_double_x87_80bit_float : 1;
 	/** enable hack to add call to __main into the main function (mingw) */
-	bool enable_main_collect2_hack : 1;
+	bool enable_main_collect2_hack    : 1;
+	bool support_fastcall_stdcall     : 1;
 	unsigned char      long_double_size;
 	unsigned char      long_long_and_double_struct_align;
 	unsigned char      long_long_size;

@@ -11,6 +11,7 @@
 #include "ast_t.h"
 #include "attribute_t.h"
 #include "constfold.h"
+#include "dialect.h"
 #include "driver/diagnostic.h"
 #include "driver/warning.h"
 #include "entity_t.h"
@@ -464,11 +465,21 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 			break;
 		case ATTRIBUTE_MS_STDCALL:
 		case ATTRIBUTE_GNU_STDCALL:
-			type = change_calling_convention(type, CC_STDCALL);
+			if (dialect.support_fastcall_stdcall) {
+				type = change_calling_convention(type, CC_STDCALL);
+			} else {
+				warningf(WARN_OTHER, &attribute->pos,
+						 "Ignoring attribute 'stdcall' for this target");
+			}
 			break;
 		case ATTRIBUTE_MS_FASTCALL:
 		case ATTRIBUTE_GNU_FASTCALL:
-			type = change_calling_convention(type, CC_FASTCALL);
+			if (dialect.support_fastcall_stdcall) {
+				type = change_calling_convention(type, CC_FASTCALL);
+			} else {
+				warningf(WARN_OTHER, &attribute->pos,
+						 "Ignoring attribute 'fastcall' for this target");
+			}
 			break;
 		case ATTRIBUTE_MS_THISCALL:
 			type = change_calling_convention(type, CC_THISCALL);
