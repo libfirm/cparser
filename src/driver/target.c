@@ -438,6 +438,7 @@ static bool pass_options_to_firm_be(void)
 		}
 	} else {
 		pic_option = "pic=none";
+		target.pic_mode = 0;
 	}
 	set_be_option(pic_option);
 
