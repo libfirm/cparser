@@ -7,12 +7,13 @@
 #include <libfirm/firm.h>
 #include <string.h>
 
-#include "adt/panic.h"
 #include "adt/obst.h"
+#include "adt/panic.h"
 #include "ast/dialect.h"
 #include "ast/entity_t.h"
 #include "ast/symbol_t.h"
 #include "ast/type_t.h"
+#include "driver/target.h"
 
 static struct obstack obst;
 
@@ -206,9 +207,9 @@ static void mangle_type(type_t *orig_type)
 	panic("invalid type encountered while mangling");
 }
 
-static void mangle_namespace(entity_t *entity)
+static void mangle_namespace(entity_t const *const entity)
 {
-	for (entity_t *e = entity->base.parent_entity; e != NULL;
+	for (entity_t const *e = entity->base.parent_entity; e != NULL;
 	     e = e->base.parent_entity) {
 	    /* TODO: we need something similar (or the same?) for classes */
 		if (e->kind == ENTITY_NAMESPACE) {
@@ -219,7 +220,7 @@ static void mangle_namespace(entity_t *entity)
 	}
 }
 
-static void mangle_entity(entity_t *entity)
+static void mangle_cxx_entity(entity_t const *const entity)
 {
 	obstack_1grow(&obst, '_');
 	obstack_1grow(&obst, 'Z');
@@ -236,159 +237,97 @@ static void mangle_entity(entity_t *entity)
 	}
 }
 
-static ident *make_id_from_obst(void)
+static char get_cc_prefix(cc_kind_t const cc)
 {
-	size_t  size = obstack_object_size(&obst);
-	char   *str  = obstack_finish(&obst);
-	ident  *id   = new_id_from_chars(str, size);
-	obstack_free(&obst, str);
-	return id;
+	/* calling convention prefix */
+	switch (cc) {
+	case CC_THISCALL:
+	case CC_DEFAULT:
+	case CC_CDECL:    return 0;
+	case CC_STDCALL:  return '_';
+	case CC_FASTCALL: return '@';
+	}
+	panic("unknown calling convention");
 }
 
-ident *create_name_win64(entity_t *entity)
+ident *create_ld_ident(entity_t const *const entity)
 {
-	const char *name = entity->base.symbol->string;
+	assert(obstack_object_size(&obst) == 0);
 
+	/* Special case: No mangling if actual_name is set */
 	if (entity->kind == ENTITY_FUNCTION) {
-#ifndef NDEBUG
-		type_t *type = skip_typeref(entity->declaration.type);
-		assert(is_type_function(type));
-		assert(type->function.linkage == LINKAGE_C &&
-		       "Only C name mangling is implemented");
-#endif
-		if (entity->declaration.modifiers & DM_DLLIMPORT) {
-			/* add prefix for imported symbols */
-			obstack_printf(&obst, "__imp_%s",
-			               entity->function.actual_name->string);
-			return make_id_from_obst();
-		}
-		if (entity->function.actual_name != NULL)
-			name = entity->function.actual_name->string;
+		symbol_t *actual_name = entity->function.actual_name;
+		if (actual_name != NULL && entity->function.btk != BUILTIN_LIBC
+		                        && entity->function.btk != BUILTIN_LIBC_CHECK)
+			return new_id_from_str(actual_name->string);
 	}
 
-	return new_id_from_str(name);
+	if (target.user_label_prefix != 0)
+		obstack_1grow(&obst, target.user_label_prefix);
 
-}
-
-/**
- * Mangles an entity linker (ld) name for win32 usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-ident *create_name_win32(entity_t *entity)
-{
-	struct obstack *o = &obst;
-
-	assert(is_declaration(entity));
-
+	bool mangle_cxx;
+	unsigned size_suffix = ~0u;
 	if (entity->kind == ENTITY_FUNCTION) {
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
 
 		if (entity->declaration.modifiers & DM_DLLIMPORT)
 			/* add prefix for imported symbols */
-			obstack_printf(o, "__imp_");
+			obstack_printf(&obst, "__imp_");
 
-		cc_kind_t cc = type->function.calling_convention;
-
-		/* calling convention prefix */
-		switch (cc) {
-		case CC_DEFAULT:
-		case CC_CDECL:
-		case CC_STDCALL:  obstack_1grow(o, '_'); break;
-		case CC_FASTCALL: obstack_1grow(o, '@'); break;
-		default:          panic("unhandled calling convention");
-		}
+		cc_kind_t const cc = type->function.calling_convention;
+		char const cc_prefix = get_cc_prefix(cc);
+		if (cc_prefix != 0)
+			obstack_1grow(&obst, cc_prefix);
 
 		switch (type->function.linkage) {
-		case LINKAGE_C:
-			obstack_printf(o, "%s", entity->base.symbol->string);
-			break;
-
 		case LINKAGE_CXX:
-			mangle_entity(entity);
-			break;
-		}
-
-		/* calling convention suffix */
-		switch (cc) {
-		case CC_DEFAULT:
-		case CC_CDECL:
-			break;
-
-		case CC_STDCALL:
-		case CC_FASTCALL: {
-			unsigned size = 0;
-			for (function_parameter_t const* i = type->function.parameters; i; i = i->next) {
-				size += get_ctype_size(i->type);
-			}
-			obstack_printf(o, "@%u", size);
-			break;
-		}
-
+			mangle_cxx = true;
 		default:
-			panic("unhandled calling convention");
+			mangle_cxx = false;
+		}
+
+		if (cc == CC_STDCALL || cc == CC_FASTCALL) {
+			size_suffix = 0;
+			for (function_parameter_t const* i = type->function.parameters;
+				 i != NULL; i = i->next) {
+				size_suffix += get_ctype_size(i->type);
+			}
 		}
 	} else {
-		obstack_printf(o, "_%s", entity->base.symbol->string);
+		/* Mangle with C++ rules if it has a namespace */
+		mangle_cxx = entity->base.parent_entity != NULL
+		          && entity->base.parent_entity->kind == ENTITY_NAMESPACE;
 	}
 
-	return make_id_from_obst();
-}
-
-/**
- * Mangles an entity linker (ld) name for Linux ELF usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-ident *create_name_elf(entity_t *entity)
-{
-	const char *name = entity->base.symbol->string;
-
-	if (entity->kind == ENTITY_FUNCTION) {
-		type_t *type = skip_typeref(entity->declaration.type);
-		assert(is_type_function(type));
-		switch (type->function.linkage) {
-			case LINKAGE_C:
-				if (entity->function.actual_name != NULL)
-					name = entity->function.actual_name->string;
-				break;
-			case LINKAGE_CXX:
-				// TODO What about __REDIRECT/actual_name with mangling?
-				mangle_entity(entity);
-				return make_id_from_obst();
+	/* Shortcut: No mangling necessary */
+	if (mangle_cxx) {
+		mangle_cxx_entity(entity);
+	} else {
+		const char *name = entity->base.symbol->string;
+		if (entity->kind == ENTITY_FUNCTION
+		 && (entity->function.btk == BUILTIN_LIBC
+		  || entity->function.btk == BUILTIN_LIBC_CHECK)) {
+			symbol_t *actual_name = entity->function.actual_name;
+			assert(actual_name != NULL);
+			name = actual_name->string;
 		}
+		/* Shortcut: No mangling at all */
+		if (obstack_object_size(&obst) == 0 && size_suffix == 0)
+			return new_id_from_str(name);
+
+		size_t len = strlen(name);
+		obstack_grow(&obst, name, len);
+		if (size_suffix != ~0u)
+			obstack_printf(&obst, "@%u", size_suffix);
 	}
 
-	return new_id_from_str(name);
-}
-
-/**
- * Mangles an entity linker (ld) name for Mach-O usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-ident *create_name_macho(entity_t *entity)
-{
-	const char *name;
-	if (entity->kind == ENTITY_FUNCTION
-	 && entity->function.actual_name != NULL) {
-		name = entity->function.actual_name->string;
-		if (entity->function.btk == BUILTIN_LIBC ||
-			entity->function.btk == BUILTIN_LIBC_CHECK)
-			goto mangle;
-		goto nomangle;
-	}
-
-	name = entity->base.symbol->string;
-mangle:
-	obstack_printf(&obst, "_%s", name);
-	return make_id_from_obst();
-nomangle:
-	return new_id_from_str(name);
+	/* Create libfirm ident from string on obstack */
+	size_t  size = obstack_object_size(&obst);
+	char   *str  = obstack_finish(&obst);
+	ident  *id   = new_id_from_chars(str, size);
+	obstack_free(&obst, str);
+	return id;
 }
 
 void init_mangle(void)

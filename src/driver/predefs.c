@@ -347,7 +347,8 @@ void add_predefined_macros(void)
 		add_define_int("__pic__", target.pic_mode);
 	}
 
-	add_define("__USER_LABEL_PREFIX__", target.user_label_prefix, false);
+	char user_label_prefix_str[] = { target.user_label_prefix, '\0' };
+	add_define("__USER_LABEL_PREFIX__", user_label_prefix_str, false);
 	add_define("__REGISTER_PREFIX__", "", false);
 	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
 

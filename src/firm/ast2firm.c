@@ -564,13 +564,6 @@ static const struct {
 
 static ident *rts_idents[ARRAY_SIZE(rts_data)];
 
-static create_ld_ident_func create_ld_ident = create_name_elf;
-
-void set_create_ld_ident(ident *(*func)(entity_t*))
-{
-	create_ld_ident = func;
-}
-
 static bool declaration_is_definition(const entity_t *entity)
 {
 	switch (entity->kind) {

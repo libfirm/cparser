@@ -37,7 +37,7 @@ typedef struct target_t {
 	 */
 	unsigned int      modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
-	const char       *user_label_prefix;
+	char              user_label_prefix;
 	unsigned char     biggest_alignment;
 	/** position independent code generation mode */
 	int               pic_mode : 4;

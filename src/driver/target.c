@@ -22,7 +22,6 @@
 target_t target = {
 	.biggest_alignment = 16,
 	.pic_mode          = -1,
-	.user_label_prefix = "",
 };
 const char *multilib_directory_target_triple;
 unsigned target_size_override;
@@ -95,10 +94,10 @@ void target_adjust_types_and_dialect(void)
 static ident *compilerlib_name_mangle(ident *id, ir_type *mt)
 {
 	(void)mt;
-	char const *const prefix = target.user_label_prefix;
-	if (*prefix == '\0')
+	char const prefix = target.user_label_prefix;
+	if (prefix == '\0')
 		return id; /* Shortcut for empty prefix */
-	return new_id_fmt("%s%s", prefix, id);
+	return new_id_fmt("%c%s", prefix, id);
 }
 
 /** Add a target specific preprocessor define. */
@@ -135,7 +134,6 @@ static bool cond_is_little_endian(void)
 static void init_generic_elf(void)
 {
 	driver_default_exe_output = "a.out";
-	set_create_ld_ident(create_name_elf);
 	target.object_format = OBJECT_FORMAT_ELF;
 	set_be_option("ia32-struct_in_reg=no");
 }
@@ -312,8 +310,7 @@ bsd:
 		init_generic_elf();
 	} else if (strstart(os, "darwin")) {
 		driver_default_exe_output = "a.out";
-		set_create_ld_ident(create_name_macho);
-		target.user_label_prefix = "_";
+		target.user_label_prefix = '_';
 		target.object_format = OBJECT_FORMAT_MACH_O;
 		target.pic_mode = 2;
 		set_be_option("ia32-stackalign=4");
@@ -347,7 +344,6 @@ bsd:
 		ppdefc("WIN32",      "1", cond_not_strict);
 		if (pointer_size == 8) {
 			set_be_option("amd64-x64abi=yes");
-			set_create_ld_ident(create_name_win64);
 			ppdef( "_WIN64",    "1");
 			ppdef( "__WIN64",   "1");
 			ppdef( "__WIN64__", "1");
@@ -360,8 +356,7 @@ bsd:
 			dialect.pointer_sized_uint = ATOMIC_TYPE_ULONGLONG;
 		} else {
 			assert(pointer_size == 4);
-			set_create_ld_ident(create_name_win32);
-			target.user_label_prefix = "_";
+			target.user_label_prefix = '_';
 			dialect.pointer_sized_int  = ATOMIC_TYPE_INT;
 			dialect.pointer_sized_uint = ATOMIC_TYPE_UINT;
 			dialect.support_fastcall_stdcall = true;
@@ -374,12 +369,10 @@ bsd:
 		ppdef("__midipix__", "1");
 		if (pointer_size == 8) {
 			set_be_option("amd64-x64abi=yes");
-			set_create_ld_ident(create_name_win64);
 			ppdef("__NT64", "1");
 		} else {
 			assert(pointer_size == 4);
-			set_create_ld_ident(create_name_win32);
-			target.user_label_prefix = "_";
+			target.user_label_prefix = '_';
 			ppdef("__NT32", "1");
 		}
 	} else {
