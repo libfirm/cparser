@@ -332,6 +332,11 @@ void add_predefined_macros(void)
 	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
 		add_define("_LP64",    "1", false);
 		add_define("__LP64__", "1", false);
+	} else if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 4
+	 && get_ctype_size(type_void_ptr) == 4
+	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+		add_define("_ILP32",    "1", false);
+		add_define("__ILP32__", "1", false);
 	}
 
 	ir_mode *float_mode = be_get_mode_float_arithmetic();
