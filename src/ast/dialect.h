@@ -41,6 +41,7 @@ typedef struct c_dialect_t {
 	bool enable_main_collect2_hack    : 1;
 	bool support_fastcall_stdcall     : 1;
 	unsigned char      long_double_size;
+	unsigned char      long_double_align;
 	unsigned char      long_long_and_double_struct_align;
 	unsigned char      long_long_size;
 	unsigned char      int_size;

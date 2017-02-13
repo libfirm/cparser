@@ -48,12 +48,9 @@ void target_adjust_types_and_dialect(void)
 		props[ATOMIC_TYPE_DOUBLE].struct_alignment    = ll_d_struct_align;
 	}
 
-	unsigned const size = dialect.long_double_size;
-	unsigned const alignment = size == 12 && dialect.long_double_x87_80bit_float
-	                         ? 4 : size;
-	props[ATOMIC_TYPE_LONG_DOUBLE].size             = size;
-	props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = alignment;
-	props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = alignment;
+	props[ATOMIC_TYPE_LONG_DOUBLE].size             = dialect.long_double_size;
+	props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = dialect.long_double_align;
+	props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = dialect.long_double_align;
 
 	/* stuff decided after processing operating system specifics and
 	 * commandline flags */
@@ -172,6 +169,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	const char *const os           = machine->operating_system;
 	unsigned                              pointer_size;
 	unsigned                              long_double_size;
+	unsigned                              long_double_align;
 	unsigned                              modulo_shift;
 	float_int_conversion_overflow_style_t float_int_overflow;
 	const char                           *firm_isa;
@@ -183,6 +181,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		              ? target_size_override/BITS_PER_BYTE : 4;
 		pointer_size       = size;
 		long_double_size   = 8;
+		long_double_align  = 8;
 		modulo_shift       = size * BITS_PER_BYTE;
 		float_int_overflow = ir_overflow_indefinite;
 
@@ -218,6 +217,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		pointer_size       = 4;
 		modulo_shift       = 32;
 		long_double_size   = 12;
+		long_double_align  = 4;
 		float_int_overflow = ir_overflow_indefinite;
 		target.firm_arch   = cpu;
 		/* long long and double has a 4 byte alignment inside structs, this odd
@@ -240,8 +240,10 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		pointer_size       = 4;
 		modulo_shift       = 32;
 		long_double_size   = 16;
+		long_double_align  = 8;
 		float_int_overflow = ir_overflow_min_max;
 		target.byte_order_big_endian = true;
+		target.biggest_alignment = 8;
 	} else if (streq(cpu, "arm")) {
 		/* TODO: test, what about
 		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
@@ -252,7 +254,9 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		pointer_size       = 4;
 		modulo_shift       = 256;
 		long_double_size   = 8;
+		long_double_align  = 8;
 		float_int_overflow = ir_overflow_min_max;
+		target.biggest_alignment = 8;
 	} else if (is_amd64_cpu(cpu)) {
 		ppdef("__x86_64",   "1");
 		ppdef("__x86_64__", "1");
@@ -262,6 +266,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		pointer_size       = 8;
 		modulo_shift       = 32;
 		long_double_size   = 16;
+		long_double_align  = 16;
 		float_int_overflow = ir_overflow_indefinite;
 		dialect.long_double_x87_80bit_float = true;
 	} else if (streq(cpu, "mips")) {
@@ -270,8 +275,10 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		pointer_size       =  4;
 		modulo_shift       = 32;
 		long_double_size   =  8;
+		long_double_align  =  8;
 		float_int_overflow = ir_overflow_indefinite;
 		target.byte_order_big_endian = true;
+		target.biggest_alignment = 8;
 	} else {
 		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		exit(EXIT_FAILURE);
@@ -284,6 +291,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 	dialect.int_size           = MIN(pointer_size, 4);
 	dialect.long_size          = MIN(pointer_size, 8);
 	dialect.long_double_size   = long_double_size;
+	dialect.long_double_align  = long_double_align;
 	dialect.wchar_atomic_kind  = ATOMIC_TYPE_INT;
 	dialect.pointer_sized_int  = ATOMIC_TYPE_LONG;
 	dialect.pointer_sized_uint = ATOMIC_TYPE_ULONG;
@@ -316,6 +324,7 @@ bsd:
 		set_be_option("ia32-stackalign=4");
 		set_be_option("ia32-struct_in_reg=yes");
 		dialect.long_double_size = 16;
+		dialect.long_double_align = 16;
 		ppdef( "__MACH__",               "1");
 		ppdef( "__APPLE__",              "1");
 		ppdef( "__APPLE_CC__",           "1");
