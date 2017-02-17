@@ -109,11 +109,11 @@ typedef enum optimization_level_t {
 
 extern ir_entity *rts_entities[rts_max];
 
-/** Initialize for the Firm-generating back end. */
-void init_gen_firm(void);
+/** Initializes the firm optimization manager. */
+void init_firm_opt(void);
 
-/** free resources hold by firm-generating back end */
-void exit_gen_firm(void);
+/** Frees resources used by the firm optimization manager. */
+void exit_firm_opt(void);
 
 /**
  * Transform, optimize and generate code

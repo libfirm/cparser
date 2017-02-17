@@ -691,7 +691,7 @@ void set_be_option(char const *const arg)
 		panic("setting firm backend option '%s' failed (maybe an outdated version of firm is used)", arg);
 }
 
-void init_gen_firm(void)
+void init_firm_opt(void)
 {
 	ir_init();
 	enable_safe_defaults();
@@ -773,7 +773,7 @@ void generate_code(FILE *out, const char *input_filename)
 	timer_stop(t_backend);
 }
 
-void exit_gen_firm(void)
+void exit_firm_opt(void)
 {
 	ir_finish();
 }

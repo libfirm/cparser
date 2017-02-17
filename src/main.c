@@ -310,7 +310,7 @@ int main(int argc, char **argv)
 	init_driver();
 	init_default_driver();
 	init_preprocessor();
-	init_gen_firm(); /* initialize early because we need to parse options */
+	init_firm_opt(); /* initialize early because we need to parse options */
 	init_ast();
 	init_parser();
 
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
 	assert(state.action != NULL);
 	int ret = state.action(argv[0]);
 
-	exit_gen_firm();
+	exit_firm_opt();
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();
