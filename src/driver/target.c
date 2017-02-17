@@ -224,7 +224,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		 * mode is everywhere except for windows OSes (they will revert it
 		 * below) */
 		dialect.long_long_and_double_struct_align = 4;
-		dialect.long_double_x87_80bit_float       = true;
+		dialect.x87_long_double                   = true;
 	} else if (streq(cpu, "sparc")) {
 		ppdefc("sparc",     "1", cond_not_strict);
 		ppdef( "__sparc",   "1");
@@ -268,7 +268,7 @@ static void set_options_for_machine(machine_triple_t const *const machine)
 		long_double_size   = 16;
 		long_double_align  = 16;
 		float_int_overflow = ir_overflow_indefinite;
-		dialect.long_double_x87_80bit_float = true;
+		dialect.x87_long_double = true;
 	} else if (streq(cpu, "mips")) {
 		ppdef("__mips__", "1");
 		firm_isa           = "mips";

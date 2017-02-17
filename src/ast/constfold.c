@@ -1043,8 +1043,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
 	if (flags & ATOMIC_TYPE_FLAG_FLOAT) {
-		if (kind == ATOMIC_TYPE_LONG_DOUBLE
-		 && dialect.long_double_x87_80bit_float) {
+		if (kind == ATOMIC_TYPE_LONG_DOUBLE && dialect.x87_long_double) {
 			assert(size == 12 || size == 16);
 			return new_float_mode("F80", irma_x86_extended_float, 15, 64,
 			                      target.float_int_overflow);
