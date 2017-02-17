@@ -10,6 +10,7 @@
 
 #include "adt/util.h"
 #include "machine_triple.h"
+#include "firm/firm_opt.h"
 #include "options.h"
 
 typedef enum object_format_t {
@@ -72,11 +73,12 @@ struct codegen_option_t {
 	char              option[];
 };
 
-extern codegen_option_t  *codegen_options;
-extern codegen_option_t **codegen_options_anchor;
-extern bool               profile_generate;
-extern bool               profile_use;
-extern const char        *multilib_directory_target_triple;
-extern unsigned           target_size_override;
+extern optimization_level_t opt_level;
+extern codegen_option_t    *codegen_options;
+extern codegen_option_t   **codegen_options_anchor;
+extern bool                 profile_generate;
+extern bool                 profile_use;
+extern const char          *multilib_directory_target_triple;
+extern unsigned             target_size_override;
 
 #endif

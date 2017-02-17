@@ -27,10 +27,11 @@
 #include "target.h"
 #include "wrappergen/write_jna.h"
 
-codegen_option_t  *codegen_options        = NULL;
-codegen_option_t **codegen_options_anchor = &codegen_options;
-bool               profile_generate;
-bool               profile_use;
+codegen_option_t    *codegen_options        = NULL;
+codegen_option_t   **codegen_options_anchor = &codegen_options;
+optimization_level_t opt_level              = OPT_1;
+bool                 profile_generate;
+bool                 profile_use;
 
 static compilation_unit_type_t forced_unittype = COMPILATION_UNIT_AUTODETECT;
 
@@ -725,28 +726,28 @@ bool options_parse_early_codegen(options_state_t *s)
 
 	const char *arg;
 	if (accept_prefix(s, "-O", false, &arg)) {
-		unsigned opt_level;
 		if (arg[0] == '\0') {
-			opt_level = 1; /* '-O' is equivalent to '-O1'. */
+			opt_level = OPT_1; /* '-O' is equivalent to '-O1'. */
 		} else if (is_digit(arg[0])) {
-			opt_level = arg[0] - '0';
+			switch (arg[0] - '0') {
+			case 0: opt_level = OPT_0; break;
+			case 1: opt_level = OPT_1; break;
+			case 2: opt_level = OPT_2; break;
+			default: opt_level = OPT_3; break;
+			}
 		} else if (streq(arg, "fast")) {
-			opt_level = 3; /* TODO stub. */
+			opt_level = OPT_fast;
 		} else if (streq(arg, "g")) {
-			opt_level = 0; /* TODO stub. */
+			opt_level = OPT_g;
 		} else if (streq(arg, "s")) {
-			opt_level = 2; /* TODO For now, until we have a real '-Os'. */
-			predef_optimize_size = true;
+			opt_level = OPT_s;
 		} else if (streq(arg, "z")) {
-			opt_level = 2; /* TODO For now until we have a real '-Oz'. */
-			predef_optimize_size = true;
+			opt_level = OPT_z;
 		} else {
 			errorf(NULL, "invalid optimization option '%s'", full_option);
 			s->argument_errors = true;
 			return true;
 		}
-		choose_optimization_pack(opt_level);
-		predef_optimize = opt_level > 0;
 	} else
 		return false;
 	/* Remove argument so we do not parse it again in later phases */

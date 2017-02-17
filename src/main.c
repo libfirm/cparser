@@ -333,6 +333,7 @@ int main(int argc, char **argv)
 
 	/* Setup target so later options can override the target defaults */
 	target_set_defaults();
+	set_optimization_level(opt_level);
 
 	/* parse rest of options */
 	for (state.i = 1; state.i < argc; ++state.i) {

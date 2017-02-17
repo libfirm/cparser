@@ -7,9 +7,6 @@
 
 #include <stdbool.h>
 
-extern bool predef_optimize;
-extern bool predef_optimize_size;
-
 void add_predefined_macros(void);
 
 #endif

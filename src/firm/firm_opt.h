@@ -96,6 +96,17 @@ enum rts_names {
 	rts_max
 };
 
+typedef enum optimization_level_t {
+	OPT_0,
+	OPT_1,
+	OPT_2,
+	OPT_3,
+	OPT_fast,
+	OPT_s,
+	OPT_z,
+	OPT_g,
+} optimization_level_t;
+
 extern ir_entity *rts_entities[rts_max];
 
 /** Initialize for the Firm-generating back end. */
@@ -125,7 +136,7 @@ void firm_option_help(print_option_help_func func);
 
 /** Choose an optimization level. (Typically used to interpret the -O compiler
  * switches) */
-void choose_optimization_pack(int level);
+void set_optimization_level(optimization_level_t opt_level);
 
 /**
  * Initialize implicit optimization settings in firm. Frontends should call this

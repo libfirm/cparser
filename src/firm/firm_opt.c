@@ -892,32 +892,35 @@ bool firm_is_inlining_enabled(void)
 	return config->flags & OPT_FLAG_ENABLED;
 }
 
-void choose_optimization_pack(int level)
+void set_optimization_level(optimization_level_t level)
 {
-	/* apply optimization level */
 	switch (level) {
-	default:
-	case 3:
+	case OPT_fast:
+	case OPT_3:
 		set_option("bool");
 		set_option("thread-jumps");
 		set_option("if-conversion");
 		/* FALLTHROUGH */
-	case 2:
+	case OPT_2:
 		set_option("inline");
 		set_option("occults");
 		set_option("deconv");
 		set_option("memcombine");
 		set_be_option("omitfp");
-		break;
+		return;
 
-	case 1:
+	case OPT_s:
+	case OPT_z:
+	case OPT_1:
 		set_option("no-inline");
-		break;
+		return;
 
-	case 0:
+	case OPT_g:
+	case OPT_0:
 		set_option("no-opt");
-		break;
+		return;
 	}
+	panic("Invalid optimization level");
 }
 
 void init_implicit_optimizations(void)

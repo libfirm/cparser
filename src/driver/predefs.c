@@ -20,9 +20,6 @@
 #include "target.h"
 #include "version.h"
 
-bool predef_optimize;
-bool predef_optimize_size;
-
 static void add_define_prop_fmt(const char *name_template, const char *name,
                                 const char *value_fmt, ...)
 {
@@ -302,9 +299,9 @@ void add_predefined_macros(void)
 	 * of x87 inline assembly in the glibc/linux headers which we don't support
 	 * yet */
 #if 0
-	if (predef_optimize)
+	if (opt_level != OPT_O0 && opt_level != OPT_Og)
 		add_define("__OPTIMIZE__", "1", false);
-	if (predef_optimize_size)
+	if (opt_level == OPT_Os || opt_level == OPT_Oz)
 		add_define("__OPTIMIZE_SIZE__", "1", false);
 #endif
 
