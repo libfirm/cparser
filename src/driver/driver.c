@@ -25,7 +25,7 @@ const char         *filtev;
 int                 colorterm;
 bool                do_timing;
 bool                print_timing;
-const char         *driver_default_exe_output = "a.out";
+const char         *driver_default_exe_output;
 struct obstack      file_obst;
 compilation_unit_t *units;
 
