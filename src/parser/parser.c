@@ -1901,9 +1901,12 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			designator = parse_designation();
 			goto finish_designator;
 		} else if (peek(T_IDENTIFIER) && peek_ahead(':')) {
-			/* GNU-style designator ("identifier: value") */
+			/* GNU-style designator
+			   Example: struct identifier { identifier: value };
+			                                ^~~~~~~~~~~~~~~~~
+			   obsolete since GCC 2.5 */
 			if (!GNU_MODE)
-				errorf(HERE, "designator with ':' is a GCC extension");
+				warningf(WARN_PEDANTIC, HERE, "designator with ':' is a GCC extension");
 			designator         = allocate_ast_zero(sizeof(designator[0]));
 			designator->pos    = *HERE;
 			designator->symbol = token.base.symbol;
@@ -3531,7 +3534,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 						if (size < 0) {
 							errorf(&size_expression->base.pos, "size of array must be greater than zero");
 						} else if (size == 0 && !GNU_MODE) {
-							errorf(&size_expression->base.pos, "size of array must be greater than zero (zero length arrays are a GCC extension)");
+							warningf(WARN_PEDANTIC, &size_expression->base.pos,
+								"size of array must be greater than zero (zero length arrays are a GCC extension)");
 						}
 					} else {
 						errorf(&size_expression->base.pos, "array is too large");
@@ -5212,13 +5216,8 @@ static void parse_external_declaration(void)
 
 	position_t const *const pos = &ndeclaration->base.pos;
 	if (current_scope != file_scope) {
-		if (GNU_MODE) {
-			warningf(WARN_PEDANTIC, pos,
-			         "nested function %N is a GCC extension", ndeclaration);
-		} else {
-			errorf(pos,
-			       "nested function %N is a GCC extension", ndeclaration);
-		}
+		warningf(WARN_PEDANTIC, pos,
+			"nested function %N is a GCC extension", ndeclaration);
 	}
 
 	if (is_typeref(orig_type))
@@ -5453,7 +5452,7 @@ static void parse_bitfield_member(entity_t *entity)
 	type_t *skipped = skip_typeref(type);
 	if (is_type_integer(skipped)) {
 		if (!GNU_MODE && is_type_enum(skipped))
-			errorf(&entity->base.pos,
+			warningf(WARN_PEDANTIC, &entity->base.pos,
 			       "enum type '%T' as bitfield base is a GCC extension", type);
 
 		long size_long;
@@ -6665,7 +6664,7 @@ static label_t *get_label(char const *const context)
 static expression_t *parse_label_address(void)
 {
 	if (!GNU_MODE)
-		errorf(HERE, "taking address of a label is a GCC extension");
+		warningf(WARN_PEDANTIC, HERE, "taking address of a label is a GCC extension");
 
 	position_t const pos = *HERE;
 	eat(T_ANDAND);
@@ -7446,7 +7445,8 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	bool          gnu_cond = false;
 	if (peek(':')) {
 		if (!GNU_MODE)
-			errorf(HERE, "omitting consequence of conditional expression is a GCC extension");
+			warningf(WARN_PEDANTIC, HERE,
+				"omitting consequence of conditional expression is a GCC extension");
 		gnu_cond = true;
 	} else {
 		true_expression = parse_expression();
@@ -7712,7 +7712,7 @@ static void semantic_incdec(unary_expression_t *expression)
 			errorf(pos, "operation needs a real or pointer type, but got '%T'", type);
 			orig_type = type = type_error_type;
 		} else if (!GNU_MODE) {
-			errorf(pos, "operation on '%T' is a GCC extension", type);
+			warningf(WARN_PEDANTIC, pos, "operation on '%T' is a GCC extension", type);
 		}
 	}
 	if (!is_lvalue(value))
@@ -9449,7 +9449,7 @@ static statement_t *parse_case_statement(void)
 	rem_anchor_token(T_DOTDOTDOT);
 	if (accept(T_DOTDOTDOT)) {
 		if (!GNU_MODE)
-			errorf(pos, "case ranges are a GCC extension");
+			warningf(WARN_PEDANTIC, pos, "case ranges are a GCC extension");
 		expression_t *end_range
 			= parse_integer_constant_expression("case range end");
 		if (end_range->base.type == type_error_type) {
@@ -9884,7 +9884,7 @@ static statement_t *parse_goto(void)
 	statement_t *statement;
 	if (peek_ahead('*')) {
 		if (!GNU_MODE)
-			errorf(HERE, "computed goto is a GCC extension");
+			warningf(WARN_PEDANTIC, HERE, "computed goto is a GCC extension");
 		statement = allocate_statement_zero(STATEMENT_COMPUTED_GOTO);
 		eat(T_goto);
 		eat('*');
