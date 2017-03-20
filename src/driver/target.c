@@ -153,7 +153,7 @@ static bool pass_options_to_firm_be(void)
 		set_target_option("profileuse");
 	}
 	if (target.set_use_frame_pointer) {
-		set_target_option(target.use_frame_pointer ? "omitfp" : "omitfp=no");
+		set_target_option(target.use_frame_pointer ? "omitfp=no" : "omitfp");
 	}
 
 	if (target.set_pic) {
