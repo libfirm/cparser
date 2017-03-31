@@ -1729,8 +1729,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 			ir_node *const sub       = new_d_Sub(dbgi, left, right);
 			ir_node *const no_mem    = new_NoMem();
-			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size,
-			                                       op_pin_state_floats);
+			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size, false);
 			return new_d_Proj(dbgi, divn, mode, pn_Div_res);
 		}
 		/* fallthrough */
