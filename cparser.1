@@ -60,7 +60,7 @@ Output the abstract syntax tree of the parsed input file as C again.
 Use the integrated preprocessor instead of an external one.
 .No This is the default if no Fl target No is specified .
 .No Otherwise the external preprocessor Ar architecture Ns Cm - Ns Ar vendor Ns Cm - Ns Ar system Ns Cm -gcc No is used .
-.It Fl target Ar architecture Ns - Ns Ar vendor Ns - Ns Ar system
+.It Fl target Ar architecture Ns Op Oo Cm - Ns Ar vendor Oc Ns Cm - Ns Ar system
 Set target, for which code is generated.
 .No Supported Ar architecture Ns s are:
 .Bl -dash -compact
@@ -80,7 +80,7 @@ Set target, for which code is generated.
 .It
 .Cm leon Pq for Cm sparc
 .It
-.Cm unknown
+.Cm unknown No (default)
 .El
 .No Supported Ar system Ns s are:
 .Bl -dash -compact
@@ -89,7 +89,7 @@ Set target, for which code is generated.
 .It
 .Cm darwin*
 .It
-.Cm elf , irtss , octopos
+.Cm elf , irtss , octopos , unknown No (default)
 .It
 .Cm freebsd*
 .It
