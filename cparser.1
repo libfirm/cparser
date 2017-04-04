@@ -5,7 +5,7 @@
 .Nd C compiler
 .Sh SYNOPSIS
 .Nm
-.Op Fl c | S | E | -print-ast
+.Op Fl c | S | E | -print-ast | dumpmachine
 .Op Fl -print-implicit-cast
 .Op Fl -print-parenthesis
 .Op Fl Oo Cm no- Oc Ns Cm integrated-cpp
@@ -52,6 +52,8 @@ Preprocess the input file only.
 By default the result is output to stdout.
 .It Fl -print-ast
 Output the abstract syntax tree of the parsed input file as C again.
+.It Fl dumpmachine
+.No Print the default target triple or the current target triple selected by Fl target .
 .It Fl -print-implicit-cast
 .No When using Fl -print-ast , No show casts, which are inserted by the semantic checks .
 .It Fl -print-parenthesis
