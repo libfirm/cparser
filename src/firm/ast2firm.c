@@ -2132,6 +2132,14 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	return deref_address(dbgi, type, addr);
 }
 
+static ir_node *make_name(funcname_expression_t const *const expr, char const *const name)
+{
+	begin_string_construction();
+	obstack_grow(&string_obst, name, strlen(name));
+	string_t *const string = finish_string_construction(STRING_ENCODING_CHAR);
+	return string_to_firm(&expr->base.pos, string);
+}
+
 static ir_node *function_name_to_firm(const funcname_expression_t *const expr)
 {
 	switch (expr->kind) {
@@ -2139,24 +2147,15 @@ static ir_node *function_name_to_firm(const funcname_expression_t *const expr)
 	case FUNCNAME_PRETTY_FUNCTION:
 	case FUNCNAME_FUNCDNAME:
 		if (current_function_name == NULL) {
-			position_t const *const src_pos = &expr->base.pos;
-			char       const *const name
-				= current_function_entity->base.base.symbol->string;
-			begin_string_construction();
-			obstack_grow(&string_obst, name, strlen(name));
-			string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
-			current_function_name = string_to_firm(src_pos, string);
+			char const *const name = current_function_entity->base.base.symbol->string;
+			current_function_name = make_name(expr, name);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
 		if (current_funcsig == NULL) {
-			position_t const *const src_pos = &expr->base.pos;
-			ir_entity        *const ent     = get_irg_entity(current_ir_graph);
-			char       const *const name    = get_entity_ld_name(ent);
-			begin_string_construction();
-			obstack_grow(&string_obst, name, strlen(name));
-			string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
-			current_funcsig = string_to_firm(src_pos, string);
+			ir_entity  *const ent  = get_irg_entity(current_ir_graph);
+			char const *const name = get_entity_ld_name(ent);
+			current_funcsig = make_name(expr, name);
 		}
 		return current_funcsig;
 	}
