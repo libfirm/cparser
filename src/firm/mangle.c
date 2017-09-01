@@ -283,6 +283,7 @@ ident *create_ld_ident(entity_t const *const entity)
 		switch (type->function.linkage) {
 		case LINKAGE_CXX:
 			mangle_cxx = true;
+			break;
 		default:
 			mangle_cxx = false;
 		}
