@@ -872,6 +872,7 @@ static void parse_character_constant(string_encoding_t const enc)
 
 #define SYMBOL_CASES_WITHOUT_E_P \
 	     '$': if (no_dollar_in_symbol) goto dollar_sign; \
+		/* FALLTHROUGH */ \
 	case 'a': \
 	case 'b': \
 	case 'c': \
@@ -1567,6 +1568,7 @@ static bool concat_tokens(const position_t *pos,
 		break;
 	case '=':
 		if (kind1 == '=') { set_punctuator(T_EQUALEQUAL);        return true; }
+		/* FALLTHROUGH */
 	case '>':
 		switch (kind1) {
 		case '=':         { set_punctuator(T_GREATEREQUAL);      return true; }
@@ -2027,6 +2029,15 @@ end_number:
 
 #define ELSE(kind) ELSE_CODE(set_punctuator(kind); return;)
 
+#define FALLTHROUGH_ELSE_CODE(code) \
+		/* FALLTHROUGH */ \
+	default: \
+		code \
+	}
+
+#define FALLTHROUGH_ELSE(kind) \
+	FALLTHROUGH_ELSE_CODE(set_punctuator(kind); return;)
+
 static void maybe_skip_newline(void)
 {
 	switch (input.c) {
@@ -2203,7 +2214,7 @@ digraph_percentcolon:
 				return;
 			}
 			/* FALLTHROUGH */
-		ELSE(':')
+		FALLTHROUGH_ELSE(':')
 	case '=':
 		MAYBE_PROLOG
 		MAYBE('=', T_EQUALEQUAL)

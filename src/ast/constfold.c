@@ -300,6 +300,7 @@ static ir_tarval *literal_to_tarval_(const literal_expression_t *literal,
 			return get_mode_one(mode);
 		} else {
 			assert(literal->value->begin[0] == 'f');
+			/* FALLTHROUGH */
 	case EXPR_LITERAL_MS_NOOP:
 			return get_mode_null(mode);
 		}

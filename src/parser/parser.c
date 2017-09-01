@@ -3374,6 +3374,7 @@ ptr_operator_end: ;
 		switch (la1->kind) {
 		case T_IDENTIFIER:
 			if (is_typedef_symbol(la1->base.symbol)) {
+				/* FALLTHROUGH */
 		case ')':
 				/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
 				 * interpreted as ``function with no parameter specification'',
@@ -3387,6 +3388,7 @@ ptr_operator_end: ;
 					errorf(HERE, "function declarator must have a name");
 				}
 			} else {
+				/* FALLTHROUGH */
 		case '&':
 		case '(':
 		case '*':
@@ -5124,7 +5126,7 @@ static void check_unreachable(statement_t* const stmt, void *const env)
 					return;
 			}
 		}
-	}
+	} /* FALLTHROUGH */
 
 	default:
 warn_unreachable:
@@ -8280,8 +8282,7 @@ static bool maybe_negative(expression_t const *const expr)
 				const type_t *skipped = skip_typeref(member->declaration.type);
 				return is_type_signed(skipped);
 			}
-			/* FALLTHROUGH */
-		}
+		} /* FALLTHROUGH */
 
 		default:
 			return true;
@@ -10224,6 +10225,7 @@ static statement_t *intern_parse_statement(void)
 			default:
 					statement = parse_expression_statement();
 				} else {
+					/* FALLTHROUGH */
 			case DECLARATION_START:
 			case T_IDENTIFIER:
 					statement = parse_declaration_statement();

@@ -301,11 +301,13 @@ bool warningf(warning_t const warn, position_t const* pos, char const *const fmt
 		char const* kind_color;
 		case WARN_STATE_ON:
 			if (is_warn_on(WARN_ERROR)) {
+				/* FALLTHROUGH */
 		case WARN_STATE_ON | WARN_STATE_ERROR:
 				++error_count;
 				kind       = "error";
 				kind_color = colors.error;
 			} else {
+				/* FALLTHROUGH */
 		case WARN_STATE_ON | WARN_STATE_NO_ERROR:
 				++warning_count;
 				kind       = "warning";
