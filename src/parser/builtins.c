@@ -111,6 +111,9 @@ void create_gnu_builtins(void)
 	b(BUILTIN_NAN,         "nanf",           make_function_1_type(type_float, type_char_ptr, DM_CONST));
 	b(BUILTIN_NAN,         "nanl",           make_function_1_type(type_long_double, type_char_ptr, DM_CONST));
 	b(BUILTIN_ISNAN,       "isnan",          make_function_type(type_int, 1, (type_t *[]) { template }, DM_CONST));
+	b(BUILTIN_SIGNBIT,     "signbit",        make_function_1_type(type_int, type_double, DM_CONST));
+	b(BUILTIN_SIGNBIT,     "signbitf",       make_function_1_type(type_int, type_float, DM_CONST));
+	b(BUILTIN_SIGNBIT,     "signbitl",       make_function_1_type(type_int, type_long_double, DM_CONST));
 	b(BUILTIN_VA_END,      "va_end",         make_function_1_type(type_void, type_valist_arg, DM_NONE));
 	b(BUILTIN_EXPECT,      "expect",         make_function_2_type(type_long, type_long, type_long, DM_CONST));
 	b(BUILTIN_OBJECT_SIZE, "object_size",    make_function_2_type(type_size_t, type_void_ptr, type_int, DM_CONST));

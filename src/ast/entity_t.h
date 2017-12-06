@@ -71,6 +71,7 @@ typedef enum {
 	BUILTIN_OBJECT_SIZE,
 	BUILTIN_ROTL,
 	BUILTIN_ROTR,
+	BUILTIN_SIGNBIT,
 	BUILTIN_VA_END,
 } builtin_kind_t;
 
