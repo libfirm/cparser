@@ -736,6 +736,13 @@ entity_created:
 	return irentity;
 }
 
+/**
+ * Creates a new Conv node if dest_mode differs from the mode of value,
+ * otherwise returns value unchanged.
+ *
+ * @param value       the node representing the value to convert
+ * @param dest_mode   the mode to convert to
+ */
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 {
 	ir_mode *value_mode = get_irn_mode(value);
@@ -994,6 +1001,21 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_mode      *arg_mode = get_ir_mode_arithmetic(arg->base.type);
 		ir_node      *val      = create_conv(dbgi, expression_to_value(arg), arg_mode);
 		ir_node      *cmp      = new_d_Cmp(dbgi, val, val, ir_relation_unordered);
+		type_t       *res_type = function_type->function.return_type;
+		ir_mode      *res_mode = get_ir_mode_storage(res_type);
+		ir_node      *zero     = new_d_Const(dbgi, get_mode_null(res_mode));
+		ir_node      *one      = new_d_Const(dbgi, get_mode_one(res_mode));
+		return new_d_Mux(dbgi, cmp, zero, one);
+	}
+	case BUILTIN_SIGNBIT: {
+		expression_t *arg      = call->arguments->expression;
+		// Might be faster to pop into a 64 bit slot on x86_64
+		ir_node      *val      = create_conv(dbgi, expression_to_value(arg), get_modeF());
+		ir_node      *bits     = new_d_Bitcast(dbgi, val, get_modeIu());
+		ir_node      *mask     = new_d_Const_long(dbgi, get_modeIu(), 1L << 31);
+		ir_node      *flag     = new_d_And(dbgi, bits, mask);
+		ir_node      *cmp      = new_d_Cmp(dbgi, flag, mask, ir_relation_equal);
+
 		type_t       *res_type = function_type->function.return_type;
 		ir_mode      *res_mode = get_ir_mode_storage(res_type);
 		ir_node      *zero     = new_d_Const(dbgi, get_mode_null(res_mode));
