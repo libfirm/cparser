@@ -536,6 +536,10 @@ static bool property_attribute_equal(const attribute_property_argument_t *prop1,
 static bool attribute_argument_equal(const attribute_argument_t *arg1,
                                      const attribute_argument_t *arg2)
 {
+	if (arg1 == arg2)
+		/* This is vital for avoiding cycles when merging attribute lists */
+		return true;
+
 	if (arg1->kind != arg2->kind)
 		return false;
 
@@ -543,7 +547,9 @@ static bool attribute_argument_equal(const attribute_argument_t *arg1,
 	case ATTRIBUTE_ARGUMENT_SYMBOL:
 		return arg1->v.symbol == arg2->v.symbol;
 	case ATTRIBUTE_ARGUMENT_EXPRESSION:
-		/* TODO */
+		/* TODO: As of Dec 2017, an equality check for expression_t
+		         is not implemented.
+		 */
 		return false;
 	}
 	panic("unknown argument type");
