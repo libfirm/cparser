@@ -344,7 +344,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 }
 
 /**
- * Prints an unary expression.
+ * Prints a unary expression.
  *
  * @param unexpr   the unary expression
  */

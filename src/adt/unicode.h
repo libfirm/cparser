@@ -14,7 +14,7 @@ typedef unsigned int utf32;
 #define UTF32_EOF           ((utf32)-1)
 
 /**
- * "parse" an utf8 character from a string.
+ * "parse" a utf8 character from a string.
  * Warning: This function only works for valid utf-8 inputs. The behaviour
  * is undefined for invalid utf-8 input.
  *
