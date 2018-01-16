@@ -142,6 +142,7 @@ static statement_t *parse_statement(void);
 static expression_t *parse_subexpression(precedence_t);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
+static type_t       *parse_non_empty_typename(void);
 static void          parse_externals(void);
 static void          parse_external(void);
 
@@ -1264,7 +1265,9 @@ static attribute_format_argument_t *parse_attribute_format(void)
 			s->specifier = parse_string_literals(ctx);
 			rem_anchor_token(':');
 			expect(':');
-			s->type = parse_typename();
+			// The type should probably not default to int when left out.
+			// Otherwise, call parse_typename instead.
+			s->type = parse_non_empty_typename();
 
 			*anchor = s;
 			anchor  = &s->next;
@@ -2398,6 +2401,8 @@ static type_t *parse_typeof(void)
 	type_t       *type;
 	if (is_declaration_specifier(&token)) {
 		expression = NULL;
+		// The call to is_declaration_specifier will make sure this won't parse
+		// an empty type defaulting to int.
 		type       = parse_typename();
 	} else {
 		expression = parse_expression();
@@ -5615,6 +5620,13 @@ static type_t *parse_typename(void)
 	return result;
 }
 
+static type_t *parse_non_empty_typename(void) {
+	if (!is_declaration_specifier(&token)) {
+		errorf(HERE, "unexpected token %K, expected a type", &token);
+		return type_error_type;
+	}
+	return parse_typename();
+}
 
 typedef expression_t* (*parse_expression_function)(void);
 typedef expression_t* (*parse_expression_infix_function)(expression_t *left);
@@ -6213,6 +6225,7 @@ static expression_t *parse_cast(void)
 	eat('(');
 	add_anchor_token(')');
 
+	// Empty typenames (aka default ints) are rejected in semantic_cast.
 	type_t *type = parse_typename();
 
 	rem_anchor_token(')');
@@ -6386,7 +6399,7 @@ static expression_t *parse_offsetof(void)
 	add_anchor_token(')');
 	add_anchor_token(',');
 	expect('(');
-	type_t *type = parse_typename();
+	type_t *type = parse_non_empty_typename();
 	rem_anchor_token(',');
 	expect(',');
 	designator_t *designator = parse_designator();
@@ -6487,13 +6500,14 @@ static expression_t *parse_va_start(void)
 	expression->va_starte.parameter = args[1];
 
 	if (!current_function) {
-		errorf(&expression->base.pos, "'va_start' used outside of function");
+		errorf(&expression->base.pos,
+				"'va_start' used outside of function");
 	} else if (!current_function->base.type->function.variadic) {
 		errorf(&expression->base.pos,
-		       "'va_start' used in non-variadic function");
+				"'va_start' used in non-variadic function");
 	} else if (!is_last_parameter(args[1])) {
 		errorf(&args[1]->base.pos,
-		       "second argument of 'va_start' must be last parameter of the current function");
+				"second argument of 'va_start' must be last parameter of the current function");
 	} else {
 		check_vararg_support(expression);
 	}
@@ -6520,7 +6534,7 @@ static expression_t *parse_va_arg(void)
 
 	rem_anchor_token(',');
 	expect(',');
-	expression->base.type = parse_typename();
+	expression->base.type = parse_non_empty_typename();
 	rem_anchor_token(')');
 	expect(')');
 
@@ -6578,10 +6592,10 @@ static expression_t *parse_builtin_types_compatible(void)
 	add_anchor_token(')');
 	add_anchor_token(',');
 	expect('(');
-	expression->builtin_types_compatible.left = parse_typename();
+	expression->builtin_types_compatible.left = parse_non_empty_typename();
 	rem_anchor_token(',');
 	expect(',');
-	expression->builtin_types_compatible.right = parse_typename();
+	expression->builtin_types_compatible.right = parse_non_empty_typename();
 	rem_anchor_token(')');
 	expect(')');
 	expression->base.type = type_int;
@@ -6859,6 +6873,8 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 		position_t const pos = *HERE;
 		eat('(');
 		add_anchor_token(')');
+		// We already made sure the typename is non empty (no default int) by
+		// calling is_declaration_specifier
 		orig_type = parse_typename();
 		rem_anchor_token(')');
 		expect(')');
