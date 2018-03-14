@@ -258,6 +258,14 @@ static void define_float_properties(const char *prefix,
 	add_define_prop_fmt("__%s_HAS_QUIET_NAN__", prefix, "1");
 }
 
+static bool is_ILP(unsigned const size_int, unsigned const size_long, unsigned const size_pointer)
+{
+	return
+		get_atomic_type_size(ATOMIC_TYPE_INT)  == size_int &&
+		get_atomic_type_size(ATOMIC_TYPE_LONG) == size_long &&
+		get_ctype_size(type_void_ptr)          == size_pointer;
+}
+
 void add_predefined_macros(void)
 {
 	add_define("__STDC__", "1", true);
@@ -317,14 +325,10 @@ void add_predefined_macros(void)
 
 	add_define("__FINITE_MATH_ONLY__",    "0",    false);
 
-	if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 8
-	 && get_ctype_size(type_void_ptr) == 8
-	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+	if (is_ILP(4, 8, 8)) {
 		add_define("_LP64",    "1", false);
 		add_define("__LP64__", "1", false);
-	} else if (get_atomic_type_size(ATOMIC_TYPE_LONG) == 4
-	 && get_ctype_size(type_void_ptr) == 4
-	 && get_atomic_type_size(ATOMIC_TYPE_INT) == 4) {
+	} else if (is_ILP(4, 4, 4)) {
 		add_define("_ILP32",    "1", false);
 		add_define("__ILP32__", "1", false);
 	}
