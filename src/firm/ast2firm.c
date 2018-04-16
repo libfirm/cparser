@@ -4502,6 +4502,7 @@ static jump_target *jump_to_label(label_t *const label)
 	prepare_label_target(label);
 	jump_target *tgt = &label->target;
 	jump_to_target(tgt);
+	assert(label->n_users != 0);
 	if (--label->n_users == 0) {
 		enter_jump_target(tgt);
 		tgt = NULL;
