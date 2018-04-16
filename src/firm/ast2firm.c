@@ -4497,15 +4497,23 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 	return statement_to_firm(statement->statement);
 }
 
+static jump_target *jump_to_label(label_t *const label)
+{
+	prepare_label_target(label);
+	jump_target *tgt = &label->target;
+	jump_to_target(tgt);
+	if (--label->n_users == 0) {
+		enter_jump_target(tgt);
+		tgt = NULL;
+	}
+	return tgt;
+}
+
 static ir_node *label_to_firm(const label_statement_t *statement)
 {
-	label_t *const label = statement->label;
-	prepare_label_target(label);
-	jump_to_target(&label->target);
-	if (--label->n_users == 0) {
-		enter_jump_target(&label->target);
-	} else {
-		enter_immature_jump_target(&label->target);
+	jump_target *const imm_target = jump_to_label(statement->label);
+	if (imm_target) {
+		enter_immature_jump_target(imm_target);
 		keep_loop();
 	}
 
@@ -4514,11 +4522,7 @@ static ir_node *label_to_firm(const label_statement_t *statement)
 
 static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
 {
-	label_t *const label = stmt->label;
-	prepare_label_target(label);
-	jump_to_target(&label->target);
-	if (--label->n_users == 0)
-		enter_jump_target(&label->target);
+	jump_to_label(stmt->label);
 	set_unreachable_now();
 	return NULL;
 }
