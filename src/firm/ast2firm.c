@@ -4576,7 +4576,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_node *ins[n_inputs + n_outputs + 1];
 	size_t   in_size = 0;
 
-	ir_asm_constraint tmp_in_constraints[n_outputs];
+	ir_asm_constraint *in_constraints = NEW_ARR_F(ir_asm_constraint, 0);
 
 	const expression_t *out_exprs[n_outputs];
 	ir_node            *out_addrs[n_outputs];
@@ -4602,7 +4602,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 				constraint.pos        = pos;
 				constraint.constraint = new_id_from_str(buf);
 				constraint.mode       = get_ir_mode_storage(expr->base.type);
-				tmp_in_constraints[in_size] = constraint;
+				ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 				ins[in_size] = value;
 
 				++in_size;
@@ -4630,7 +4630,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			constraint.pos              = pos;
 			constraint.constraint       = constraints;
 			constraint.mode             = mode_M;
-			tmp_in_constraints[in_size] = constraint;
+			ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 
 			ins[in_size] = expression_to_addr(argument->expression);
 			++in_size;
@@ -4640,8 +4640,6 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	       == out_size * sizeof(ir_asm_constraint));
 	ir_asm_constraint *output_constraints = obstack_finish(&asm_obst);
 
-	obstack_grow(&asm_obst, tmp_in_constraints,
-	             in_size * sizeof(tmp_in_constraints[0]));
 	for (const entity_t *entity = statement->inputs; entity != NULL;
 	     entity = entity->base.next) {
 		const asm_argument_t *argument = &entity->asm_argument;
@@ -4659,20 +4657,18 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		constraint.pos        = next_pos++;
 		constraint.constraint = new_id_from_str(argument->constraints->begin);
 		constraint.mode       = get_irn_mode(input);
+		ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 
-		obstack_grow(&asm_obst, &constraint, sizeof(constraint));
 		ins[in_size++] = input;
 	}
 
 	ir_node *mem = needs_memory ? get_store() : new_NoMem();
-	assert(obstack_object_size(&asm_obst)
-	       == in_size * sizeof(ir_asm_constraint));
-	ir_asm_constraint *input_constraints = obstack_finish(&asm_obst);
+	assert(ARR_LEN(in_constraints) == in_size);
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
-	ir_node  *node     = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
+	ir_node  *node     = new_d_ASM(dbgi, mem, in_size, ins, in_constraints,
 	                               out_size, output_constraints,
 	                               n_clobbers, clobbers, asm_text);
 
@@ -4696,6 +4692,8 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
+
+	DEL_ARR_F(in_constraints);
 
 	return NULL;
 }
