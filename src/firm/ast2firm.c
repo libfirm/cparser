@@ -4568,8 +4568,9 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	unsigned next_pos = 0;
 
-	ir_node          **ins            = NEW_ARR_F(ir_node*, 0);
-	ir_asm_constraint *in_constraints = NEW_ARR_F(ir_asm_constraint, 0);
+	ir_node          **ins             = NEW_ARR_F(ir_node*, 0);
+	ir_asm_constraint *in_constraints  = NEW_ARR_F(ir_asm_constraint, 0);
+	ir_asm_constraint *out_constraints = NEW_ARR_F(ir_asm_constraint, 0);
 
 	const expression_t *out_exprs[n_outputs];
 	ir_node            *out_addrs[n_outputs];
@@ -4607,8 +4608,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			constraint.pos        = pos;
 			constraint.constraint = constraints;
 			constraint.mode       = get_ir_mode_storage(expr->base.type);
-
-			obstack_grow(&asm_obst, &constraint, sizeof(constraint));
+			ARR_APP1(ir_asm_constraint, out_constraints, constraint);
 		} else {
 			/* the only case where an argument doesn't "write" is when it is
 			 * a memor operand (so we really write to the pointed memory instead
@@ -4627,9 +4627,6 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 		}
 	}
-	assert(obstack_object_size(&asm_obst)
-	       == out_size * sizeof(ir_asm_constraint));
-	ir_asm_constraint *output_constraints = obstack_finish(&asm_obst);
 
 	for (const entity_t *entity = statement->inputs; entity != NULL;
 	     entity = entity->base.next) {
@@ -4657,11 +4654,13 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	size_t const n_ins = ARR_LEN(ins);
 	assert(ARR_LEN(in_constraints) == n_ins);
 
+	assert(ARR_LEN(out_constraints) == out_size);
+
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
 	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins, in_constraints,
-	                               out_size, output_constraints,
+	                               out_size, out_constraints,
 	                               n_clobbers, clobbers, asm_text);
 
 	if (statement->is_volatile) {
@@ -4685,6 +4684,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
 
+	DEL_ARR_F(out_constraints);
 	DEL_ARR_F(in_constraints);
 	DEL_ARR_F(ins);
 
