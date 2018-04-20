@@ -4560,21 +4560,17 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		clobbers = obstack_finish(&asm_obst);
 	}
 
-	size_t n_outputs = 0;
-	for (const entity_t *argument = statement->outputs; argument != NULL;
-	     argument = argument->base.next) {
-		n_outputs++;
-	}
-
 	unsigned next_pos = 0;
+
+	typedef struct out_info {
+		expression_t const *expr;
+		ir_node            *addr;
+	} out_info;
 
 	ir_node          **ins             = NEW_ARR_F(ir_node*, 0);
 	ir_asm_constraint *in_constraints  = NEW_ARR_F(ir_asm_constraint, 0);
+	out_info          *outs            = NEW_ARR_F(out_info, 0);
 	ir_asm_constraint *out_constraints = NEW_ARR_F(ir_asm_constraint, 0);
-
-	const expression_t *out_exprs[n_outputs];
-	ir_node            *out_addrs[n_outputs];
-	size_t              out_size = 0;
 
 	for (const entity_t *entity = statement->outputs; entity != NULL;
 	     entity = entity->base.next) {
@@ -4591,7 +4587,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 				ARR_APP1(ir_node*, ins, value);
 
 				char buf[64];
-				snprintf(buf, sizeof(buf), "%u", (unsigned) out_size);
+				snprintf(buf, sizeof(buf), "%u", (unsigned)ARR_LEN(outs));
 
 				ir_asm_constraint constraint;
 				constraint.pos        = pos;
@@ -4600,9 +4596,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 				ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 			}
 
-			out_exprs[out_size] = expr;
-			out_addrs[out_size] = addr;
-			++out_size;
+			ARR_APP1(out_info, outs, ((out_info){ expr, addr }));
 
 			ir_asm_constraint constraint;
 			constraint.pos        = pos;
@@ -4654,13 +4648,14 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	size_t const n_ins = ARR_LEN(ins);
 	assert(ARR_LEN(in_constraints) == n_ins);
 
-	assert(ARR_LEN(out_constraints) == out_size);
+	size_t const n_outs = ARR_LEN(outs);
+	assert(ARR_LEN(out_constraints) == n_outs);
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
 	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins, in_constraints,
-	                               out_size, out_constraints,
+	                               n_outs, out_constraints,
 	                               n_clobbers, clobbers, asm_text);
 
 	if (statement->is_volatile) {
@@ -4671,21 +4666,21 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create output projs & connect them */
 	if (needs_memory) {
-		ir_node *projm = new_Proj(node, mode_M, out_size);
+		ir_node *projm = new_Proj(node, mode_M, n_outs);
 		set_store(projm);
 	}
 
-	for (size_t i = 0; i < out_size; ++i) {
-		const expression_t *out_expr = out_exprs[i];
-		ir_mode            *mode     = get_ir_mode_storage(out_expr->base.type);
-		ir_node            *proj     = new_Proj(node, mode, i);
-		ir_node            *addr     = out_addrs[i];
-
+	for (size_t i = 0; i < n_outs; ++i) {
+		expression_t const *const out_expr = outs[i].expr;
+		ir_mode            *const mode     = get_ir_mode_storage(out_expr->base.type);
+		ir_node            *const proj     = new_Proj(node, mode, i);
+		ir_node            *const addr     = outs[i].addr;
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
 
 	DEL_ARR_F(out_constraints);
 	DEL_ARR_F(in_constraints);
+	DEL_ARR_F(outs);
 	DEL_ARR_F(ins);
 
 	return NULL;
