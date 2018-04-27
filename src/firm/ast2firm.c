@@ -4560,49 +4560,40 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		clobbers = obstack_finish(&asm_obst);
 	}
 
-	unsigned next_pos = 0;
-
 	typedef struct out_info {
 		expression_t const *expr;
 		ir_node            *addr;
 	} out_info;
 
-	ir_node          **ins             = NEW_ARR_F(ir_node*, 0);
-	ir_asm_constraint *in_constraints  = NEW_ARR_F(ir_asm_constraint, 0);
-	out_info          *outs            = NEW_ARR_F(out_info, 0);
-	ir_asm_constraint *out_constraints = NEW_ARR_F(ir_asm_constraint, 0);
+	ir_node          **ins         = NEW_ARR_F(ir_node*, 0);
+	out_info          *outs        = NEW_ARR_F(out_info, 0);
+	ir_asm_constraint *constraints = NEW_ARR_F(ir_asm_constraint, 0);
 
 	for (const entity_t *entity = statement->outputs; entity != NULL;
 	     entity = entity->base.next) {
 	    const asm_argument_t *argument = &entity->asm_argument;
-		unsigned pos         = next_pos++;
-		ident   *constraints = new_id_from_str(argument->constraints->begin);
+
+		ir_asm_constraint constraint = {
+			.in_pos     = -1,
+			.out_pos    = -1,
+			.constraint = new_id_from_str(argument->constraints->begin),
+			.mode       = NULL,
+		};
+
 		if (argument->direct_write) {
 			expression_t *expr   = argument->expression;
 			ir_node      *addr   = expression_to_addr(expr);
-			/* in+output, construct an artifical same_as constraint on the
-			 * input */
 			if (argument->direct_read) {
+				constraint.in_pos = ARR_LEN(ins);
+
 				ir_node *value = get_value_from_lvalue(expr, addr);
 				ARR_APP1(ir_node*, ins, value);
-
-				char buf[64];
-				snprintf(buf, sizeof(buf), "%u", (unsigned)ARR_LEN(outs));
-
-				ir_asm_constraint constraint;
-				constraint.pos        = pos;
-				constraint.constraint = new_id_from_str(buf);
-				constraint.mode       = get_ir_mode_storage(expr->base.type);
-				ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 			}
 
-			ARR_APP1(out_info, outs, ((out_info){ expr, addr }));
+			constraint.out_pos = ARR_LEN(outs);
+			constraint.mode    = get_ir_mode_storage(expr->base.type);
 
-			ir_asm_constraint constraint;
-			constraint.pos        = pos;
-			constraint.constraint = constraints;
-			constraint.mode       = get_ir_mode_storage(expr->base.type);
-			ARR_APP1(ir_asm_constraint, out_constraints, constraint);
+			ARR_APP1(out_info, outs, ((out_info){ expr, addr }));
 		} else {
 			/* the only case where an argument doesn't "write" is when it is
 			 * a memor operand (so we really write to the pointed memory instead
@@ -4611,20 +4602,27 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			assert(argument->indirect_write);
 			needs_memory = true;
 
+			constraint.in_pos = ARR_LEN(ins);
+			constraint.mode   = mode_M;
+
 			ir_node *const addr = expression_to_addr(argument->expression);
 			ARR_APP1(ir_node*, ins, addr);
-
-			ir_asm_constraint constraint;
-			constraint.pos              = pos;
-			constraint.constraint       = constraints;
-			constraint.mode             = mode_M;
-			ARR_APP1(ir_asm_constraint, in_constraints, constraint);
 		}
+
+		ARR_APP1(ir_asm_constraint, constraints, constraint);
 	}
 
 	for (const entity_t *entity = statement->inputs; entity != NULL;
 	     entity = entity->base.next) {
 		const asm_argument_t *argument = &entity->asm_argument;
+
+		ir_asm_constraint constraint = {
+			.in_pos     = ARR_LEN(ins),
+			.out_pos    = -1,
+			.constraint = new_id_from_str(argument->constraints->begin),
+			.mode       = NULL,
+		};
+
 		ir_node *input;
 		if (argument->direct_read) {
 			/* we can treat this as "normal" input */
@@ -4636,26 +4634,20 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		}
 		ARR_APP1(ir_node*, ins, input);
 
-		ir_asm_constraint constraint;
-		constraint.pos        = next_pos++;
-		constraint.constraint = new_id_from_str(argument->constraints->begin);
-		constraint.mode       = get_irn_mode(input);
-		ARR_APP1(ir_asm_constraint, in_constraints, constraint);
+		constraint.mode = get_irn_mode(input);
+		ARR_APP1(ir_asm_constraint, constraints, constraint);
 	}
 
 	ir_node *mem = needs_memory ? get_store() : new_NoMem();
 
-	size_t const n_ins = ARR_LEN(ins);
-	assert(ARR_LEN(in_constraints) == n_ins);
-
-	size_t const n_outs = ARR_LEN(outs);
-	assert(ARR_LEN(out_constraints) == n_outs);
+	size_t const n_ins         = ARR_LEN(ins);
+	size_t const n_constraints = ARR_LEN(constraints);
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
-	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins, in_constraints,
-	                               n_outs, out_constraints,
+	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins,
+	                               n_constraints, constraints,
 	                               n_clobbers, clobbers, asm_text);
 
 	if (statement->is_volatile) {
@@ -4666,11 +4658,11 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create output projs & connect them */
 	if (needs_memory) {
-		ir_node *projm = new_Proj(node, mode_M, n_outs);
+		ir_node *projm = new_Proj(node, mode_M, n_constraints);
 		set_store(projm);
 	}
 
-	for (size_t i = 0; i < n_outs; ++i) {
+	for (size_t i = 0, n_outs = ARR_LEN(outs); i < n_outs; ++i) {
 		expression_t const *const out_expr = outs[i].expr;
 		ir_mode            *const mode     = get_ir_mode_storage(out_expr->base.type);
 		ir_node            *const proj     = new_Proj(node, mode, i);
@@ -4678,8 +4670,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
 
-	DEL_ARR_F(out_constraints);
-	DEL_ARR_F(in_constraints);
+	DEL_ARR_F(constraints);
 	DEL_ARR_F(outs);
 	DEL_ARR_F(ins);
 
