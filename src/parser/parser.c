@@ -4740,7 +4740,14 @@ static void check_reachable(statement_t *const stmt)
 	switch (stmt->kind) {
 	case STATEMENT_ERROR:
 	case STATEMENT_EMPTY:
+		goto fallthrough;
+
 	case STATEMENT_ASM:
+		for (asm_label_t const *i = stmt->asms.labels; i; i = i->next) {
+			statement_t *const tgt = i->label->statement;
+			if (tgt)
+				check_reachable(tgt);
+		}
 		goto fallthrough;
 
 	case STATEMENT_DECLARATION: {
