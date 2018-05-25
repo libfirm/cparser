@@ -4741,8 +4741,7 @@ static void check_reachable(statement_t *const stmt)
 	case STATEMENT_ERROR:
 	case STATEMENT_EMPTY:
 	case STATEMENT_ASM:
-		next = stmt->base.next;
-		break;
+		goto fallthrough;
 
 	case STATEMENT_DECLARATION: {
 		declaration_statement_t const *const decl = &stmt->declaration;
@@ -4759,14 +4758,13 @@ static void check_reachable(statement_t *const stmt)
 					break;
 			}
 		}
-		next = stmt->base.next;
-		break;
+		goto fallthrough;
 	}
 
 	case STATEMENT_COMPOUND:
 		next = stmt->compound.statements;
 		if (next == NULL)
-			next = stmt->base.next;
+			goto fallthrough;
 		break;
 
 	case STATEMENT_RETURN: {
@@ -4796,8 +4794,7 @@ static void check_reachable(statement_t *const stmt)
 			return;
 		}
 
-		next = stmt->base.next;
-		break;
+		goto fallthrough;
 	}
 
 	case STATEMENT_SWITCH: {
@@ -4845,8 +4842,7 @@ static void check_reachable(statement_t *const stmt)
 				return;
 		}
 
-		next = stmt->base.next;
-		break;
+		goto fallthrough;
 	}
 
 	case STATEMENT_EXPRESSION: {
@@ -4855,8 +4851,7 @@ static void check_reachable(statement_t *const stmt)
 		if (!expression_returns(expr))
 			return;
 
-		next = stmt->base.next;
-		break;
+		goto fallthrough;
 	}
 
 	case STATEMENT_CONTINUE:
@@ -4947,6 +4942,7 @@ found_break_parent:
 		if (val > 0)
 			return;
 
+fallthrough:
 		next = stmt->base.next;
 		break;
 	}
