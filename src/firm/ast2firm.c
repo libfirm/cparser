@@ -4590,7 +4590,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 				ARR_APP1(ir_node*, ins, value);
 			}
 
-			constraint.out_pos = ARR_LEN(outs);
+			constraint.out_pos = pn_ASM_first_out + ARR_LEN(outs);
 			constraint.mode    = get_ir_mode_storage(expr->base.type);
 
 			ARR_APP1(out_info, outs, ((out_info){ expr, addr }));
@@ -4658,14 +4658,14 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create output projs & connect them */
 	if (needs_memory) {
-		ir_node *projm = new_Proj(node, mode_M, n_constraints);
+		ir_node *const projm = new_Proj(node, mode_M, pn_ASM_M);
 		set_store(projm);
 	}
 
 	for (size_t i = 0, n_outs = ARR_LEN(outs); i < n_outs; ++i) {
 		expression_t const *const out_expr = outs[i].expr;
 		ir_mode            *const mode     = get_ir_mode_storage(out_expr->base.type);
-		ir_node            *const proj     = new_Proj(node, mode, i);
+		ir_node            *const proj     = new_Proj(node, mode, pn_ASM_first_out + i);
 		ir_node            *const addr     = outs[i].addr;
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
