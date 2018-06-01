@@ -9184,7 +9184,7 @@ static void parse_asm_labels(asm_label_t **anchor)
 	if (peek(T_IDENTIFIER)) {
 		add_anchor_token(',');
 		do {
-			label_t *const label = get_label("'asm goto' labels");
+			label_t *const label = get_label("'asm goto' label");
 			if (label) {
 				use_label(label);
 
