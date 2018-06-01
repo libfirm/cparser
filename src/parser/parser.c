@@ -9173,6 +9173,12 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 	}
 }
 
+static void use_label(label_t *const label)
+{
+	label->n_users += 1;
+	label->used     = true;
+}
+
 static void parse_asm_labels(asm_label_t **anchor)
 {
 	if (peek(T_IDENTIFIER)) {
@@ -9180,6 +9186,8 @@ static void parse_asm_labels(asm_label_t **anchor)
 		do {
 			label_t *const label = get_label("'asm goto' labels");
 			if (label) {
+				use_label(label);
+
 				asm_label_t *const asm_label = allocate_ast_zero(sizeof(*asm_label));
 				asm_label->label = label;
 
@@ -9922,8 +9930,7 @@ static statement_t *parse_goto(void)
 
 		label_t *const label = get_label("goto");
 		if (label) {
-			label->n_users        += 1;
-			label->used            = true;
+			use_label(label);
 			statement->gotos.label = label;
 		} else {
 			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous, &builtin_position)->label;
