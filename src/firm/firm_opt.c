@@ -38,6 +38,8 @@ struct a_firm_opt {
 	int      clone_threshold; /**< The threshold value for procedure cloning. */
 	unsigned inline_maxsize;  /**< Maximum function size for inlining. */
 	unsigned inline_threshold;/**< Inlining benefice threshold. */
+	unsigned unroll_factor;   /**< unroll factor for loop unrolling */
+	unsigned unroll_maxsize;  /**< maximum number of nodes in loop */
 };
 
 /* dumping options */
@@ -73,6 +75,8 @@ static struct a_firm_opt firm_opt = {
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
 	.inline_threshold =  0,
+	.unroll_factor    =  1,
+	.unroll_maxsize   =  64,
 };
 
 /* dumping options */
@@ -341,6 +345,11 @@ static void do_gcse(ir_graph *irg)
 	set_opt_global_cse(1);
 	optimize_graph_df(irg);
 	set_opt_global_cse(0);
+}
+
+static void do_loop_unrolling2(ir_graph *irg)
+{
+	unroll_loops(irg, firm_opt.unroll_factor, firm_opt.unroll_maxsize);
 }
 
 static opt_config_t opts[] = {
@@ -846,6 +855,12 @@ int firm_option(const char *const opt)
 		return 1;
 	} else if ((val = strstart(opt, "inline-threshold="))) {
 		sscanf(val, "%u", &firm_opt.inline_threshold);
+		return 1;
+	} else if ((val = strstart(opt, "unroll-factor="))) {
+		sscanf(val, "%u", &firm_opt.unroll_factor);
+		return 1;
+	} else if ((val = strstart(opt, "unroll-max-size="))) {
+		sscanf(val, "%u", &firm_opt.unroll_maxsize);
 		return 1;
 	} else if (streq(opt, "no-opt")) {
 		disable_all_opts();
