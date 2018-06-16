@@ -245,6 +245,11 @@ void init_firm_target(void)
 		errorf(NULL, "Failed to initialize libfirm code generation\n");
 		exit(EXIT_FAILURE);
 	}
+
+	if (strstart(ir_triple_get_operating_system(target.machine), "openbsd")) {
+		target.pic = true;
+		target.set_pic = true;
+	}
 }
 
 bool target_setup(void)

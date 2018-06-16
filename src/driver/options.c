@@ -366,6 +366,7 @@ bool options_parse_linker(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-L%s", arg);
 	} else if (simple_arg("static", s)
 	        || simple_arg("no-pie", s)
+	        || simple_arg("nopie", s)
 	        || simple_arg("nodefaultlibs", s)
 	        || simple_arg("nostartfiles", s)
 	        || simple_arg("nostdlib", s)
@@ -384,6 +385,8 @@ bool options_parse_linker(options_state_t *s)
 	} else if (simple_arg("pg", s)) {
 		set_target_option("gprof");
 		driver_add_flag(&ldflags_obst, "-pg");
+	} else if ((arg = equals_arg("fuse-ld", s)) != NULL) {
+		driver_add_flag(&ldflags_obst, "-fuse-ld=%s", arg);
 	} else if ((arg = equals_arg("print-file-name", s)) != NULL) {
 		print_file_name_file = arg;
 		s->action = action_print_file_name;
