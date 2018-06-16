@@ -366,6 +366,7 @@ bool options_parse_linker(options_state_t *s)
 		driver_add_flag(&ldflags_obst, "-L%s", arg);
 	} else if (simple_arg("static", s)
 	        || simple_arg("no-pie", s)
+	        || simple_arg("nopie", s)
 	        || simple_arg("nodefaultlibs", s)
 	        || simple_arg("nostartfiles", s)
 	        || simple_arg("nostdlib", s)
