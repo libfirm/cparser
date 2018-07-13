@@ -111,6 +111,7 @@ struct pp_input_t {
 	input_t            *input;
 	pp_input_t         *parent;
 	searchpath_entry_t *path;
+	char const         *real_name;
 	position_t          pos;
 	unsigned            output_line;
 };
@@ -231,6 +232,7 @@ static void switch_input(input_t *const decoder, char const *const input_name,
 		.bufend             = end,
 		.bufpos             = end,
 		.output_line        = 0,
+		.real_name          = input_name,
 		.pos = {
 			.input_name       = input_name,
 			.lineno           = 1,
@@ -3214,7 +3216,7 @@ static bool do_include(bool const bracket_include, bool const include_next,
 		entry = bracket_searchpath.first;
 	} else {
 		/* put dirname of current input on obstack */
-		char const *const filename   = input.pos.input_name;
+		char const *const filename   = input.real_name;
 		char const *const last_slash = strrchr(filename, '/');
 		if (last_slash)
 			obstack_grow(&symbol_obstack, filename, last_slash - filename + 1);
