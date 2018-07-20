@@ -8646,6 +8646,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	/* If an equal sign is followed by an infix operator without spaces then it
 	 * was probably intended to be a compound assignment */
 	if (expression->base.kind == EXPR_BINARY_ASSIGN
+	 && !expression->right->base.parenthesized
 	 && is_ambiguous_unary_expression_kind(expression->right->kind)
 	 && are_positions_contiguous(&expression->base.pos,
 	                             &expression->right->base.pos))
