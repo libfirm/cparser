@@ -16,6 +16,7 @@ cparser 1.22.1 (2016-01-23)
 * Add option `-Wlabel-at-end-of-block`
 * Split `-Wparentheses` into `Wparentheses-assignment`, `Wparentheses-comparison`, `Wparentheses-else`, `Wparentheses-logical` and `Wparentheses-shift`
 * Add target `mips`
+* Add target `riscv32`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
