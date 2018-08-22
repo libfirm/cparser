@@ -1390,7 +1390,6 @@ static bool concat_macro_parameters(const position_t *pos,
 		}
 	}
 
-	assert(current_call.macro == NULL);
 	assert(obstack_object_size(&pp_obstack) == 0);
 	pp_definition_t *const newdef = OALLOCZ(&pp_obstack, pp_definition_t);
 	newdef->symbol       = sym_anonymous;
