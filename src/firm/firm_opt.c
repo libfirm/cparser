@@ -396,7 +396,7 @@ static opt_config_t opts[] = {
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRP("opt-cc",            mark_private_methods,     "calling conventions optimization",                      OPT_FLAG_NONE),
-	IRG("ces-si",            ces_special_instruction,  "CES SI identification",                                 OPT_FLAG_NONE),
+	IRG("ces-si",            ces_special_instruction,  "CES SI identification",                                 OPT_FLAG_ENABLED),
 #undef IRP
 #undef IRG
 };
@@ -686,6 +686,7 @@ static void do_firm_lowering(void)
 		do_irg_opt(irg, "memcombine");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "frame");
+		do_irg_opt(irg, "ces-si");
 	}
 	/* hack so we get global initializers constant folded even at -O0 */
 	set_opt_constant_folding(1);
