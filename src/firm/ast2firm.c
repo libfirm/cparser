@@ -245,6 +245,8 @@ static mtp_additional_properties get_additional_type_properties(
 		        | mtp_property_terminates;
 	if (modifiers & DM_PURE)
 		result |= mtp_property_no_write | mtp_property_terminates;
+	if (modifiers & DM_SPECIAL_INSTRUCTION)
+		result |= mtp_special_instruction;
 	if (modifiers & DM_RETURNS_TWICE)
 		result |= mtp_property_returns_twice;
 	if (modifiers & DM_NORETURN)

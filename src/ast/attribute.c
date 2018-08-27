@@ -92,6 +92,7 @@ static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_WEAK]                   = "weak",
 	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
 	[ATTRIBUTE_GNU_WEAK_IMPORT]            = "weak_import",
+	[ATTRIBUTE_ICORE_SPECIAL_INSTRUCTION]  = "special_instruction",
 	[ATTRIBUTE_MS_ALIGN]                   = "align",
 	[ATTRIBUTE_MS_ALLOCATE]                = "allocate",
 	[ATTRIBUTE_MS_DEPRECATED]              = "deprecated",
@@ -365,6 +366,9 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_WEAK_IMPORT:   modifiers |= DM_WEAK; break;
 		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 		case ATTRIBUTE_GNU_GNU_INLINE:    modifiers |= DM_GNU_INLINE; break;
+
+		case ATTRIBUTE_ICORE_SPECIAL_INSTRUCTION:
+		                                  modifiers |= DM_SPECIAL_INSTRUCTION; break;
 
 		case ATTRIBUTE_MS_DLLIMPORT:      modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:      modifiers |= DM_DLLEXPORT; break;

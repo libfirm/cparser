@@ -55,6 +55,8 @@ typedef enum decl_modifiers_t {
 	DM_LEAF              = 1 << 28,
 	DM_GNU_INLINE        = 1 << 29,
 	DM_PACKED            = 1 << 30,
+	DM_SPECIAL_INSTRUCTION
+	                     = 1 << 31,
 } decl_modifiers_t;
 
 unsigned get_declaration_alignment(const declaration_t *declaration);
