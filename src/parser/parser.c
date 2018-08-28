@@ -1300,8 +1300,9 @@ static attribute_t *parse_attribute_gnu_single(void)
 
 	attribute_kind_t  kind;
 	char const *const name = symbol->string;
+
 	for (kind = ATTRIBUTE_GNU_FIRST;; ++kind) {
-		if (kind > ATTRIBUTE_GNU_LAST) {
+		if (kind > ATTRIBUTE_ICORE_LAST) {
 			/* special case for "__const" */
 			if (peek(T_const)) {
 				kind = ATTRIBUTE_GNU_CONST;
