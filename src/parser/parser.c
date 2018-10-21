@@ -1381,6 +1381,7 @@ static attribute_t *parse_attributes(attribute_t *first)
 			attribute = parse_attribute_asm();
 			break;
 
+
 		case T_cdecl:
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_CDECL);
 			eat(T_cdecl);
@@ -9412,6 +9413,23 @@ static statement_t *parse_asm_statement(void)
 	}
 }
 
+
+static void parse__Pragma(void)
+{
+	eat(T__Pragma);
+	add_anchor_token(')');
+	add_anchor_token(T_STRING_LITERAL);
+	expect('(');
+	rem_anchor_token(T_STRING_LITERAL);
+    /* what kind of allocation? does it need freeing? TODO */
+	string_t *message = parse_string_literals("_Pragma operator");
+    (void)message;
+    warningf(WARN_UNKNOWN_PRAGMAS, HERE, "gcc _Pragma is ignored");
+	rem_anchor_token(')');
+	expect(')');
+}
+
+
 static statement_t *parse_label_inner_statement(statement_t const *const label,
                                                 char const *const label_kind)
 {
@@ -10232,6 +10250,7 @@ static statement_t *intern_parse_statement(void)
 {
 	/* declaration or statement */
 	statement_t *statement;
+again:
 	switch (token.kind) {
 	case T_IDENTIFIER: {
 		token_kind_t const la1_type = look_ahead(1)->kind;
@@ -10294,6 +10313,9 @@ static statement_t *intern_parse_statement(void)
 	case EXPRESSION_START:
 		statement = parse_expression_statement();
 		break;
+
+    /*_Pragma operator parsed and ignored for gcc compatibility*/
+	case T__Pragma: parse__Pragma();                               goto again;
 
 	default:
 		errorf(HERE, "unexpected token %K while parsing statement", &token);
@@ -10422,6 +10444,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_volatile);
 	add_anchor_token(T_wchar_t);
 	add_anchor_token(T_while);
+	add_anchor_token(T__Pragma);
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
@@ -10545,6 +10568,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token('&');
 	rem_anchor_token('!');
 	rem_anchor_token('}');
+	rem_anchor_token(T__Pragma);
 
 	POP_SCOPE();
 	POP_PARENT();
@@ -10892,7 +10916,7 @@ static void parse_external(void)
 	case T___extension__:
 	/* tokens below are for implicit int */
 	case '&':  /* & x; -> int& x; (and error later, because C++ has no
-	                               implicit int) */
+                                  implicit int) */
 	case '*':  /* * x; -> int* x; */
 	case '(':  /* (x); -> int (x); */
 			PUSH_EXTENSION();
@@ -10904,6 +10928,11 @@ static void parse_external(void)
 	case T_asm:
 		parse_global_asm();
 		return;
+
+    /*_Pragma operator parsed and ignored for gcc compatibility*/
+    case T__Pragma:
+        parse__Pragma();
+        return;
 
 	case T_namespace:
 		parse_namespace_definition();
