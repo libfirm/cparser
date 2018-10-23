@@ -159,14 +159,6 @@ $(builddir)/%.o: %.c
 	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(SELFCHECK_FLAGS) $<
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
 
-#the tests require a posix shell
-test: $(cparser_EXE)
-	@echo "TESTS"
-	$(Q)cd $(top_srcdir)/tests && sh run_all_tests.sh "../../$(cparser_EXE)"
-test_cc: $(cparser_EXE)
-	@echo "TESTS"
-	$(Q)cd $(top_srcdir)/tests && TESTS_CC=cc sh run_all_tests.sh "../../$(cparser_EXE)"
-
 clean:
 	@echo 'CLEAN'
 	$(Q)rm -rf $(builddir)
