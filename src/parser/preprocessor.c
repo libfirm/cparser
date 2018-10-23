@@ -60,13 +60,14 @@ struct pp_definition_t {
 	token_t         *token_list;
 
 	position_t       pos;
-	bool             is_expanding    : 1;
-	bool             may_recurse     : 1;
-	bool             has_parameters  : 1;
-	bool             is_parameter    : 1;
-	bool             is_variadic     : 1;
-	bool             standard_define : 1;
-	bool             not_specified   : 1;
+    bool             is_expanding           : 1;
+    bool             may_recurse            : 1;
+    bool             has_parameters         : 1;
+    bool             is_parameter           : 1;
+    bool             is_variadic            : 1;
+    bool             standard_define        : 1;
+    bool             not_specified          : 1;
+    bool             is_specially_handled   : 1; /*predefined macro functions that are handled differntly*/
 };
 
 typedef struct pp_expansion_state_t {
@@ -1126,6 +1127,10 @@ static void start_function_macro_expansion(const macro_call_t *call)
 			parameter->not_specified = true;
 		}
 	}
+    if (current_call.macro->is_specially_handled){
+        //TODO: this is done temporarily for _Pragma
+        warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.pos, "_Pragma is not currently supported");
+    }
 
 	pp_expansion_state_t *expansion  = begin_expanding(call->macro);
 	expansion->previous_is_expanding = call->previous_is_expanding;
@@ -2670,6 +2675,26 @@ void add_define_macro(char const *const name, char const *const macro_arg,
 	def->token_list     = obstack_finish(&pp_obstack);
 }
 
+
+void define_special_macro_functions()
+{
+    /*_Pragma definition */
+    pp_definition_t *def = add_define_("_Pragma", true);
+
+    symbol_t *const parameter_symbol = symbol_table_insert("directive");
+    pp_definition_t *parameter = OALLOCZ(&pp_obstack, pp_definition_t);
+    parameter->pos          = builtin_position;
+    parameter->symbol       = parameter_symbol;
+    parameter->is_parameter = true;
+    parameter->is_variadic  = false;
+
+    def->has_parameters = true;
+    def->is_specially_handled = true; /*we catch it later during expansion*/
+    def->n_parameters   = 1;
+    def->parameters     = obstack_finish(&pp_obstack);
+}
+
+
 void parse_define(char const *opt)
 {
 	assert(obstack_object_size(&config_obstack) == 0);
@@ -4064,7 +4089,7 @@ have_token:
 			if (current_call.argument_brace_count > 0) {
 				--current_call.argument_brace_count;
 			} else {
-				assert(kind == ')');
+				assert(current_call.argument_brace_count == 0);
 				start_function_macro_expansion(&current_call);
 				pop_macro_call();
 				info = call_whitespace_info;

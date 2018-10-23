@@ -453,6 +453,8 @@ void add_predefined_macros(void)
 
 	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
 
+    define_special_macro_functions();
+
 	/* Add target specific defines */
 	for (ir_platform_define_t const *define = ir_platform_define_first();
 		 define != NULL; define = ir_platform_define_next(define)) {
