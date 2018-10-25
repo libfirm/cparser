@@ -60,14 +60,14 @@ struct pp_definition_t {
 	token_t         *token_list;
 
 	position_t       pos;
-    bool             is_expanding           : 1;
-    bool             may_recurse            : 1;
-    bool             has_parameters         : 1;
-    bool             is_parameter           : 1;
-    bool             is_variadic            : 1;
-    bool             standard_define        : 1;
-    bool             not_specified          : 1;
-    bool             is_specially_handled   : 1; /*predefined macro functions that are handled differntly*/
+	bool             is_expanding    : 1;
+	bool             may_recurse     : 1;
+	bool             has_parameters  : 1;
+	bool             is_parameter    : 1;
+	bool             is_variadic     : 1;
+	bool             standard_define : 1;
+	bool             not_specified   : 1;
+	bool             is_pragma       : 1; /*_Pragma*/
 };
 
 typedef struct pp_expansion_state_t {
@@ -1127,8 +1127,8 @@ static void start_function_macro_expansion(const macro_call_t *call)
 			parameter->not_specified = true;
 		}
 	}
-    if (current_call.macro->is_specially_handled){
-        //TODO: this is done temporarily for _Pragma
+    if (current_call.macro->is_pragma){
+        /*TODO: this is done temporarily for _Pragma*/
         warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.pos, "_Pragma is not currently supported");
     }
 
@@ -2676,24 +2676,23 @@ void add_define_macro(char const *const name, char const *const macro_arg,
 }
 
 
-void define_special_macro_functions()
+void define_pragma_macro(void)
 {
-    /*_Pragma definition */
-    pp_definition_t *def = add_define_("_Pragma", true);
+	/*_Pragma definition */
+	pp_definition_t *def = add_define_("_Pragma", true);
 
-    symbol_t *const parameter_symbol = symbol_table_insert("directive");
-    pp_definition_t *parameter = OALLOCZ(&pp_obstack, pp_definition_t);
-    parameter->pos          = builtin_position;
-    parameter->symbol       = parameter_symbol;
-    parameter->is_parameter = true;
-    parameter->is_variadic  = false;
+	symbol_t *const parameter_symbol = symbol_table_insert("directive");
+	pp_definition_t *parameter		 = OALLOCZ(&pp_obstack, pp_definition_t);
+	parameter->pos          = builtin_position;
+	parameter->symbol       = parameter_symbol;
+	parameter->is_parameter = true;
+	parameter->is_variadic  = false;
 
-    def->has_parameters = true;
-    def->is_specially_handled = true; /*we catch it later during expansion*/
-    def->n_parameters   = 1;
-    def->parameters     = obstack_finish(&pp_obstack);
+	def->has_parameters = true;
+	def->is_pragma		= true; /*we catch it later during expansion*/
+	def->n_parameters   = 1;
+	def->parameters     = obstack_finish(&pp_obstack);
 }
-
 
 void parse_define(char const *opt)
 {

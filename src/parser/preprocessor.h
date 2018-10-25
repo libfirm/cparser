@@ -50,7 +50,7 @@ void add_define(char const *name, char const *val, bool standard_define);
 void add_define_string(char const *name, char const *val, bool standard_define);
 void add_define_macro(char const *name, char const *macro_arg,
                       char const *val, bool standard_define);
-void define_special_macro_functions(void);
+void define_pragma_macro(void);
 void parse_define(char const *string);
 void undefine(char const *name);
 
