@@ -1127,8 +1127,8 @@ static void start_function_macro_expansion(const macro_call_t *call)
 			parameter->not_specified = true;
 		}
 	}
-    if (current_call.macro->is_pragma){
-        /*TODO: this is done temporarily for _Pragma*/
+	if (current_call.macro->is_pragma){
+	/*TODO: this is done temporarily for _Pragma*/
         warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.pos, "_Pragma is not currently supported");
     }
 
