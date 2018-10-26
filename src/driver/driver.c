@@ -245,6 +245,10 @@ bool process_all_units(compilation_env_t *env)
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		if (unit->type == COMPILATION_UNIT_AUTODETECT)
 			unit->type = autodetect_input(unit->name);
+		if (unit->original_name && env->outname && streq(unit->original_name, env->outname)) {
+			errorf(NULL, "output file '%s' is the same as the input file", env->outname);
+			return false;
+		}
 
 		stat_ev_ctx_push_str("compilation_unit", unit->name);
 		bool ok = process_unit(env, unit);
