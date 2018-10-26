@@ -246,7 +246,7 @@ bool process_all_units(compilation_env_t *env)
 		if (unit->type == COMPILATION_UNIT_AUTODETECT)
 			unit->type = autodetect_input(unit->name);
 		if (unit->original_name && env->outname && streq(unit->original_name, env->outname)) {
-			errorf(NULL, "output filename '%s' is the same as the input filename.", env->outname);
+			errorf(NULL, "output file '%s' is the same as the input file", env->outname);
 			return false;
 		}
 
