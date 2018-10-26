@@ -1129,8 +1129,8 @@ static void start_function_macro_expansion(const macro_call_t *call)
 	}
 	if (current_call.macro->is_pragma){
 	/*TODO: this is done temporarily for _Pragma*/
-        warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.pos, "_Pragma is not currently supported");
-    }
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.pos, "_Pragma is not currently supported");
+	}
 
 	pp_expansion_state_t *expansion  = begin_expanding(call->macro);
 	expansion->previous_is_expanding = call->previous_is_expanding;
