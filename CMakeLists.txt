@@ -64,7 +64,7 @@ include_directories(src)
 
 add_subdirectory(libfirm)
 # Also include generated header files which are dropped into firm's BINARY_DIR.
-include_directories(libfirm/include ${libfirm_BINARY_DIR}/include)
+include_directories(libfirm/include ${libfirm_BINARY_DIR}/gen/include/libfirm)
 
 add_executable(cparser ${SOURCES})
 target_link_libraries(cparser firm)
