@@ -62,12 +62,12 @@ set(SOURCES
 )
 include_directories(src)
 
-# Need libfirm of the same version as cparser
-find_package(libfirm ${cparser_VERSION} REQUIRED)
-include_directories(${libfirm_INCLUDE_DIRS})
+add_subdirectory(libfirm)
+# Also include generated header files which are dropped into firm's BINARY_DIR.
+include_directories(libfirm/include ${libfirm_BINARY_DIR}/include)
 
 add_executable(cparser ${SOURCES})
-target_link_libraries(cparser libfirm::firm)
+target_link_libraries(cparser firm)
 if(UNIX)
 	target_link_libraries(cparser m)
 endif()
