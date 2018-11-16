@@ -18,6 +18,7 @@ else()
 endif()
 
 set(SOURCES
+	src/adt/panic.c
 	src/adt/pset_new.c
 	src/adt/strutil.c
 	src/ast/ast.c
@@ -37,7 +38,6 @@ set(SOURCES
 	src/driver/diagnostic.c
 	src/driver/driver.c
 	src/driver/help.c
-	src/driver/machine_triple.c
 	src/driver/options.c
 	src/driver/predefs.c
 	src/driver/target.c
@@ -46,6 +46,7 @@ set(SOURCES
 	src/driver/warning.c
 	src/firm/ast2firm.c
 	src/firm/firm_opt.c
+	src/firm/jittest.c
 	src/firm/jump_target.c
 	src/firm/mangle.c
 	src/main.c
