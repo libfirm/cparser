@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <assert.h>
 #include <libfirm/firm.h>
 
@@ -38,6 +37,7 @@ struct a_firm_opt {
 	int      clone_threshold; /**< The threshold value for procedure cloning. */
 	unsigned inline_maxsize;  /**< Maximum function size for inlining. */
 	unsigned inline_threshold;/**< Inlining benefice threshold. */
+	unsigned bool_expr_limit; /**< Size limit for generated boolean expressions in boolopt */
 };
 
 /* dumping options */
@@ -73,6 +73,7 @@ static struct a_firm_opt firm_opt = {
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
 	.inline_threshold =  0,
+	.bool_expr_limit  =  8,
 };
 
 /* dumping options */
@@ -114,6 +115,7 @@ static const struct params {
   { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "strict alias rules" },
   { X("no-strict-aliasing"),     &firm_opt.strict_alias,     0, "strict alias rules" },
   { X("clone-threshold=<value>"),NULL,                       0, "set clone threshold to <value>" },
+  { X("bool-expr-limit=<value>"),NULL,                       0, "set size limit for generated boolean expressions in boolopt to <value>" },
 
   /* other firm regarding options */
   { X("verify-off"),             &firm_opt.verify,           0, "disable node verification" },
@@ -343,10 +345,15 @@ static void do_gcse(ir_graph *irg)
 	set_opt_global_cse(0);
 }
 
+static void do_bool(ir_graph *irg)
+{
+	opt_bool(irg, firm_opt.bool_expr_limit);
+}
+
 static opt_config_t opts[] = {
 #define IRG(a, b, c, d) { OPT_TARGET_IRG, a, .u.transform_irg = b, c, d }
 #define IRP(a, b, c, d) { OPT_TARGET_IRP, a, .u.transform_irp = b, c, d }
-	IRG("bool",              opt_bool,                 "bool simplification",                                   OPT_FLAG_NONE),
+	IRG("bool",              do_bool,                  "bool simplification",                                   OPT_FLAG_NONE),
 	IRG("combo",             combo,                    "combined CCE, UCE and GVN",                             OPT_FLAG_NONE),
 	IRG("confirm",           construct_confirms,       "confirm optimization",                                  OPT_FLAG_HIDE_OPTIONS),
 	IRG("control-flow",      optimize_cf,              "optimization of control-flow",                          OPT_FLAG_HIDE_OPTIONS),
@@ -847,6 +854,9 @@ int firm_option(const char *const opt)
 	} else if ((val = strstart(opt, "inline-threshold="))) {
 		sscanf(val, "%u", &firm_opt.inline_threshold);
 		return 1;
+    } else if ((val = strstart(opt, "bool-expr-limit="))) {
+        sscanf(val, "%u", &firm_opt.bool_expr_limit);
+        return 1;
 	} else if (streq(opt, "no-opt")) {
 		disable_all_opts();
 		return 1;
