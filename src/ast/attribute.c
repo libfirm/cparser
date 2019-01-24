@@ -301,7 +301,6 @@ static void handle_attribute_asm(const attribute_t *attribute,
 	symbol_t *sym = symbol_table_insert(expression->string_literal.value->begin);
 	entity->function.actual_name = sym;
 	assert(argument->next == NULL);
-	return;
 }
 
 static void handle_attribute_alias(const attribute_t *attribute,

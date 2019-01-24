@@ -19,12 +19,12 @@ typedef struct walk_env_t {
 	void *env;
 } walk_env_t;
 
-static void walk_expression(expression_t *expr, const walk_env_t *const env);
+static void walk_expression(expression_t *expr, const walk_env_t *env);
 static void walk_statement(statement_t *stmt, const walk_env_t *env);
 static void walk_entity(entity_t *entity, const walk_env_t *env);
-static void walk_designator(const designator_t *, const walk_env_t *);
-static void walk_initializer(const initializer_t  *, const walk_env_t *);
-static void walk_scope(const scope_t *const scope, const walk_env_t *const env);
+static void walk_designator(const designator_t *designator, const walk_env_t *env);
+static void walk_initializer(const initializer_t  *initializer, const walk_env_t *env);
+static void walk_scope(const scope_t *scope, const walk_env_t *env);
 
 static void walk_type(type_t *const type, const walk_env_t *const env)
 {

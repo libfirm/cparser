@@ -139,7 +139,7 @@ static unsigned short token_anchor_set[T_LAST_TOKEN];
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
-static expression_t *parse_subexpression(precedence_t);
+static expression_t *parse_subexpression(precedence_t precedence);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
 static type_t       *parse_non_empty_typename(void);
@@ -1418,8 +1418,7 @@ static attribute_t *parse_attributes(attribute_t *first)
 #define ENT_ANY ((entity_t*)-1)
 
 static void mark_vars_read(expression_t *expr, entity_t *lhs_ent);
-static entity_t *determine_lhs_ent(expression_t *const expr,
-                                   entity_t *lhs_ent);
+static entity_t *determine_lhs_ent(expression_t *expr, entity_t *lhs_ent);
 
 static designator_t *parse_designation(void)
 {
@@ -4612,7 +4611,7 @@ static int determine_truth(expression_t const* const cond)
 	     : -1;
 }
 
-static void check_reachable(statement_t *);
+static void check_reachable(statement_t *stmt);
 static bool reaches_end;
 
 static bool expression_returns(expression_t const *const expr)
@@ -5146,7 +5145,7 @@ warn_unreachable:
 	}
 }
 
-static void prepare_main_collect2(entity_t*);
+static void prepare_main_collect2(entity_t *entity);
 
 static void parse_external_declaration(void)
 {

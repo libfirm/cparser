@@ -318,8 +318,8 @@ compilation_unit_type_t autodetect_input(char const *const path)
 		streq(suffix, "h")   ? COMPILATION_UNIT_C                      :
 		streq(suffix, "ir")  ? COMPILATION_UNIT_IR                     :
 		streq(suffix, "o")   ? COMPILATION_UNIT_OBJECT                 :
-		streq(suffix, "s")   ? COMPILATION_UNIT_PREPROCESSED_ASSEMBLER :
 		streq(suffix, "so")  ? COMPILATION_UNIT_OBJECT                 :
+		streq(suffix, "s")   ? COMPILATION_UNIT_PREPROCESSED_ASSEMBLER :
 		COMPILATION_UNIT_OBJECT; /* gcc behavior: unknown file extension means
 		                            object file */
 }

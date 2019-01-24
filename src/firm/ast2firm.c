@@ -2498,7 +2498,7 @@ incdec:
 }
 
 static void complex_equality_evaluation(const binary_expression_t *binexpr,
-	jump_target *const true_target, jump_target *const false_target,
+	jump_target *true_target, jump_target *false_target,
 	ir_relation relation);
 
 static complex_value complex_to_control_flow(const expression_t *expression,
@@ -3084,7 +3084,7 @@ static complex_value complex_conditional_to_firm(
 	return val;
 }
 
-static void create_local_declarations(entity_t*);
+static void create_local_declarations(entity_t *first);
 
 static complex_value compound_statement_to_firm_complex(
 	const compound_statement_t *compound)
