@@ -75,7 +75,7 @@ static struct a_firm_opt firm_opt = {
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
 	.inline_threshold =  0,
-	.unroll_factor    =  1,
+	.unroll_factor    =  4,
 	.unroll_maxsize   =  64,
 };
 
@@ -118,6 +118,8 @@ static const struct params {
   { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "strict alias rules" },
   { X("no-strict-aliasing"),     &firm_opt.strict_alias,     0, "strict alias rules" },
   { X("clone-threshold=<value>"),NULL,                       0, "set clone threshold to <value>" },
+  { X("unroll-max-size=<size>"), NULL,                       0, "set maximum size of loops for loop unrolling" },
+  { X("unroll-factor=<size>"),   NULL,                       0, "set unroll factor for loop unrolling" },
 
   /* other firm regarding options */
   { X("verify-off"),             &firm_opt.verify,           0, "disable node verification" },
