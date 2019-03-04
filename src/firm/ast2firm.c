@@ -4540,6 +4540,20 @@ static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const sta
 	return NULL;
 }
 
+typedef struct out_info {
+	expression_t const *expr;
+	ir_node            *addr;
+	ir_node            *proj;
+} out_info;
+
+static void asm_set_values(out_info const *const outs)
+{
+	for (size_t i = 0, n = ARR_LEN(outs); i < n; ++i) {
+		out_info const *const o = &outs[i];
+		set_value_for_expression_addr(o->expr, o->proj, o->addr);
+	}
+}
+
 static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 {
 	if (!currently_reachable())
@@ -4565,11 +4579,6 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	if (n_clobbers > 0) {
 		clobbers = obstack_finish(&asm_obst);
 	}
-
-	typedef struct out_info {
-		expression_t const *expr;
-		ir_node            *addr;
-	} out_info;
 
 	ir_node          **ins         = NEW_ARR_F(ir_node*, 0);
 	out_info          *outs        = NEW_ARR_F(out_info, 0);
@@ -4599,7 +4608,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			constraint.out_pos = pn_ASM_first_out + ARR_LEN(outs);
 			constraint.mode    = get_ir_mode_storage(expr->base.type);
 
-			ARR_APP1(out_info, outs, ((out_info){ expr, addr }));
+			ARR_APP1(out_info, outs, ((out_info){ expr, addr, NULL }));
 		} else {
 			/* the only case where an argument doesn't "write" is when it is
 			 * a memor operand (so we really write to the pointed memory instead
@@ -4666,13 +4675,13 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		set_store(projm);
 	}
 
-	for (size_t i = 0, n_outs = ARR_LEN(outs); i < n_outs; ++i) {
-		expression_t const *const out_expr = outs[i].expr;
-		ir_mode            *const mode     = get_ir_mode_storage(out_expr->base.type);
-		ir_node            *const proj     = new_Proj(node, mode, pn_ASM_first_out + i);
-		ir_node            *const addr     = outs[i].addr;
-		set_value_for_expression_addr(out_expr, proj, addr);
+	unsigned out_pos = pn_ASM_first_out;
+	for (size_t i = 0, n = ARR_LEN(outs); i < n; ++i) {
+		ir_mode *const mode = get_ir_mode_storage(outs[i].expr->base.type);
+		outs[i].proj = new_Proj(node, mode, out_pos++);
 	}
+
+	asm_set_values(outs);
 
 	DEL_ARR_F(constraints);
 	DEL_ARR_F(outs);
