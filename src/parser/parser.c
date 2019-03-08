@@ -9335,10 +9335,26 @@ static statement_t *parse_gcc_asm_statement(void)
 	add_anchor_token(':');
 	add_anchor_token(T_STRING_LITERAL);
 
-	if (accept(T_volatile))
-		asm_statement->is_volatile = true;
+	bool asm_goto     = false;
+	bool asm_volatile = false;
+	for (;; next_token()) {
+		switch (token.kind) {
+			bool* flag;
+		case T_goto:     flag = &asm_goto;     goto check_duplicate;
+		case T_volatile: flag = &asm_volatile; goto check_duplicate;
+check_duplicate:
+			if (*flag)
+				warningf(WARN_OTHER, HERE, "duplicate asm qualifier %K", &token);
+			*flag = true;
+			continue;
 
-	bool const asm_goto = accept(T_goto);
+		default:
+			break;
+		}
+		break;
+	}
+
+	asm_statement->is_volatile = asm_volatile;
 
 	expect('(');
 	rem_anchor_token(T_STRING_LITERAL);
