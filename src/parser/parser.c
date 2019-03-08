@@ -9336,11 +9336,13 @@ static statement_t *parse_gcc_asm_statement(void)
 	add_anchor_token(T_STRING_LITERAL);
 
 	bool asm_goto     = false;
+	bool asm_inline   = false; /* currently ignored */
 	bool asm_volatile = false;
 	for (;; next_token()) {
 		switch (token.kind) {
 			bool* flag;
 		case T_goto:     flag = &asm_goto;     goto check_duplicate;
+		case T_inline:   flag = &asm_inline;   goto check_duplicate;
 		case T_volatile: flag = &asm_volatile; goto check_duplicate;
 check_duplicate:
 			if (*flag)

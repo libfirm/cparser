@@ -18,6 +18,7 @@ cparser 1.22.1 (2016-01-23)
 * Add target `mips`
 * Add target `riscv32`
 * Accept asm qualifiers in arbitrary order
+* Accept (and ignore) the asm qualifier `inline`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
