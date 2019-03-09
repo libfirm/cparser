@@ -9215,6 +9215,22 @@ static void parse_asm_labels(asm_label_t **anchor)
 	}
 }
 
+static unsigned set_asm_operand_entities(unsigned pos, bool *const need_normalization, entity_t *const operands)
+{
+	for (entity_t *i = operands; i; i = i->base.next) {
+		i->asm_argument.pos = pos++;
+		if (i->base.symbol) {
+			*need_normalization = true;
+			entity_t *const old = set_entity(i);
+			if (old) {
+				errorf(&i->base.pos, "multiple declarations of %N", i);
+				note_prev_decl(old);
+			}
+		}
+	}
+	return pos;
+}
+
 static void normalize_asm_text(asm_statement_t *asm_statement)
 {
 	if (!asm_statement->has_arguments) {
@@ -9233,34 +9249,9 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	/* normalize asm text if necessary */
 	unsigned pos                = 0;
 	bool     need_normalization = false;
-	for (entity_t *output = asm_statement->outputs; output != NULL;
-	     output = output->base.next) {
-		output->asm_argument.pos = pos++;
-		symbol_t *symbol = output->base.symbol;
-		if (symbol != NULL) {
-			need_normalization = true;
-			entity_t *old = set_entity(output);
-			if (old != NULL) {
-				errorf(&output->base.pos, "multiple declarations of %N",
-				       output);
-				note_prev_decl(old);
-			}
-		}
-	}
-	for (entity_t *input = asm_statement->inputs; input != NULL;
-	     input = input->base.next) {
-		input->asm_argument.pos = pos++;
-		symbol_t *symbol = input->base.symbol;
-		if (symbol != NULL) {
-			need_normalization = true;
-			entity_t *old = set_entity(input);
-			if (old != NULL) {
-				errorf(&input->base.pos, "multiple declarations of %N",
-				       input);
-				note_prev_decl(old);
-			}
-		}
-	}
+	pos = set_asm_operand_entities(pos, &need_normalization, asm_statement->outputs);
+	set_asm_operand_entities(pos, &need_normalization, asm_statement->inputs);
+
 	if (!need_normalization) {
 		asm_statement->normalized_text = asm_statement->asm_text;
 		return;
