@@ -9231,6 +9231,15 @@ static unsigned set_asm_operand_entities(unsigned pos, bool *const need_normaliz
 	return pos;
 }
 
+static void reset_asm_operand_entities(entity_t *const operands)
+{
+	for (entity_t *i = operands; i; i = i->base.next) {
+		symbol_t *const symbol = i->base.symbol;
+		if (symbol)
+			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
+	}
+}
+
 static void normalize_asm_text(asm_statement_t *asm_statement)
 {
 	if (!asm_statement->has_arguments) {
@@ -9299,18 +9308,8 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	asm_statement->normalized_text
 		= finish_string_construction(asm_statement->asm_text->encoding);
 
-	for (entity_t *input = asm_statement->inputs; input != NULL;
-	     input = input->base.next) {
-		symbol_t *symbol = input->base.symbol;
-		if (symbol != NULL)
-			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
-	}
-	for (entity_t *output = asm_statement->outputs; output != NULL;
-	     output = output->base.next) {
-		symbol_t *symbol = output->base.symbol;
-		if (symbol != NULL)
-			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
-	}
+	reset_asm_operand_entities(asm_statement->inputs);
+	reset_asm_operand_entities(asm_statement->outputs);
 }
 
 /**
