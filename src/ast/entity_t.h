@@ -235,11 +235,15 @@ struct function_t {
 	ir_entity *irentity;
 };
 
-struct asm_argument_t {
+struct asm_operand_t {
 	entity_base_t   base;
+	unsigned        pos;
+};
+
+struct asm_argument_t {
+	asm_operand_t   base;
 	const string_t *constraints;
 	expression_t   *expression;
-	unsigned        pos;
 	bool            direct_read    :1;/**< argument value is read */
 	bool            direct_write   :1;/**< argument is lvalue and written to */
 	bool            indirect_read  :1;/**< argument is address which is read */
@@ -259,6 +263,7 @@ union entity_t {
 	function_t            function;
 	compound_member_t     compound_member;
 	asm_argument_t        asm_argument;
+	asm_operand_t         asm_operand;
 };
 
 #define DECLARATION_KIND_CASES \

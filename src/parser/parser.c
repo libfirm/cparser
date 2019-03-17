@@ -9019,12 +9019,12 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 	const char *constraints = argument->constraints->begin;
 	asm_constraint_flags_t asm_flags = be_parse_asm_constraints(constraints);
 	if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-		errorf(&argument->base.pos, "some constraints in '%s' are invalid",
+		errorf(&argument->base.base.pos, "some constraints in '%s' are invalid",
 		       constraints);
 		return;
 	}
 	if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-		errorf(&argument->base.pos,
+		errorf(&argument->base.base.pos,
 		       "some constraints in '%s' are not supported on target",
 		       constraints);
 		return;
@@ -9032,7 +9032,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 
 	if (is_out) {
 		if ((asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) == 0)
-			errorf(&argument->base.pos,
+			errorf(&argument->base.base.pos,
 			       "constraints '%s' for output operand do not indicate write",
 			       constraints);
 
@@ -9084,7 +9084,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 			errorf(&expression->base.pos,
 			       "asm output argument is not an lvalue");
 	} else if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
-		errorf(&argument->base.pos,
+		errorf(&argument->base.base.pos,
 			   "constraints '%s' for input operand indicate write",
 			   constraints);
 	}
@@ -9218,7 +9218,7 @@ static void parse_asm_labels(asm_label_t **anchor)
 static unsigned set_asm_operand_entities(unsigned pos, bool *const need_normalization, entity_t *const operands)
 {
 	for (entity_t *i = operands; i; i = i->base.next) {
-		i->asm_argument.pos = pos++;
+		i->asm_operand.pos = pos++;
 		if (i->base.symbol) {
 			*need_normalization = true;
 			entity_t *const old = set_entity(i);
@@ -9295,8 +9295,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 						for ( ; c < b; ++c) {
 							obstack_1grow(&string_obst, *c);
 						}
-						obstack_printf(&string_obst, "%u",
-						               argument->asm_argument.pos);
+						obstack_printf(&string_obst, "%u", argument->asm_operand.pos);
 						c = e;
 						continue;
 					}
