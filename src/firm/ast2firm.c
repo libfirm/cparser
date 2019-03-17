@@ -41,6 +41,11 @@ typedef struct complex_value {
 	ir_node *imag;
 } complex_value;
 
+static inline complex_value init_complex_value(void)
+{
+	return (complex_value){NULL, NULL};
+}
+
 static int         next_value_number_function;
 static jump_target continue_target;
 static jump_target break_target;
@@ -3012,10 +3017,9 @@ static complex_value complex_to_control_flow(
 static complex_value complex_conditional_to_firm(
 	const conditional_expression_t *const expression)
 {
-	jump_target true_target  = init_jump_target(NULL);
-	jump_target false_target = init_jump_target(NULL);
-	complex_value cond_val;
-	memset(&cond_val, 0, sizeof(cond_val));
+	jump_target   true_target  = init_jump_target(NULL);
+	jump_target   false_target = init_jump_target(NULL);
+	complex_value cond_val     = init_complex_value();
 	if (expression->true_expression == NULL) {
 		assert(is_type_complex(skip_typeref(expression->condition->base.type)));
 		cond_val = complex_to_control_flow(expression->condition,
@@ -3024,8 +3028,7 @@ static complex_value complex_conditional_to_firm(
 		expression_to_control_flow(expression->condition, &true_target, &false_target);
 	}
 
-	complex_value  val;
-	memset(&val, 0, sizeof(val));
+	complex_value   val         = init_complex_value();
 	jump_target     exit_target = init_jump_target(NULL);
 	type_t   *const type        = skip_typeref(expression->base.type);
 	ir_mode  *const mode        = get_complex_mode_arithmetic(type);
@@ -3073,7 +3076,7 @@ static complex_value compound_statement_to_firm_complex(
 {
 	create_local_declarations(compound->scope.first_entity);
 
-	complex_value result    = { NULL, NULL };
+	complex_value result    = init_complex_value();
 	statement_t  *statement = compound->statements;
 	statement_t  *next;
 	for ( ; statement != NULL; statement = next) {
