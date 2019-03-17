@@ -13,11 +13,9 @@ typedef struct jump_target {
 	bool     first;
 } jump_target;
 
-static inline void init_jump_target(jump_target *const tgt,
-                                    ir_node *const block)
+static inline jump_target init_jump_target(ir_node *const block)
 {
-	tgt->block = block;
-	tgt->first = false;
+	return (jump_target){block, false};
 }
 
 void jump_from_block_to_target(jump_target *tgt, ir_node *block);

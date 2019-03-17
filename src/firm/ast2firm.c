@@ -52,13 +52,13 @@ static ir_node   **ijmp_blocks;
 
 #define PUSH_BREAK(val) \
 	jump_target const old_break_target = break_target; \
-	(init_jump_target(&break_target, (val)))
+	(break_target = init_jump_target((val)))
 #define POP_BREAK() \
 	((void)(break_target = old_break_target))
 
 #define PUSH_CONTINUE(val) \
 	jump_target const old_continue_target = continue_target; \
-	(init_jump_target(&continue_target, (val)))
+	(continue_target = init_jump_target((val)))
 #define POP_CONTINUE() \
 	((void)(continue_target = old_continue_target))
 
@@ -1597,11 +1597,10 @@ static ir_node *control_flow_to_1_0(expression_t const *const expr,
                                     jump_target *const true_target,
                                     jump_target *const false_target)
 {
-	ir_node        *val  = NULL;
-	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-	ir_mode  *const mode = get_ir_mode_storage(expr->base.type);
-	jump_target     exit_target;
-	init_jump_target(&exit_target, NULL);
+	ir_node        *val         = NULL;
+	dbg_info *const dbgi        = get_dbg_info(&expr->base.pos);
+	ir_mode  *const mode        = get_ir_mode_storage(expr->base.type);
+	jump_target     exit_target = init_jump_target(NULL);
 
 	if (enter_jump_target(true_target)) {
 		jump_to_target(&exit_target);
@@ -1630,10 +1629,8 @@ static ir_node *create_cast(unary_expression_t const *const expr)
 {
 	type_t *const to_type = skip_typeref(expr->base.type);
 	if (is_type_atomic(to_type, ATOMIC_TYPE_BOOL)) {
-		jump_target true_target;
-		jump_target false_target;
-		init_jump_target(&true_target,  NULL);
-		init_jump_target(&false_target, NULL);
+		jump_target true_target  = init_jump_target(NULL);
+		jump_target false_target = init_jump_target(NULL);
 		const expression_t *const as_expr = (const expression_t*)expr;
 		expression_to_control_flow(as_expr, &true_target, &false_target);
 		return control_flow_to_1_0(as_expr, &true_target, &false_target);
@@ -1891,10 +1888,8 @@ static ir_node *binop_assign_to_firm(binary_expression_t const *const expr)
 
 	type_t *const type = skip_typeref(expr->base.type);
 	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
-		jump_target true_target;
-		jump_target false_target;
-		init_jump_target(&true_target,  NULL);
-		init_jump_target(&false_target, NULL);
+		jump_target true_target  = init_jump_target(NULL);
+		jump_target false_target = init_jump_target(NULL);
 		ir_mode *const mode = get_irn_mode(result);
 		ir_node *const zero = new_Const(get_mode_null(mode));
 		compare_to_control_flow((expression_t const*)expr, result, zero, ir_relation_unordered_less_greater, &true_target, &false_target);
@@ -2065,18 +2060,15 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
-	jump_target true_target;
-	jump_target false_target;
-	init_jump_target(&true_target,  NULL);
-	init_jump_target(&false_target, NULL);
+	jump_target true_target  = init_jump_target(NULL);
+	jump_target false_target = init_jump_target(NULL);
 	ir_node *const cond_expr = expression_to_control_flow(expression->condition, &true_target, &false_target);
 
 	ir_node        *val  = NULL;
 	dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
 	type_t   *const type = skip_typeref(expression->base.type);
 	ir_mode  *const mode = is_type_void(type) ? NULL : get_ir_mode_arithmetic(type);
-	jump_target exit_target;
-	init_jump_target(&exit_target, NULL);
+	jump_target exit_target = init_jump_target(NULL);
 
 	if (enter_jump_target(&true_target)) {
 		if (expression->true_expression) {
@@ -2398,10 +2390,8 @@ static ir_node *expression_to_value(expression_t const *const expr)
 	case EXPR_BINARY_LOGICAL_OR:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_UNARY_NOT: {
-		jump_target true_target;
-		jump_target false_target;
-		init_jump_target(&true_target,  NULL);
-		init_jump_target(&false_target, NULL);
+		jump_target true_target  = init_jump_target(NULL);
+		jump_target false_target = init_jump_target(NULL);
 		expression_to_control_flow(expr, &true_target, &false_target);
 		return control_flow_to_1_0(expr, &true_target, &false_target);
 	}
@@ -2499,8 +2489,7 @@ incdec:
 
 static ir_node *short_circuit_expression_to_control_flow(bool const is_and, expression_t const *const expr, jump_target *const true_target, jump_target *const false_target)
 {
-	jump_target extra_target;
-	init_jump_target(&extra_target, NULL);
+	jump_target extra_target = init_jump_target(NULL);
 	expression_to_control_flow(expr->binary.left, is_and ? &extra_target : true_target, is_and ? false_target : &extra_target);
 	if (enter_jump_target(&extra_target))
 		expression_to_control_flow(expr->binary.right, true_target, false_target);
@@ -2948,8 +2937,7 @@ static void complex_equality_evaluation(const binary_expression_t *binexpr,
 	jump_target *const true_target, jump_target *const false_target,
 	ir_relation relation)
 {
-	jump_target extra_target;
-	init_jump_target(&extra_target, NULL);
+	jump_target extra_target = init_jump_target(NULL);
 
 	complex_value left  = expression_to_complex(binexpr->left);
 	complex_value right = expression_to_complex(binexpr->right);
@@ -2980,9 +2968,8 @@ static complex_value complex_to_control_flow(
 	const expression_t *const expression, jump_target *const true_target,
 	jump_target *const false_target)
 {
-	jump_target extra_target;
-	init_jump_target(&extra_target, NULL);
-	complex_value       value      = expression_to_complex(expression);
+	jump_target   extra_target = init_jump_target(NULL);
+	complex_value value        = expression_to_complex(expression);
 	if (is_Const(value.real) && is_Const(value.imag)) {
 		ir_tarval *tv_real = get_Const_tarval(value.real);
 		ir_tarval *tv_imag = get_Const_tarval(value.imag);
@@ -3025,10 +3012,8 @@ static complex_value complex_to_control_flow(
 static complex_value complex_conditional_to_firm(
 	const conditional_expression_t *const expression)
 {
-	jump_target true_target;
-	jump_target false_target;
-	init_jump_target(&true_target,  NULL);
-	init_jump_target(&false_target, NULL);
+	jump_target true_target  = init_jump_target(NULL);
+	jump_target false_target = init_jump_target(NULL);
 	complex_value cond_val;
 	memset(&cond_val, 0, sizeof(cond_val));
 	if (expression->true_expression == NULL) {
@@ -3041,11 +3026,10 @@ static complex_value complex_conditional_to_firm(
 
 	complex_value  val;
 	memset(&val, 0, sizeof(val));
-	jump_target    exit_target;
-	init_jump_target(&exit_target, NULL);
-	type_t   *const type = skip_typeref(expression->base.type);
-	ir_mode  *const mode = get_complex_mode_arithmetic(type);
-	dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
+	jump_target     exit_target = init_jump_target(NULL);
+	type_t   *const type        = skip_typeref(expression->base.type);
+	ir_mode  *const mode        = get_complex_mode_arithmetic(type);
+	dbg_info *const dbgi        = get_dbg_info(&expression->base.pos);
 
 	if (enter_jump_target(&true_target)) {
 		if (expression->true_expression) {
@@ -4309,15 +4293,12 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	create_local_declarations(statement->scope.first_entity);
 
 	/* Create the condition. */
-	jump_target true_target;
-	jump_target false_target;
-	init_jump_target(&true_target,  NULL);
-	init_jump_target(&false_target, NULL);
+	jump_target true_target  = init_jump_target(NULL);
+	jump_target false_target = init_jump_target(NULL);
 	if (currently_reachable())
 		expression_to_control_flow(statement->condition, &true_target, &false_target);
 
-	jump_target exit_target;
-	init_jump_target(&exit_target, NULL);
+	jump_target exit_target = init_jump_target(NULL);
 
 	/* Create the true statement. */
 	enter_jump_target(&true_target);
@@ -4350,8 +4331,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 		enter_jump_target(&continue_target);
 		jump_to_target(&break_target);
 	} else {
-		jump_target body_target;
-		init_jump_target(&body_target, NULL);
+		jump_target body_target = init_jump_target(NULL);
 		jump_to_target(&body_target);
 		enter_immature_jump_target(&body_target);
 		keep_loop();
@@ -4387,8 +4367,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	}
 
 	/* Create the header block */
-	jump_target header_target;
-	init_jump_target(&header_target, NULL);
+	jump_target header_target = init_jump_target(NULL);
 	jump_to_target(&header_target);
 	enter_immature_jump_target(&header_target);
 	keep_loop();
@@ -4400,8 +4379,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	/* Create the condition. */
 	expression_t *const cond = statement->condition;
 	if (cond && (is_constant_expression(cond) == EXPR_CLASS_VARIABLE || !fold_expression_to_bool(cond))) {
-		jump_target body_target;
-		init_jump_target(&body_target, NULL);
+		jump_target body_target = init_jump_target(NULL);
 		expression_to_control_flow(cond, &body_target, &break_target);
 		enter_jump_target(&body_target);
 	}
@@ -4500,8 +4478,7 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
 	if (current_switch != NULL && !statement->is_empty_range) {
-		jump_target case_target;
-		init_jump_target(&case_target, NULL);
+		jump_target case_target = init_jump_target(NULL);
 
 		/* Fallthrough from previous case */
 		jump_to_target(&case_target);
@@ -4904,7 +4881,7 @@ static void create_function(function_t *const function)
 
 	assert(!ijmp_ops);
 	assert(!ijmp_blocks);
-	init_jump_target(&ijmp_target, NULL);
+	ijmp_target = init_jump_target(NULL);
 	ijmp_ops    = NEW_ARR_F(ir_node*, 0);
 	ijmp_blocks = NEW_ARR_F(ir_node*, 0);
 
@@ -5145,8 +5122,8 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	ir_set_uninitialized_local_variable_func(uninitialized_local_var);
 
 	/* just to be sure */
-	init_jump_target(&break_target,    NULL);
-	init_jump_target(&continue_target, NULL);
+	break_target             = init_jump_target(NULL);
+	continue_target          = init_jump_target(NULL);
 	current_switch           = NULL;
 	current_translation_unit = unit;
 
