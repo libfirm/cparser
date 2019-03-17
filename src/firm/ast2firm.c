@@ -1630,21 +1630,21 @@ static ir_node *control_flow_to_1_0(expression_t const *const expr,
 	return val;
 }
 
-static ir_node *create_cast(unary_expression_t const *const expr)
+static ir_node *create_cast(expression_t const *const expr)
 {
 	type_t *const to_type = skip_typeref(expr->base.type);
 	if (is_type_atomic(to_type, ATOMIC_TYPE_BOOL)) {
 		jump_target true_target  = init_jump_target(NULL);
 		jump_target false_target = init_jump_target(NULL);
-		const expression_t *const as_expr = (const expression_t*)expr;
-		expression_to_control_flow(as_expr, &true_target, &false_target);
-		return control_flow_to_1_0(as_expr, &true_target, &false_target);
+		expression_to_control_flow(expr, &true_target, &false_target);
+		return control_flow_to_1_0(expr, &true_target, &false_target);
 	}
 
-	type_t  *const from_type = skip_typeref(expr->value->base.type);
-	ir_node *      value     = is_type_complex(from_type)
-		? expression_to_complex(expr->value).real
-		: expression_to_value(expr->value);
+	expression_t const *const expr_value = expr->unary.value;
+	type_t             *const from_type  = skip_typeref(expr_value->base.type);
+	ir_node            *const value      = is_type_complex(from_type)
+		? expression_to_complex(expr_value).real
+		: expression_to_value(expr_value);
 
 	if (is_type_void(to_type))
 		return NULL;
@@ -2447,7 +2447,7 @@ incdec:
 
 	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
 	case EXPR_BINARY_ASSIGN:              return assign_expression_to_firm(       &expr->binary);
-	case EXPR_UNARY_CAST:                 return create_cast(&expr->unary);
+	case EXPR_UNARY_CAST:                 return create_cast(expr);
 	case EXPR_BINARY_COMMA:               return comma_expression_to_firm(        &expr->binary);
 	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
 	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
