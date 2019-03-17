@@ -9260,7 +9260,8 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	unsigned pos                = 0;
 	bool     need_normalization = false;
 	pos = set_asm_operand_entities(pos, &need_normalization, asm_statement->outputs);
-	set_asm_operand_entities(pos, &need_normalization, asm_statement->inputs);
+	pos = set_asm_operand_entities(pos, &need_normalization, asm_statement->inputs);
+	set_asm_operand_entities(pos, &need_normalization, asm_statement->labels);
 
 	if (!need_normalization) {
 		asm_statement->normalized_text = asm_statement->asm_text;
@@ -9308,6 +9309,7 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	asm_statement->normalized_text
 		= finish_string_construction(asm_statement->asm_text->encoding);
 
+	reset_asm_operand_entities(asm_statement->labels);
 	reset_asm_operand_entities(asm_statement->inputs);
 	reset_asm_operand_entities(asm_statement->outputs);
 }
