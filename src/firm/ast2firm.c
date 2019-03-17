@@ -2497,6 +2497,16 @@ incdec:
 	panic("invalid expression");
 }
 
+static ir_node *short_circuit_expression_to_control_flow(bool const is_and, expression_t const *const expr, jump_target *const true_target, jump_target *const false_target)
+{
+	jump_target extra_target;
+	init_jump_target(&extra_target, NULL);
+	expression_to_control_flow(expr->binary.left, is_and ? &extra_target : true_target, is_and ? false_target : &extra_target);
+	if (enter_jump_target(&extra_target))
+		expression_to_control_flow(expr->binary.right, true_target, false_target);
+	return NULL;
+}
+
 static void complex_equality_evaluation(const binary_expression_t *binexpr,
 	jump_target *true_target, jump_target *false_target,
 	ir_relation relation);
@@ -2516,23 +2526,11 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 		expression_to_control_flow(expr->unary.value, false_target, true_target);
 		return NULL;
 
-	case EXPR_BINARY_LOGICAL_AND: {
-		jump_target extra_target;
-		init_jump_target(&extra_target, NULL);
-		expression_to_control_flow(expr->binary.left, &extra_target, false_target);
-		if (enter_jump_target(&extra_target))
-			expression_to_control_flow(expr->binary.right, true_target, false_target);
-		return NULL;
-	}
+	case EXPR_BINARY_LOGICAL_AND:
+		return short_circuit_expression_to_control_flow(true, expr, true_target, false_target);
 
-	case EXPR_BINARY_LOGICAL_OR: {
-		jump_target extra_target;
-		init_jump_target(&extra_target, NULL);
-		expression_to_control_flow(expr->binary.left, true_target, &extra_target);
-		if (enter_jump_target(&extra_target))
-			expression_to_control_flow(expr->binary.right, true_target, false_target);
-		return NULL;
-	}
+	case EXPR_BINARY_LOGICAL_OR:
+		return short_circuit_expression_to_control_flow(false, expr, true_target, false_target);
 
 	case EXPR_BINARY_COMMA:
 		evaluate_expression_discard_result(expr->binary.left);
