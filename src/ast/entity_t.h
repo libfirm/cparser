@@ -30,6 +30,7 @@ typedef enum {
 	ENTITY_LOCAL_LABEL,
 	ENTITY_NAMESPACE,
 	ENTITY_ASM_ARGUMENT,
+	ENTITY_ASM_LABEL,
 } entity_kind_t;
 
 typedef enum entity_namespace_t {
@@ -250,6 +251,11 @@ struct asm_argument_t {
 	bool            indirect_write :1;/**< argument is address which is written */
 };
 
+struct asm_label_t {
+	asm_operand_t  base;
+	label_t       *label;
+};
+
 union entity_t {
 	ENUMBF(entity_kind_t) kind : 8;
 	entity_base_t         base;
@@ -263,6 +269,7 @@ union entity_t {
 	function_t            function;
 	compound_member_t     compound_member;
 	asm_argument_t        asm_argument;
+	asm_label_t           asm_label;
 	asm_operand_t         asm_operand;
 };
 

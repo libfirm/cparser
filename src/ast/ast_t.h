@@ -591,11 +591,6 @@ struct asm_clobber_t {
 	asm_clobber_t *next;
 };
 
-struct asm_label_t {
-	label_t     *label;
-	asm_label_t *next;
-};
-
 struct asm_statement_t {
 	statement_base_t base;
 	position_t       textpos;
@@ -605,7 +600,7 @@ struct asm_statement_t {
 	entity_t        *inputs;  /**< list of asm_argument_t entities */
 	entity_t        *outputs; /**< list of asm_argument_t entities */
 	asm_clobber_t   *clobbers;
-	asm_label_t     *labels;
+	entity_t        *labels;
 	bool             has_arguments : 1;
 	bool             is_volatile   : 1;
 };

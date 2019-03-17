@@ -4747,8 +4747,8 @@ static void check_reachable(statement_t *const stmt)
 		goto fallthrough;
 
 	case STATEMENT_ASM:
-		for (asm_label_t const *i = stmt->asms.labels; i; i = i->next) {
-			statement_t *const tgt = i->label->statement;
+		for (entity_t const *i = stmt->asms.labels; i; i = i->base.next) {
+			statement_t *const tgt = i->asm_label.label->statement;
 			if (tgt)
 				check_reachable(tgt);
 		}
@@ -9195,20 +9195,21 @@ static void use_label(label_t *const label)
 	label->used     = true;
 }
 
-static void parse_asm_labels(asm_label_t **anchor)
+static void parse_asm_labels(entity_t **anchor)
 {
 	if (peek(T_IDENTIFIER)) {
 		add_anchor_token(',');
 		do {
-			label_t *const label = get_label("'asm goto' label");
+			position_t const pos   = *HERE;
+			label_t   *const label = get_label("'asm goto' label");
 			if (label) {
 				use_label(label);
 
-				asm_label_t *const asm_label = allocate_ast_zero(sizeof(*asm_label));
-				asm_label->label = label;
+				entity_t *const asm_label = allocate_entity_zero(ENTITY_ASM_LABEL, NAMESPACE_ASM_ARGUMENT, label->base.symbol, &pos);
+				asm_label->asm_label.label = label;
 
 				*anchor = asm_label;
-				anchor  = &asm_label->next;
+				anchor  = &asm_label->base.next;
 			}
 		} while (accept(','));
 		rem_anchor_token(',');

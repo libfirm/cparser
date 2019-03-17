@@ -1035,13 +1035,18 @@ static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 	}
 }
 
-static void print_asm_labels(asm_label_t const *const labels)
+static void print_asm_labels(entity_t const *const labels)
 {
 	print_string(" :");
 	separator_t sep = { " ", ", " };
-	for (asm_label_t const *i = labels; i; i = i->next) {
+	for (entity_t const *i = labels; i; i = i->base.next) {
+		if (i->kind != ENTITY_ASM_LABEL) {
+			print_string("invalid");
+			continue;
+		}
+
 		print_string(sep_next(&sep));
-		print_string(i->label->base.symbol->string);
+		print_string(i->base.symbol->string);
 	}
 }
 
@@ -1386,6 +1391,7 @@ void print_entity(const entity_t *entity)
 		print_char(';');
 		return;
 	case ENTITY_ASM_ARGUMENT:
+	case ENTITY_ASM_LABEL:
 		print_string(entity->base.symbol->string);
 		return;
 	case ENTITY_LABEL:

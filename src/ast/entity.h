@@ -6,6 +6,7 @@
 #define ENTITY_H
 
 typedef struct asm_argument_t    asm_argument_t;
+typedef struct asm_label_t       asm_label_t;
 typedef struct asm_operand_t     asm_operand_t;
 typedef struct compound_member_t compound_member_t;
 typedef struct compound_t        compound_t;

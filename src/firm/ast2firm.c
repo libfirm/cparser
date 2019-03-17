@@ -581,6 +581,7 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_COMPOUND_MEMBER:
 		return false;
 	case ENTITY_ASM_ARGUMENT:
+	case ENTITY_ASM_LABEL:
 	case ENTITY_CLASS:
 	case ENTITY_ENUM:
 	case ENTITY_ENUM_VALUE:
@@ -4959,6 +4960,7 @@ static ir_entity *get_irentity(entity_t *entity)
 	case ENTITY_FUNCTION:        return entity->function.irentity;
 	case ENTITY_COMPOUND_MEMBER: return entity->compound_member.entity;
 	case ENTITY_ASM_ARGUMENT:
+	case ENTITY_ASM_LABEL:
 	case ENTITY_CLASS:
 	case ENTITY_ENUM:
 	case ENTITY_ENUM_VALUE:

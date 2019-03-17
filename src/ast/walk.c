@@ -256,6 +256,7 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 			walk_entity(entry, env);
 		}
 		return;
+	case ENTITY_ASM_LABEL:
 	case ENTITY_LABEL:
 	case ENTITY_LOCAL_LABEL:
 		return;
