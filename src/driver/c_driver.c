@@ -875,9 +875,6 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	assert(obstack_object_size(&file_obst) == 0);
 	obstack_printf(&file_obst, "%s ", driver_linker);
 
-	/* Workaround for systems that expect PIE code when no flags are given. */
-	driver_add_flag(&file_obst, "-fno-PIE");
-
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		if (unit->type != COMPILATION_UNIT_OBJECT)
 			continue;
@@ -894,15 +891,52 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 
 	char *const commandline = obstack_nul_finish(&file_obst);
 
-	if (driver_verbose) {
-		puts(commandline);
-	}
-	int err = system(commandline);
-	if (err != EXIT_SUCCESS) {
-		position_t const pos = { outname, 0, 0, 0 };
-		errorf(&pos, "linker reported an error");
-		unlink(outname);
+	const char *err_name;
+	// create temp file to redirect linker stderr into
+	FILE *temp = make_temp_file("linker-first-pass.err", &err_name);
+	if (temp == NULL) {
 		return false;
+	}
+	fclose(temp);
+	// append redirect output into file to command
+	const char *const redirect = " 2>";
+	char commandline_redirect[strlen(commandline) + strlen(redirect) + strlen(err_name) + 1];
+	snprintf(commandline_redirect, sizeof(commandline_redirect), "%s%s%s", commandline, redirect, err_name);
+	if (driver_verbose) {
+		puts(commandline_redirect);
+	}
+
+	int err = system(commandline_redirect);
+	if (err != EXIT_SUCCESS) {
+		/* Workaround for systems that expect PIE code when no flags are given:
+		 * retry linking with -no-pie flag */
+		const char *err_name2;
+		// create temp file to redirect stderr of second linker pass into
+		FILE *temp2 = make_temp_file("linker-second-pass.err", &err_name2);
+		fclose(temp2);
+		// append no-pie flag and redirect output into file to command
+		const char *const no_pie = " -no-pie";
+		char commandline_try_nopie[strlen(commandline) + strlen(no_pie) + strlen(redirect) + strlen(err_name2) + 1];
+		snprintf(commandline_try_nopie, sizeof(commandline_try_nopie), "%s%s%s%s", commandline, no_pie, redirect,
+		         err_name2);
+		if (driver_verbose) {
+			puts(commandline_try_nopie);
+		}
+
+		err = system(commandline_try_nopie);
+		if (err != EXIT_SUCCESS) {
+			// linking with -no-pie did not help; output original linker errors
+			temp = fopen(err_name, "r");
+			char buf[BUFSIZ];
+			while (fgets(buf, BUFSIZ, temp)) {
+				fputs(buf, stderr);
+			}
+			fclose(temp);
+			position_t const pos = {outname, 0, 0, 0};
+			errorf(&pos, "linker reported an error");
+			unlink(outname);
+			return false;
+		}
 	}
 	return true;
 }
