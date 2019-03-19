@@ -653,7 +653,7 @@ bool options_parse_help(options_state_t *s)
 	return true;
 }
 
-static bool parse_target_triple(const char *arg)
+bool parse_target_triple(char const *const arg)
 {
 	ir_machine_triple_t *triple = ir_parse_machine_triple(arg);
 	if (triple == NULL) {

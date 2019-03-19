@@ -37,4 +37,6 @@ void setup_target_machine(void);
 char const *spaced_arg(char const *arg, options_state_t *s);
 bool simple_arg(const char *arg, options_state_t *s);
 
+bool parse_target_triple(char const *arg);
+
 #endif

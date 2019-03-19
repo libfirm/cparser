@@ -313,6 +313,19 @@ int main(int argc, char **argv)
 	init_ast();
 	init_parser();
 
+	/* Optionally set target by executable name prefix. */
+	char const *const full_name = argv[0];
+	if (full_name) {
+		char const *const slash = strrchr(full_name, '/');
+		char const *const name  = slash ? slash + 1 : full_name;
+		char const *const dash  = strstr(name, "-cparser");
+		if (dash) {
+			char *const triple = strndup(name, dash - name);
+			parse_target_triple(triple);
+			free(triple);
+		}
+	}
+
 	options_state_t state;
 	memset(&state, 0, sizeof(state));
 	state.argc   = argc;

@@ -19,6 +19,7 @@ cparser 1.22.1 (2016-01-23)
 * Add target `riscv32`
 * Accept asm qualifiers in arbitrary order
 * Accept (and ignore) the asm qualifier `inline`
+* The target triple can also be set by prefixing the executable name, e.g. `x86_64-unknown-elf-cparser`
 * Bugfixes
 
 cparser 1.22.0 (2015-12-31)
