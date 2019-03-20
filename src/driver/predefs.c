@@ -315,15 +315,16 @@ void add_predefined_macros(void)
 	/* no support for the XXX_chk functions in cparser yet */
 	add_define("_FORTIFY_SOURCE", "0", false);
 
-	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
-	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
-	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
-	add_define("__BYTE_ORDER__", target.byte_order_big_endian
-	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
-	add_define("__FLOAT_WORD_ORDER__", target.byte_order_big_endian
-	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
+	char const *const big    = "__ORDER_BIG_ENDIAN__";
+	char const *const little = "__ORDER_LITTLE_ENDIAN__";
+	add_define(big,    "4321", false);
+	add_define(little, "1234", false);
+	add_define("__ORDER_PDP_ENDIAN__", "3412", false);
+	char const *const order = target.byte_order_big_endian ? big : little;
+	add_define("__BYTE_ORDER__",       order, false);
+	add_define("__FLOAT_WORD_ORDER__", order, false);
 
-	add_define("__FINITE_MATH_ONLY__",    "0",    false);
+	add_define("__FINITE_MATH_ONLY__", "0", false);
 
 	if (is_ILP(4, 8, 8)) {
 		add_define("_LP64",    "1", false);
