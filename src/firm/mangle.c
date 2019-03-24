@@ -280,13 +280,7 @@ ident *create_ld_ident(entity_t const *const entity)
 		if (cc_prefix != 0)
 			obstack_1grow(&obst, cc_prefix);
 
-		switch (type->function.linkage) {
-		case LINKAGE_CXX:
-			mangle_cxx = true;
-			break;
-		default:
-			mangle_cxx = false;
-		}
+		mangle_cxx = type->function.linkage == LINKAGE_CXX;
 
 		if (cc == CC_STDCALL || cc == CC_FASTCALL) {
 			size_suffix = 0;
