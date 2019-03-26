@@ -9269,42 +9269,37 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	}
 
 	begin_string_construction();
-	for (const char *c = asm_statement->asm_text->begin; *c != '\0'; ++c) {
-		if (*c == '%') {
-			/* scan forward to see if we can find a [] */
-			const char *b = c+1;
-			while (*b != '\0' && *b != '%' && *b != '[' && !is_digit(*b)) {
-				++b;
+	for (const char *c = asm_statement->asm_text->begin; *c != '\0';) {
+		obstack_1grow(&string_obst, *c);
+		if (*c++ != '%')
+			continue;
+
+		/* scan forward to see if we can find a [] */
+		while (*c != '\0' && *c != '%' && *c != '[' && !is_digit(*c)) {
+			obstack_1grow(&string_obst, *c++);
+		}
+
+		if (*c == '[') {
+			/* parse identifier */
+			assert(obstack_object_size(&symbol_obstack) == 0);
+			char const *e = c + 1;
+			while (*e != '\0' && *e != ']') {
+				obstack_1grow(&symbol_obstack, *e++);
 			}
-			if (*b == '[') {
-				/* parse identifier */
-				assert(obstack_object_size(&symbol_obstack) == 0);
-				const char *e = b+1;
-				while (*e != '\0' && *e != ']') {
-					obstack_1grow(&symbol_obstack, *e);
-					++e;
-				}
-				char *const identifier = obstack_nul_finish(&symbol_obstack);
-				if (*e == ']') {
-					symbol_t *symbol   = symbol_table_insert(identifier);
-					entity_t *argument = get_entity(symbol, NAMESPACE_ASM_ARGUMENT);
-					if (argument == NULL) {
-						position_t errorpos = asm_statement->textpos;
-						errorpos.colno += b + 1 - asm_statement->asm_text->begin;
-						errorf(&errorpos, "undefined assembler operand '%Y'",
-						       symbol);
-					} else {
-						for ( ; c < b; ++c) {
-							obstack_1grow(&string_obst, *c);
-						}
-						obstack_printf(&string_obst, "%u", argument->asm_operand.pos);
-						c = e;
-						continue;
-					}
+			char *const identifier = obstack_nul_finish(&symbol_obstack);
+			if (*e == ']') {
+				symbol_t *symbol   = symbol_table_insert(identifier);
+				entity_t *argument = get_entity(symbol, NAMESPACE_ASM_ARGUMENT);
+				if (argument == NULL) {
+					position_t errorpos = asm_statement->textpos;
+					errorpos.colno += c + 1 - asm_statement->asm_text->begin;
+					errorf(&errorpos, "undefined assembler operand '%Y'", symbol);
+				} else {
+					obstack_printf(&string_obst, "%u", argument->asm_operand.pos);
+					c = e + 1;
 				}
 			}
 		}
-		obstack_1grow(&string_obst, *c);
 	}
 	asm_statement->normalized_text
 		= finish_string_construction(asm_statement->asm_text->encoding);
