@@ -9274,8 +9274,14 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 		if (*c++ != '%')
 			continue;
 
+		if (*c == '%') {
+			/* Skip '%%'. */
+			obstack_1grow(&string_obst, *c++);
+			continue;
+		}
+
 		/* scan forward to see if we can find a [] */
-		while (*c != '\0' && *c != '%' && *c != '[' && !is_digit(*c)) {
+		while (is_alpha(*c)) {
 			obstack_1grow(&string_obst, *c++);
 		}
 

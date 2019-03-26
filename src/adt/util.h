@@ -57,6 +57,11 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+static inline bool is_alpha(char const c)
+{
+	return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
+}
+
 static inline bool is_digit(char const c)
 {
 	return '0' <= c && c <= '9';
