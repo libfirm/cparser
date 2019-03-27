@@ -891,42 +891,57 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 
 	char *const commandline = obstack_nul_finish(&file_obst);
 
-	const char *err_name;
+	const char *err_without_nopie;
 	// create temp file to redirect linker stderr into
-	FILE *temp = make_temp_file("linker-first-pass.err", &err_name);
+	FILE *temp = make_temp_file("linker.err", &err_without_nopie);
 	if (temp == NULL) {
 		return false;
 	}
 	fclose(temp);
 	// append redirect output into file to command
 	const char *const redirect = " 2>";
-	char commandline_redirect[strlen(commandline) + strlen(redirect) + strlen(err_name) + 1];
-	snprintf(commandline_redirect, sizeof(commandline_redirect), "%s%s%s", commandline, redirect, err_name);
+	char commandline_without_nopie[strlen(commandline) + strlen(redirect) + strlen(err_without_nopie) + 1];
+	snprintf(commandline_without_nopie, sizeof(commandline_without_nopie), "%s%s%s", commandline, redirect,
+	         err_without_nopie);
+
+
+	const char *err_nopie;
+	// create temp file to redirect stderr of second linker pass into
+	FILE *temp2 = make_temp_file("linker-no-pie.err", &err_nopie);
+	if (temp2 == NULL) {
+		return false;
+	}
+	fclose(temp2);
+	// append no-pie flag and redirect output into file to command
+	const char *const no_pie = " -no-pie";
+	char commandline_nopie[strlen(commandline) + strlen(no_pie) + strlen(redirect) + strlen(err_nopie) + 1];
+	snprintf(commandline_nopie, sizeof(commandline_nopie), "%s%s%s%s", commandline, no_pie, redirect,
+	         err_nopie);
+
+	/* Workaround for systems that expect PIE code when no flags are given:
+	 * Try linking with -no-pie flag first if we do not explicitly want PIC code. Old linkers don't support the -no-pie
+	 * flag, so we have to try linking without the flag if the first try failed. */
+	bool try_nopie_first = !target.pic;
+
+	char *first_linker_pass = try_nopie_first ? commandline_nopie : commandline_without_nopie;
+
 	if (driver_verbose) {
-		puts(commandline_redirect);
+		puts(first_linker_pass);
 	}
 
-	int err = system(commandline_redirect);
+	int err = system(first_linker_pass);
 	if (err != EXIT_SUCCESS) {
-		/* Workaround for systems that expect PIE code when no flags are given:
-		 * retry linking with -no-pie flag */
-		const char *err_name2;
-		// create temp file to redirect stderr of second linker pass into
-		FILE *temp2 = make_temp_file("linker-second-pass.err", &err_name2);
-		fclose(temp2);
-		// append no-pie flag and redirect output into file to command
-		const char *const no_pie = " -no-pie";
-		char commandline_try_nopie[strlen(commandline) + strlen(no_pie) + strlen(redirect) + strlen(err_name2) + 1];
-		snprintf(commandline_try_nopie, sizeof(commandline_try_nopie), "%s%s%s%s", commandline, no_pie, redirect,
-		         err_name2);
-		if (driver_verbose) {
-			puts(commandline_try_nopie);
+		if (try_nopie_first) {
+			// retry without the -no-pie flag
+			if (driver_verbose) {
+				puts(commandline_without_nopie);
+			}
+			err = system(commandline_without_nopie);
 		}
 
-		err = system(commandline_try_nopie);
 		if (err != EXIT_SUCCESS) {
 			// linking with -no-pie did not help; output original linker errors
-			temp = fopen(err_name, "r");
+			temp = fopen(try_nopie_first ? err_without_nopie : err_nopie, "r");
 			char buf[BUFSIZ];
 			while (fgets(buf, BUFSIZ, temp)) {
 				fputs(buf, stderr);
