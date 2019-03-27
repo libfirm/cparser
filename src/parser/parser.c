@@ -9216,12 +9216,11 @@ static void parse_asm_labels(entity_t **anchor)
 	}
 }
 
-static unsigned set_asm_operand_entities(unsigned pos, bool *const need_normalization, entity_t *const operands)
+static unsigned set_asm_operand_entities(unsigned pos, entity_t *const operands)
 {
 	for (entity_t *i = operands; i; i = i->base.next) {
 		i->asm_operand.pos = pos++;
 		if (i->base.symbol) {
-			*need_normalization = true;
 			entity_t *const old = set_entity(i);
 			if (old) {
 				errorf(&i->base.pos, "multiple declarations of %N", i);
@@ -9257,16 +9256,10 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	}
 
 	/* normalize asm text if necessary */
-	unsigned pos                = 0;
-	bool     need_normalization = false;
-	pos = set_asm_operand_entities(pos, &need_normalization, asm_statement->outputs);
-	pos = set_asm_operand_entities(pos, &need_normalization, asm_statement->inputs);
-	set_asm_operand_entities(pos, &need_normalization, asm_statement->labels);
-
-	if (!need_normalization) {
-		asm_statement->normalized_text = asm_statement->asm_text;
-		return;
-	}
+	unsigned pos = 0;
+	pos = set_asm_operand_entities(pos, asm_statement->outputs);
+	pos = set_asm_operand_entities(pos, asm_statement->inputs);
+	set_asm_operand_entities(pos, asm_statement->labels);
 
 	begin_string_construction();
 	for (const char *c = asm_statement->asm_text->begin; *c != '\0';) {
