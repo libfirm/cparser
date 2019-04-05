@@ -4652,9 +4652,9 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
-	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins,
+	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins, asm_text,
 	                               n_constraints, constraints,
-	                               n_clobbers, clobbers, asm_text);
+	                               n_clobbers, clobbers);
 
 	if (statement->is_volatile) {
 		set_irn_pinned(node, op_pin_state_pinned);
