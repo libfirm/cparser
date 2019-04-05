@@ -4649,18 +4649,16 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	size_t const n_ins         = ARR_LEN(ins);
 	size_t const n_constraints = ARR_LEN(constraints);
 
+	ir_cons_flags flags = cons_none;
+	if (!statement->is_volatile)
+		flags |= cons_floats;
+
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
 	ident    *asm_text = new_id_from_str(statement->normalized_text->begin);
 	ir_node  *node     = new_d_ASM(dbgi, mem, n_ins, ins, asm_text,
 	                               n_constraints, constraints,
-	                               n_clobbers, clobbers);
-
-	if (statement->is_volatile) {
-		set_irn_pinned(node, op_pin_state_pinned);
-	} else {
-		set_irn_pinned(node, op_pin_state_floats);
-	}
+	                               n_clobbers, clobbers, flags);
 
 	/* create output projs & connect them */
 	if (needs_memory) {
