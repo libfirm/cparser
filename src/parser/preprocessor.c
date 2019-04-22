@@ -278,10 +278,8 @@ static void switch_input(input_t *const decoder, char const *const input_name,
 
 void switch_pp_input(FILE *const stream, char const *const input_name, searchpath_entry_t *const path, bool const is_system_header)
 {
-	input_t *const input = input_from_stream(stream, input_decoder);
-	begin_string_construction();
-	obstack_grow(&string_obst, input_name, strlen(input_name));
-	const string_t *string = finish_string_construction(STRING_ENCODING_CHAR);
+	input_t        *const input  = input_from_stream(stream, input_decoder);
+	string_t const *const string = make_string(input_name);
 	switch_input(input, string->begin, path, is_system_header);
 }
 

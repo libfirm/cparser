@@ -35,6 +35,7 @@
 #include "jump_target.h"
 #include "mangle.h"
 #include "parser/parser.h"
+#include "parser/preprocessor.h"
 
 typedef struct complex_value {
 	ir_node *real;
@@ -2154,9 +2155,7 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 
 static ir_node *make_name(funcname_expression_t const *const expr, char const *const name)
 {
-	begin_string_construction();
-	obstack_grow(&string_obst, name, strlen(name));
-	string_t *const string = finish_string_construction(STRING_ENCODING_CHAR);
+	string_t *const string = make_string(name);
 	return string_to_firm(&expr->base.pos, string);
 }
 
