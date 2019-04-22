@@ -4619,7 +4619,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			ARR_APP1(out_info, outs, ((out_info){ expr, addr, NULL }));
 		} else {
 			/* the only case where an argument doesn't "write" is when it is
-			 * a memor operand (so we really write to the pointed memory instead
+			 * a memory operand (so we really write to the pointed memory instead
 			 * of the operand itself). So for the firm ASM node the operand
 			 * (or rather its address) becomes an input. */
 			assert(argument->indirect_write);

@@ -895,7 +895,7 @@ static void print_case_label(const case_label_statement_t *statement)
 
 /**
  * returns true if the entity is a compiler generated one and has no real
- * correspondenc in the source file
+ * correspondence in the source file
  */
 static bool is_generated_entity(const entity_t *entity)
 {

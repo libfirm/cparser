@@ -1129,7 +1129,7 @@ static string_t *concat_string_literals(void)
 	string_t *result;
 	if (peek_ahead(T_STRING_LITERAL)) {
 		/* construct new string on ast_obstack, as string_obstack may be used
-		 * simulatneously be the preprocessor */
+		 * simultaneously by the preprocessor */
 		begin_string_construction_on(&ast_obstack);
 		append_string(token.literal.string);
 		eat(T_STRING_LITERAL);
