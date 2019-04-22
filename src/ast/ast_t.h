@@ -634,6 +634,7 @@ struct translation_unit_t {
  */
 static inline void *allocate_ast_zero(size_t size)
 {
+	assert(obstack_object_size(&ast_obstack) == 0);
 	return memset(obstack_alloc(&ast_obstack, size), 0, size);
 }
 
