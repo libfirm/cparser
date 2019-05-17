@@ -2,6 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include "driver/enable_posix.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
