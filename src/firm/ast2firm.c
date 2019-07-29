@@ -3409,40 +3409,51 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 		if (designator->symbol != NULL) {
 			assert(is_type_compound(type));
-			size_t    index_int = 0;
-			symbol_t *symbol    = designator->symbol;
-
+			symbol_t   *symbol   = designator->symbol;
 			compound_t *compound = type->compound.compound;
-			entity_t   *iter     = compound->members.first_entity;
-			for (; iter->base.symbol != symbol; iter = iter->base.next,
-				 ++index_int) {}
-			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
-			/* revert previous initialisations of other union elements */
-			if (type->kind == TYPE_COMPOUND_UNION) {
-				ir_initializer_t *initializer = top->initializer;
-				if (initializer != NULL
-				    && get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
-					/* are we writing to a new element? */
-					ir_initializer_t *oldi
-						= get_initializer_compound_value(initializer, index_int);
-					if (get_initializer_kind(oldi) == IR_INITIALIZER_NULL) {
-						/* clear initializer */
-						size_t len
-							= get_initializer_compound_n_entries(initializer);
-						ir_initializer_t *nulli = get_initializer_null();
-						for (size_t i = 0; i < len; ++i) {
-							set_initializer_compound_value(initializer, i,
-							                               nulli);
+			for (;;) {
+				entity_t *member = find_compound_entry(compound, symbol);
+				assert(member->kind == ENTITY_COMPOUND_MEMBER);
+
+				ir_entity *irent = member->compound_member.entity;
+				ir_type *parent = get_entity_owner(irent);
+				size_t index_int = get_compound_member_index(parent, irent);
+
+				/* revert previous initialisations of other union elements */
+				if (type->kind == TYPE_COMPOUND_UNION) {
+					ir_initializer_t *initializer = top->initializer;
+					if (initializer != NULL
+					    && get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
+						/* are we writing to a new element? */
+						ir_initializer_t *oldi
+							= get_initializer_compound_value(initializer, index_int);
+						if (get_initializer_kind(oldi) == IR_INITIALIZER_NULL) {
+							/* clear initializer */
+							size_t len
+								= get_initializer_compound_n_entries(initializer);
+							ir_initializer_t *nulli = get_initializer_null();
+							for (size_t i = 0; i < len; ++i) {
+								set_initializer_compound_value(initializer, i,
+											       nulli);
+							}
 						}
 					}
 				}
-			}
 
-			top->type           = orig_type;
-			top->compound_entry = iter;
-			top->index          = index_int;
-			orig_type           = iter->declaration.type;
+				top->type           = orig_type;
+				top->compound_entry = member;
+				top->index          = index_int;
+				orig_type           = member->declaration.type;
+
+				if (member->base.symbol) {
+					break;
+				}
+
+				descend_into_subtype(path, &designator->pos);
+				top = get_type_path_top(path);
+				compound = skip_typeref(orig_type)->compound.compound;
+			}
 		} else {
 			expression_t *array_index = designator->array_index;
 			assert(is_type_array(type));
