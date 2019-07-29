@@ -1723,6 +1723,29 @@ static void ascend_to(type_path_t *path, size_t top_path_level)
 	}
 }
 
+static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
+{
+	for (entity_t *iter = compound->members.first_entity; iter != NULL;
+	     iter = iter->base.next) {
+		if (iter->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		if (iter->base.symbol == symbol) {
+			return iter;
+		} else if (iter->base.symbol == NULL) {
+			/* search in anonymous structs and unions */
+			type_t *type = skip_typeref(iter->declaration.type);
+			if (is_type_compound(type)
+			 && find_compound_entry(type->compound.compound, symbol) != NULL)
+				return iter;
+
+			continue;
+		}
+	}
+
+	return NULL;
+}
+
 static bool walk_designator(type_path_t *path, const designator_t *designator,
                             bool used_in_offsetof)
 {
@@ -1747,18 +1770,32 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				orig_type             = type_error_type;
 			} else {
 				compound_t *compound = type->compound.compound;
-				entity_t   *iter     = compound->members.first_entity;
-				for (; iter != NULL; iter = iter->base.next) {
-					if (iter->base.symbol == symbol)
+
+				entity_t *member;
+				for (;;) {
+					member = find_compound_entry(compound, symbol);
+					if (!member) {
+						errorf(&designator->pos,
+						       "'%T' has no member named '%Y'", orig_type, symbol);
+						return false;
+					}
+					assert(member->kind == ENTITY_COMPOUND_MEMBER);
+
+					if (member->base.symbol) {
 						break;
+					}
+
+					top->type             = orig_type;
+					top->v.compound_entry = &member->declaration;
+					orig_type             = member->declaration.type;
+					descend_into_subtype(path);
+					top = get_type_path_top(path);
+					compound = skip_typeref(orig_type)->compound.compound;
 				}
-				if (iter == NULL) {
-					errorf(&designator->pos,
-					       "'%T' has no member named '%Y'", orig_type, symbol);
-					return false;
-				}
-				assert(iter->kind == ENTITY_COMPOUND_MEMBER);
-				if (used_in_offsetof && iter->compound_member.bitfield) {
+				assert(member->base.symbol == symbol);
+				assert(member->kind == ENTITY_COMPOUND_MEMBER);
+
+				if (used_in_offsetof && member->compound_member.bitfield) {
 					errorf(&designator->pos,
 					       "offsetof designator '%Y' must not specify bitfield",
 					       symbol);
@@ -1766,8 +1803,8 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				}
 
 				top->type             = orig_type;
-				top->v.compound_entry = &iter->declaration;
-				orig_type             = iter->declaration.type;
+				top->v.compound_entry = &member->declaration;
+				orig_type             = member->declaration.type;
 			}
 		} else {
 			expression_t *array_index = designator->array_index;
@@ -5342,29 +5379,6 @@ static void parse_external_declaration(void)
 	label_pop_to(label_stack_top);
 
 	POP_SCOPE();
-}
-
-static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
-{
-	for (entity_t *iter = compound->members.first_entity; iter != NULL;
-	     iter = iter->base.next) {
-		if (iter->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		if (iter->base.symbol == symbol) {
-			return iter;
-		} else if (iter->base.symbol == NULL) {
-			/* search in anonymous structs and unions */
-			type_t *type = skip_typeref(iter->declaration.type);
-			if (is_type_compound(type)
-			 && find_compound_entry(type->compound.compound, symbol) != NULL)
-				return iter;
-
-			continue;
-		}
-	}
-
-	return NULL;
 }
 
 static void check_deprecated(const position_t *pos, const entity_t *entity)
