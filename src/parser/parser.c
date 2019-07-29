@@ -5423,32 +5423,21 @@ static expression_t *find_create_select(const position_t *pos,
                                         type_qualifiers_t qualifiers,
                                         compound_t *compound, symbol_t *symbol)
 {
-	for (entity_t *iter = compound->members.first_entity; iter != NULL;
-	     iter = iter->base.next) {
-		if (iter->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
+	expression_t *select = addr;
 
-		symbol_t *iter_symbol = iter->base.symbol;
-		if (iter_symbol == NULL) {
-			type_t *type = skip_typeref(iter->declaration.type);
-			if (!is_type_compound(type))
-				continue;
-
-			compound_t *sub_compound = type->compound.compound;
-			if (find_compound_entry(sub_compound, symbol) == NULL)
-				continue;
-
-			expression_t *sub_addr = create_select(pos, addr, qualifiers, iter);
-			sub_addr->base.implicit = true;
-			return find_create_select(pos, sub_addr, qualifiers, sub_compound,
-			                          symbol);
+	for (;;) {
+		entity_t *member = find_compound_entry(compound, symbol);
+		if (!member) {
+			return NULL;
 		}
-
-		if (iter_symbol == symbol)
-			return create_select(pos, addr, qualifiers, iter);
+		assert(member->kind == ENTITY_COMPOUND_MEMBER);
+		select = create_select(pos, select, qualifiers, member);
+		type_t *member_type = skip_typeref(member->declaration.type);
+		if (!is_type_compound(member_type) || member->base.symbol) {
+			return select;
+		}
+		compound = member_type->compound.compound;
 	}
-
-	return NULL;
 }
 
 static void parse_bitfield_member(entity_t *entity)
