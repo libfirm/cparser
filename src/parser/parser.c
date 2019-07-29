@@ -1723,29 +1723,6 @@ static void ascend_to(type_path_t *path, size_t top_path_level)
 	}
 }
 
-static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
-{
-	for (entity_t *iter = compound->members.first_entity; iter != NULL;
-	     iter = iter->base.next) {
-		if (iter->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		if (iter->base.symbol == symbol) {
-			return iter;
-		} else if (iter->base.symbol == NULL) {
-			/* search in anonymous structs and unions */
-			type_t *type = skip_typeref(iter->declaration.type);
-			if (is_type_compound(type)
-			 && find_compound_entry(type->compound.compound, symbol) != NULL)
-				return iter;
-
-			continue;
-		}
-	}
-
-	return NULL;
-}
-
 static bool walk_designator(type_path_t *path, const designator_t *designator,
                             bool used_in_offsetof)
 {
