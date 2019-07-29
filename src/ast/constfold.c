@@ -409,13 +409,20 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			symbol_t *symbol = designator->symbol;
 
 			compound_t *compound = type->compound.compound;
-			entity_t   *iter     = compound->members.first_entity;
-			for (; iter->base.symbol != symbol; iter = iter->base.next) {}
 
-			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
-			offset += iter->compound_member.offset;
+			for (;;) {
+				entity_t *member = find_compound_entry(compound, symbol);
+				assert(member->kind = ENTITY_COMPOUND_MEMBER);
+				offset += member->compound_member.offset;
 
-			orig_type = iter->declaration.type;
+				orig_type = member->declaration.type;
+
+				if (member->base.symbol) {
+					break;
+				}
+
+				compound = skip_typeref(orig_type)->compound.compound;
+			}
 		} else {
 			expression_t *array_index = designator->array_index;
 			assert(designator->array_index != NULL);
