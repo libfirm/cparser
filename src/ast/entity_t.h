@@ -298,4 +298,6 @@ elf_visibility_t get_elf_visibility_from_string(const char *string);
 
 entity_t *skip_unnamed_bitfields(entity_t*);
 
+entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol);
+
 #endif

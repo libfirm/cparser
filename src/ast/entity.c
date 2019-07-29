@@ -10,6 +10,7 @@
 #include "adt/strutil.h"
 #include "adt/util.h"
 #include "ast_t.h"
+#include "type_t.h"
 
 const char *get_entity_kind_name(entity_kind_t kind)
 {
@@ -115,4 +116,27 @@ unsigned get_declaration_alignment(const declaration_t *declaration)
 	if (declaration->base.kind == ENTITY_COMPOUND_MEMBER)
 		return get_type_alignment_compound(type);
 	return get_ctype_alignment(type);
+}
+
+entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
+{
+	for (entity_t *iter = compound->members.first_entity; iter != NULL;
+	     iter = iter->base.next) {
+		if (iter->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		if (iter->base.symbol == symbol) {
+			return iter;
+		} else if (iter->base.symbol == NULL) {
+			/* search in anonymous structs and unions */
+			type_t *type = skip_typeref(iter->declaration.type);
+			if (is_type_compound(type)
+			 && find_compound_entry(type->compound.compound, symbol) != NULL)
+				return iter;
+
+			continue;
+		}
+	}
+
+	return NULL;
 }
