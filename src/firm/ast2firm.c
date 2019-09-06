@@ -5134,6 +5134,7 @@ void exit_ast2firm(void)
 		return;
 	exit_mangle();
 	obstack_free(&asm_obst, NULL);
+	ast2firm_initialized = false;
 }
 
 static void global_asm_to_firm(statement_t *s)
@@ -5188,4 +5189,5 @@ void translation_unit_to_firm(translation_unit_t *unit)
 
 	current_ir_graph         = NULL;
 	current_translation_unit = NULL;
+	exit_ast2firm();
 }

@@ -378,8 +378,8 @@ int main(int argc, char **argv)
 	assert(state.action != NULL);
 	int ret = state.action(argv[0]);
 
-	exit_firm_opt();
-	exit_ast2firm();
+	//exit_firm_opt();
+	//exit_ast2firm();
 	exit_parser();
 	exit_ast();
 	exit_preprocessor();

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <libfirm/firm_common.h>
 
 #include "adt/panic.h"
 #include "adt/strutil.h"
@@ -18,6 +19,7 @@
 #include "c_driver.h"
 #include "diagnostic.h"
 #include "timing.h"
+#include "target.h"
 
 const char         *outname;
 bool                produce_statev;
@@ -216,6 +218,12 @@ void set_unit_handler(compilation_unit_type_t type,
 bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 {
 	bool res;
+	if (!is_initialized()) {
+		init_firm_target();
+		init_firm_opt();
+		set_optimization_level(opt_level);
+		target_setup();
+	}
 	for (;;) {
 		compilation_unit_type_t type = unit->type;
 		compilation_unit_handler handler = handlers[type];
@@ -232,6 +240,7 @@ bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 		assert(unit->type != type); /* handler should have changed the type */
 	}
 	print_diagnostic_summary();
+	exit_firm_opt();
 	return res;
 }
 

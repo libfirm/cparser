@@ -757,8 +757,8 @@ bool build_firm_ir(compilation_env_t *env, compilation_unit_t *unit)
 	ir_timer_t *t_construct = ir_timer_new();
 	timer_register(t_construct, "Frontend: Graph construction");
 	timer_start(t_construct);
-	if (already_constructed_firm)
-		panic("compiling multiple files/translation units not yet supported");
+	/*if (already_constructed_firm)
+		panic("compiling multiple files/translation units not yet supported");*/
 	already_constructed_firm = true;
 	init_implicit_optimizations();
 	translation_unit_to_firm(unit->ast);
