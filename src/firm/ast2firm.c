@@ -5160,6 +5160,7 @@ static const char *get_cwd(void)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	printf("translation_unit_to_firm\n");
 	init_ast2firm();
 	if (dialect.cpp) {
 		be_dwarf_set_source_language(DW_LANG_C_plus_plus);

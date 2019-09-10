@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <libfirm/firm_common.h>
+#include <ast/type_hash.h>
 
 #include "adt/panic.h"
 #include "adt/strutil.h"
@@ -219,6 +220,10 @@ bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 {
 	bool res;
 	if (!is_initialized()) {
+		init_typehash();
+	}
+	target_adjust_types_and_dialect();
+	if (!is_initialized()) {
 		init_firm_target();
 		init_firm_opt();
 		set_optimization_level(opt_level);
@@ -239,6 +244,8 @@ bool process_unit(compilation_env_t *env, compilation_unit_t *unit)
 		}
 		assert(unit->type != type); /* handler should have changed the type */
 	}
+	exit_types();
+	exit_typehash();
 	print_diagnostic_summary();
 	exit_firm_opt();
 	return res;

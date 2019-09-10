@@ -2035,7 +2035,7 @@ void init_ast_dialect(void)
 
 void exit_ast(void)
 {
-	exit_types();
-	exit_typehash();
+	//exit_types();
+	//exit_typehash();
 	obstack_free(&ast_obstack, NULL);
 }
