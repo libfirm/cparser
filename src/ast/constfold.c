@@ -412,7 +412,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 
 			for (;;) {
 				entity_t *member = find_compound_entry(compound, symbol);
-				assert(member->kind = ENTITY_COMPOUND_MEMBER);
+				assert(member->kind == ENTITY_COMPOUND_MEMBER);
 				offset += member->compound_member.offset;
 
 				orig_type = member->declaration.type;
