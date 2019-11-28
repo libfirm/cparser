@@ -67,12 +67,16 @@ CPARSERS = $(addsuffix .check, $(cparser_SOURCES) $(libcparser_SOURCES))
 CPARSEROS = $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
 CPARSEROS2 = $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
 
+
+libfirm_lfmalloc_name = liblfmalloc.a
+libfirm_lfmalloc = $(builddir)/$(libfirm_lfmalloc_name)
+
 # This hides the noisy commandline outputs. Show them with "make V=1"
 ifneq ($(V),1)
 Q ?= @
 endif
 
-all: $(cparser_EXE)
+all: $(cparser_EXE) $(libfirm_lfmalloc)
 
 # disable make builtin suffix rules
 .SUFFIXES:
@@ -158,6 +162,14 @@ $(builddir)/%.o: %.c
 	@echo 'CC $@'
 	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(SELFCHECK_FLAGS) $<
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
+
+# lfmalloc runtime
+libfirm_lfmalloc_firm = build/$(variant)/$(libfirm_lfmalloc_name)
+
+.PHONY: $(libfirm_lfmalloc)
+$(libfirm_lfmalloc):
+	$(Q)$(MAKE) -s -C $(FIRM_HOME) $(libfirm_lfmalloc_firm) #TODO Achim: with -s or not?
+	$(Q)cp $(FIRM_HOME)/$(libfirm_lfmalloc_firm) $@ #TODO Achim: Always copy, not sure how to fix
 
 clean:
 	@echo 'CLEAN'

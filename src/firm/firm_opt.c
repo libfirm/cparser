@@ -387,6 +387,7 @@ static opt_config_t opts[] = {
 	IRG("unroll-loops",      do_loop_unrolling2,       "loop unrolling",                                        OPT_FLAG_NONE),
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRG("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
+	IRG("lf-asan",           lowfat_asan,              "lowfat adresssanitizer instrumentation",                OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("local-const",       local_opts_const_code,    "local optimisation of constant initializers",
@@ -491,6 +492,7 @@ static void do_irp_opt(const char *name)
  */
 static void enable_safe_defaults(void)
 {
+	set_opt_enabled("lf-asan", true); /*TODO: switch on based on flag*/
 	set_opt_enabled("remove-unused", true);
 	set_opt_enabled("opt-tail-rec", true);
 	set_opt_enabled("opt-func-call", true);
@@ -569,6 +571,7 @@ static void do_firm_optimizations(void)
 	for (size_t i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
 
+		do_irg_opt(irg, "lf-asan");
 		do_irg_opt(irg, "scalar-replace");
 		do_irg_opt(irg, "invert-loops");
 		do_irg_opt(irg, "unroll-loops");
@@ -689,7 +692,7 @@ static void do_firm_lowering(void)
 	/* hack so we get global initializers constant folded even at -O0 */
 	set_opt_constant_folding(1);
 	set_opt_algebraic_simplification(1);
-	do_irp_opt("local-const");
+	//do_irp_opt("local-const");
 	set_opt_constant_folding(firm_opt.const_folding);
 	set_opt_algebraic_simplification(firm_opt.const_folding);
 	do_irp_opt("remove-unused");
