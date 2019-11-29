@@ -695,6 +695,13 @@ bool options_parse_early_target(options_state_t *s)
 		driver_add_flag(&asflags_obst, full_option);
 		driver_add_flag(&ldflags_obst, full_option);
 		target_size_override = atoi(option+1);
+	} else if (equals_arg("march", s) || equals_arg("mabi", s)) {
+		// relevant for RISC-V: pass -march and -mabi to assembler etc.
+		driver_add_flag(&cppflags_obst, full_option);
+		driver_add_flag(&asflags_obst, full_option);
+		driver_add_flag(&ldflags_obst, full_option);
+		// keep argument for parsing in backend options
+		return false;
 	} else {
 		bool truth_value;
 		const char *fopt;
