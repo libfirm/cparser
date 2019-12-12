@@ -889,6 +889,10 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	driver_add_flag(&file_obst, outname);
 	obstack_printf(&file_obst, "%s", flags);
 
+	/* TODO: Remove. Only temporary for benchmarking */
+	driver_add_flag(&file_obst, "-L/data1/firm/");
+	driver_add_flag(&file_obst, "-llfmalloc");
+
 	char *const commandline = obstack_nul_finish(&file_obst);
 
 	const char *err_without_nopie;
