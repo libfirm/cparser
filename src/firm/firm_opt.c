@@ -35,6 +35,7 @@ struct a_firm_opt {
 	bool     no_alias;        /**< no aliasing possible. */
 	bool     verify;          /**< Firm verifier setting */
 	bool     check_all;       /**< enable checking all Firm phases */
+	bool     pagecache;       /**< enable pagecache optimization */
 	int      clone_threshold; /**< The threshold value for procedure cloning. */
 	unsigned inline_maxsize;  /**< Maximum function size for inlining. */
 	unsigned inline_threshold;/**< Inlining benefice threshold. */
@@ -77,6 +78,7 @@ static struct a_firm_opt firm_opt = {
 	.inline_threshold =  0,
 	.unroll_factor    =  4,
 	.unroll_maxsize   =  64,
+	.pagecache        =  true,
 };
 
 /* dumping options */
@@ -120,6 +122,8 @@ static const struct params {
   { X("clone-threshold=<value>"),NULL,                       0, "set clone threshold to <value>" },
   { X("unroll-max-size=<size>"), NULL,                       0, "set maximum size of loops for loop unrolling" },
   { X("unroll-factor=<size>"),   NULL,                       0, "set unroll factor for loop unrolling" },
+  { X("pagecache"),              &firm_opt.pagecache,        1, "enable pagecache optimization" },
+  { X("no-pagecache"),           &firm_opt.pagecache,        0, "disable pagecache optimization" },
 
   /* other firm regarding options */
   { X("verify-off"),             &firm_opt.verify,           0, "disable node verification" },
@@ -387,6 +391,7 @@ static opt_config_t opts[] = {
 	IRG("unroll-loops",      do_loop_unrolling2,       "loop unrolling",                                        OPT_FLAG_NONE),
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRG("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
+	IRG("pagecache",          do_loop_pagecache,       "enable shm pagecache",                                  OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("local-const",       local_opts_const_code,    "local optimisation of constant initializers",
@@ -537,6 +542,7 @@ static void do_firm_optimizations(void)
 	/* parameter passing code should set them directly sometime... */
 	set_opt_enabled("confirm", firm_opt.confirm);
 	set_opt_enabled("remove-confirms", firm_opt.confirm);
+	set_opt_enabled("pagecache", firm_opt.pagecache);
 
 	/* first remove unused functions, to avoid spending unnecessary time
 	 * optimizing them */
@@ -585,6 +591,7 @@ static void do_firm_optimizations(void)
 			 */
 			do_irg_opt(irg, "control-flow");
 			do_irg_opt(irg, "confirm");
+			do_irg_opt(irg, "pagecache");
 			do_irg_opt(irg, "vrp");
 			do_irg_opt(irg, "local");
 		}
