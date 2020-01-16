@@ -387,7 +387,7 @@ static opt_config_t opts[] = {
 	IRG("unroll-loops",      do_loop_unrolling2,       "loop unrolling",                                        OPT_FLAG_NONE),
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRG("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
-	IRG("lf-asan",           lowfat_asan,              "lowfat adresssanitizer instrumentation",                OPT_FLAG_NONE),
+	IRG("lf-asan",           lowfat_asan,              "lowfat adresssanitizer instrumentation",                OPT_FLAG_ESSENTIAL),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("local-const",       local_opts_const_code,    "local optimisation of constant initializers",

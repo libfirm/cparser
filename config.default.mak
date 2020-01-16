@@ -5,9 +5,9 @@ ifneq ("$(wildcard $(top_srcdir)/libfirm)", "")
 FIRM_HOME     ?= $(top_srcdir)/libfirm
 FIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include -I$(FIRM_HOME)/build/gen/include/libfirm
 FIRM_LIBS     ?= -lm
-LIBFIRM_FILE_BASE ?= build/$(variant)/libfirm.a
+LIBFIRM_FILE_BASE ?= $(top_builddir)/$(variant)/libfirm.a
 LIBFIRM_FILE  ?= $(FIRM_HOME)/$(LIBFIRM_FILE_BASE)
-LIBFIRM_FILE_DLL_BASE ?= build/$(variant)/libfirm$(DLLEXT)
+LIBFIRM_FILE_DLL_BASE ?= $(top_builddir)/$(variant)/libfirm$(DLLEXT)
 LIBFIRM_FILE_DLL ?= $(FIRM_HOME)/$(LIBFIRM_FILE_DLL_BASE)
 else
 PKG_CONFIG    ?= pkg-config

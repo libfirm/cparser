@@ -891,8 +891,8 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 
 	/* TODO: Remove. Only temporary for benchmarking */
 	//driver_add_flag(&file_obst, "-L/data1/firm/");
-	driver_add_flag(&file_obst, "-L/home/achim/Daten/uni/Bachelorarbeit/cparser/build/optimize/");
-	driver_add_flag(&file_obst, "-llfmalloc");
+	//driver_add_flag(&file_obst, "-L/home/achim/Daten/uni/Bachelorarbeit/cparser/build/optimize/");
+	//driver_add_flag(&file_obst, "-llfmalloc");
 
 	char *const commandline = obstack_nul_finish(&file_obst);
 

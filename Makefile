@@ -122,8 +122,7 @@ $(LIBFIRM_FILE): libfirm_subdir
 Makefile: libfirm_subdir
 # Build libfirm in subdirectory
 libfirm_subdir:
-	$(Q)$(MAKE) -w -C $(FIRM_HOME) $(LIBFIRM_FILE_BASE)
-
+	$(Q)$(MAKE) -w -C $(FIRM_HOME) top_builddir=$(top_builddir) $(LIBFIRM_FILE_BASE)
 $(LIBFIRM_FILE_DLL): libfirm_subdir_dll
 libfirm_subdir_dll:
 	$(Q)$(MAKE) -w -C $(FIRM_HOME) $(LIBFIRM_FILE_DLL_BASE)
@@ -164,12 +163,12 @@ $(builddir)/%.o: %.c
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
 
 # lfmalloc runtime
-libfirm_lfmalloc_firm = build/$(variant)/$(libfirm_lfmalloc_name)
+libfirm_lfmalloc_firm = $(top_builddir)/$(variant)/$(libfirm_lfmalloc_name)
 
 .PHONY: $(libfirm_lfmalloc)
 $(libfirm_lfmalloc):
-	$(Q)$(MAKE) -s -C $(FIRM_HOME) $(libfirm_lfmalloc_firm) #TODO Achim: with -s or not?
-	$(Q)cp $(FIRM_HOME)/$(libfirm_lfmalloc_firm) $@ #TODO Achim: Always copy, not sure how to fix
+	$(Q)$(MAKE) CC=$(CC) builddir=$(top_builddir) -C $(FIRM_HOME) $(libfirm_lfmalloc_firm)
+	$(Q)cp $(FIRM_HOME)/$(libfirm_lfmalloc_firm) $@
 
 clean:
 	@echo 'CLEAN'
