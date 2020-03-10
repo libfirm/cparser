@@ -167,7 +167,7 @@ libfirm_lfmalloc_firm = $(top_builddir)/$(variant)/$(libfirm_lfmalloc_name)
 
 .PHONY: $(libfirm_lfmalloc)
 $(libfirm_lfmalloc):
-	$(Q)$(MAKE) CC=$(CC) builddir=$(top_builddir) -C $(FIRM_HOME) $(libfirm_lfmalloc_firm)
+	$(Q)$(MAKE) CC=$(abspath $(cparser_EXE)) builddir=$(builddir) -C $(FIRM_HOME) $(libfirm_lfmalloc_firm)
 	$(Q)cp $(FIRM_HOME)/$(libfirm_lfmalloc_firm) $@
 
 clean:
