@@ -91,8 +91,9 @@ REVISION ?= $(shell git --git-dir $(top_srcdir)/.git describe --abbrev=40 --alwa
 SELFCHECK_FLAGS ?= -Wall -Wno-shadow -Werror
 
 # Update revision.h if necessary
+HASH := \#
 UNUSED := $(shell \
-	REV="\#define cparser_REVISION \"$(REVISION)\""; \
+	REV="$(HASH)define cparser_REVISION \"$(REVISION)\""; \
 	echo "$$REV" | cmp -s - $(REVISIONH) 2> /dev/null || echo "$$REV" > $(REVISIONH) \
 )
 # determine if we can use "cparser-beta" as quickcheck
