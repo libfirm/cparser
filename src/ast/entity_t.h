@@ -223,6 +223,7 @@ struct function_t {
 	scope_t        parameters;
 	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
+	unsigned       si_opcode;          /**< value from attribute((special_instruction())) */
 	union {
 		symbol_t  *symbol;
 		entity_t  *entity;

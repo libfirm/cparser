@@ -704,6 +704,8 @@ static ir_entity *get_function_entity(function_t *const function)
 
 	handle_decl_modifiers(irentity, (entity_t*)function);
 
+	set_entity_si_opcode(irentity, function->si_opcode);
+
 	if (function->body != NULL && function_is_inline_only(function))
 		add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
 

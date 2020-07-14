@@ -243,6 +243,17 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 	}
 }
 
+static void handle_attribute_special_instruction(const attribute_t *attribute, entity_t *entity)
+{
+	int si_opcode = 0;
+	if (attribute->a.arguments) {
+		attribute_argument_t *argument = attribute->a.arguments;
+		si_opcode = fold_expression_to_int(argument->v.expression);
+	}
+	assert(entity->kind == ENTITY_FUNCTION);
+	entity->function.si_opcode = si_opcode & 0x1F;
+}
+
 static void warn_arguments(const attribute_t *attribute)
 {
 	if (attribute->a.arguments == NULL)
@@ -367,9 +378,6 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 		case ATTRIBUTE_GNU_GNU_INLINE:    modifiers |= DM_GNU_INLINE; break;
 
-		case ATTRIBUTE_ICORE_SPECIAL_INSTRUCTION:
-		                                  modifiers |= DM_SPECIAL_INSTRUCTION; break;
-
 		case ATTRIBUTE_MS_DLLIMPORT:      modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:      modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_MS_NAKED:          modifiers |= DM_NAKED; break;
@@ -389,6 +397,11 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 
 		case ATTRIBUTE_GNU_ASM:
 			handle_attribute_asm(attribute, entity);
+			break;
+
+		case ATTRIBUTE_ICORE_SPECIAL_INSTRUCTION:
+		        modifiers |= DM_SPECIAL_INSTRUCTION;
+			handle_attribute_special_instruction(attribute, entity);
 			break;
 
 		case ATTRIBUTE_GNU_VISIBILITY:
