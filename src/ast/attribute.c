@@ -252,6 +252,8 @@ static void handle_attribute_special_instruction(const attribute_t *attribute, e
 	}
 	assert(entity->kind == ENTITY_FUNCTION);
 	entity->function.si_opcode = si_opcode & 0x1F;
+	extern bool driver_link_si;
+	driver_link_si = true;
 }
 
 static void warn_arguments(const attribute_t *attribute)
