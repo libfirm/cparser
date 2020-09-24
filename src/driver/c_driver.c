@@ -69,7 +69,6 @@ struct obstack  ldflags_obst;
 struct obstack  asflags_obst;
 struct obstack  codegenflags_obst;
 bool            construct_dep_target;
-bool            driver_link_si = false;
 int             driver_use_integrated_preprocessor = -1;
 bool            driver_no_stdinc;
 bool            driver_verbose;
@@ -886,8 +885,6 @@ bool link_program(compilation_env_t *env, compilation_unit_t *units)
 	if (lsysroot)
 		obstack_printf(&file_obst, " --sysroot=%s", lsysroot);
 
-	if(driver_link_si && !strcmp(ir_triple_get_cpu_type(target.machine), "sparc"))
-		driver_add_flag(&file_obst, "si.o");
 	driver_add_flag(&file_obst, "-o");
 	driver_add_flag(&file_obst, outname);
 	obstack_printf(&file_obst, "%s", flags);
